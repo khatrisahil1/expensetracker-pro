@@ -1,0 +1,7 @@
+{
+  "name": "ExpenseTracker Pro",
+  "description": "A comprehensive financial management suite featuring expense tracking, forecasting simulation, impulse control, and bill splitting capabilities.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
