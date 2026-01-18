@@ -20,6 +20,7 @@ const getMonthsSince = (dateStr?: string | null) => {
 };
 
 import React, { useState, useEffect } from 'react';
+import { DotLottieReact } from '@lottiefiles/dotlottie-react';
 import { useStore, Transaction } from '../context/Store';
 
 const SettingsScreen: React.FC = () => {
@@ -372,10 +373,17 @@ const SettingsScreen: React.FC = () => {
           <div className="fixed inset-0 z-[200] bg-black/80 flex items-center justify-center p-6 backdrop-blur-md animate-fade-in" onClick={() => setShowProModal(false)}>
               <div className="bg-surface-light dark:bg-surface-dark border border-indigo-500/30 rounded-[3rem] w-full max-w-sm relative overflow-hidden shadow-2xl animate-slide-up flex flex-col items-center text-center" onClick={e => e.stopPropagation()}>
                   
-                  {/* Confetti / Graphic Placeholder */}
-                  <div className="w-full h-40 bg-gradient-to-br from-indigo-500 to-purple-600 relative flex items-center justify-center">
-                      <div className="absolute inset-0 opacity-20 bg-[url('https://www.transparenttextures.com/patterns/stardust.png')]"></div>
-                      <span className="text-6xl animate-bounce">🎉</span>
+                  {/* 🎉 Lottie Header */}
+                  <div className="relative w-full h-40 overflow-hidden">
+                    {/* Gradient background */}
+                    <div className="absolute inset-0 bg-gradient-to-br from-indigo-500 to-purple-600 z-0" />
+                    {/* 🎉 Confetti Lottie */}
+                    <DotLottieReact
+                      src="https://lottie.host/548611e1-3f2c-47f1-bd7b-7f1261f6ab4d/Vg9bT4b9gq.lottie"
+                      autoplay
+                      loop={true}
+                      className="absolute inset-0 w-full h-full z-10 pointer-events-none"
+                    />
                   </div>
 
                   <div className="p-8 flex flex-col gap-4">
@@ -687,7 +695,7 @@ const SettingsScreen: React.FC = () => {
 
                       {/* Password Reset Section */}
                       <section className="bg-gray-50 dark:bg-surface-darker rounded-3xl p-8 border border-border-light dark:border-border-dark/30 flex flex-col items-center text-center">
-                          <h3 className="text-xs font-black uppercase tracking-[0.2em] text-text-light-main mb-8 w-full text-left">Password</h3>
+                          <h3 className="text-xs font-black uppercase tracking-[0.2em] text-light-main mb-8 w-full text-left">Password</h3>
                           <div className="flex flex-col gap-6 w-full">
                               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                   <div className="flex flex-col gap-2 text-left">
