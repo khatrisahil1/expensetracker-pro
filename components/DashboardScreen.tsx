@@ -72,10 +72,10 @@ export const StreakVisual: React.FC<{ count: number }> = ({ count }) => {
   const lottieMap: Record<StreakTier, string> = {
     single: "https://lottie.host/bd4943b7-a504-4f64-a6ae-72ce6a96dfa2/7v4kl3Ndl7.lottie",
     stack:  "https://lottie.host/a9c83fe1-5340-40ae-8b8c-f1ad8312aa63/8fEsa8IE7w.lottie",
-    bag:    "https://lottie.host/bd4943b7-a504-4f64-a6ae-72ce6a96dfa2/7v4kl3Ndl7.lottie",
-    reward: "https://lottie.host/bd4943b7-a504-4f64-a6ae-72ce6a96dfa2/7v4kl3Ndl7.lottie",
-    vault:  "https://lottie.host/bd4943b7-a504-4f64-a6ae-72ce6a96dfa2/7v4kl3Ndl7.lottie",
-    legend: "https://lottie.host/bd4943b7-a504-4f64-a6ae-72ce6a96dfa2/7v4kl3Ndl7.lottie",
+    bag:    "https://lottie.host/78d6f6bf-836d-4e79-98b1-15297e5431b4/pWjfsPi4dq.lottie",
+    reward: "https://lottie.host/08d2cad2-35de-4cf4-94b3-7e20923a3ca6/5hOQzGfL1Z.lottie",
+    vault:  "https://lottie.host/dacd1761-1fdb-4c67-a1d7-dce9f7098a68/fauCFJWZYw.lottie",
+    legend: "hhttps://lottie.host/5f2a8771-51dc-426b-a826-e4fc0a30f75f/kvcqD0l4xL.lottie",
   };
 
   return (
