@@ -1,26 +1,5 @@
-// Format a date string as "Jan 2025"
-const formatMonthYear = (dateStr?: string | null) => {
-  if (!dateStr) return '—';
-  const date = new Date(dateStr);
-  return date.toLocaleDateString('en-US', {
-    month: 'short',
-    year: 'numeric',
-  });
-};
-
-// Get the number of months since a date string (rounded down)
-const getMonthsSince = (dateStr?: string | null) => {
-  if (!dateStr) return 0;
-  const start = new Date(dateStr);
-  const now = new Date();
-  let months =
-    (now.getFullYear() - start.getFullYear()) * 12 +
-    (now.getMonth() - start.getMonth());
-  return months < 0 ? 0 : months;
-};
 
 import React, { useState, useEffect } from 'react';
-import { DotLottieReact } from '@lottiefiles/dotlottie-react';
 import { useStore, Transaction } from '../context/Store';
 
 const SettingsScreen: React.FC = () => {
@@ -373,17 +352,10 @@ const SettingsScreen: React.FC = () => {
           <div className="fixed inset-0 z-[200] bg-black/80 flex items-center justify-center p-6 backdrop-blur-md animate-fade-in" onClick={() => setShowProModal(false)}>
               <div className="bg-surface-light dark:bg-surface-dark border border-indigo-500/30 rounded-[3rem] w-full max-w-sm relative overflow-hidden shadow-2xl animate-slide-up flex flex-col items-center text-center" onClick={e => e.stopPropagation()}>
                   
-                  {/* 🎉 Lottie Header */}
-                  <div className="relative w-full h-40 overflow-hidden">
-                    {/* Gradient background */}
-                    <div className="absolute inset-0 bg-gradient-to-br from-indigo-500 to-purple-600 z-0" />
-                    {/* 🎉 Confetti Lottie */}
-                    <DotLottieReact
-                      src="https://lottie.host/548611e1-3f2c-47f1-bd7b-7f1261f6ab4d/Vg9bT4b9gq.lottie"
-                      autoplay
-                      loop={true}
-                      className="absolute inset-0 w-full h-full z-10 pointer-events-none"
-                    />
+                  {/* Confetti / Graphic Placeholder */}
+                  <div className="w-full h-40 bg-gradient-to-br from-indigo-500 to-purple-600 relative flex items-center justify-center">
+                      <div className="absolute inset-0 opacity-20 bg-[url('https://www.transparenttextures.com/patterns/stardust.png')]"></div>
+                      <span className="text-6xl animate-bounce">🎉</span>
                   </div>
 
                   <div className="p-8 flex flex-col gap-4">
@@ -552,14 +524,14 @@ const SettingsScreen: React.FC = () => {
                       <section>
                           <div className="flex justify-between items-center mb-8 border-b border-border-light dark:border-border-dark pb-3">
                             <h3 className="text-sm font-black uppercase tracking-[0.2em] text-primary">Category Sync</h3>
-                            <button onClick={handleListSave} className="text-[10px] font-black uppercase tracking-widest bg-primary/10 text-primary px-4 py-2 rounded-full border border-primary/20 hover:bg-primary hover:text-black transition-all shadow-glow">Apply</button>
+                            <button onClick={handleListSave} className="text-[10px] font-black uppercase tracking-widest bg-primary/10 text-primary px-4 py-2 rounded-full border border-primary/20 hover:bg-primary hover:text-black transition-all shadow-glow">Apply Lists</button>
                           </div>
                           
                           <div className="space-y-10">
                               {([
                                 { key: 'exp', label: 'Expense Categories', list: expenseCategories },
                                 { key: 'inc', label: 'Income Sources', list: incomeCategories },
-                                { key: 'pay', label: 'Payment Methods', list: paymentMethods }
+                                { key: 'pay', label: 'Settlement Channels', list: paymentMethods }
                               ] as const).map(item => (
                                 <div key={item.key} className="flex flex-col gap-4">
                                     <label className="text-xs font-black uppercase tracking-widest text-text-light-muted opacity-60">{item.label}</label>
@@ -604,39 +576,17 @@ const SettingsScreen: React.FC = () => {
                                       </div>
                                       <h2 className="text-3xl font-black uppercase tracking-tight">Pro Membership</h2>
                                   </div>
-                                  <span className="bg-white/20 px-3 py-1 rounded-lg text-xs font-bold">₹99/month</span>
+                                  <span className="bg-white/20 px-3 py-1 rounded-lg text-xs font-bold">$9.99/mo</span>
                               </div>
-                              <div className="flex gap-6 mt-2">
-                                <div className="flex flex-col">
-                                  <span className="text-[10px] uppercase font-bold text-indigo-200">
-                                    Member Since
-                                  </span>
-                                  <span className="font-bold">
-                                    {formatMonthYear(user?.metadata?.creationTime)}
-                                  </span>
-                                </div>
-                                <div className="flex flex-col">
-                                  <span className="text-[10px] uppercase font-bold text-indigo-200">
-                                    Membership
-                                  </span>
-
-                                  <span className="font-bold flex items-center gap-2">
-                                    {(() => {
-                                      const months = getMonthsSince(user?.metadata?.creationTime);
-                                      if (months === 0) return 'New Member';
-                                      if (months < 12) return `${months} months`;
-                                      const years = Math.floor(months / 12);
-                                      return `${years} year${years > 1 ? 's' : ''}`;
-                                    })()}
-
-                                    {getMonthsSince(user?.metadata?.creationTime) >= 12 && (
-                                      <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-widest
-                                        bg-yellow-400/20 text-yellow-200 border border-yellow-400/30">
-                                        Loyal
-                                      </span>
-                                    )}
-                                  </span>
-                                </div>
+                              <div className="flex gap-4 mt-2">
+                                  <div className="flex flex-col">
+                                      <span className="text-[10px] uppercase font-bold text-indigo-200">Member Since</span>
+                                      <span className="font-bold">Jan 2024</span>
+                                  </div>
+                                  <div className="flex flex-col">
+                                      <span className="text-[10px] uppercase font-bold text-indigo-200">Next Billing</span>
+                                      <span className="font-bold">Free Forever</span>
+                                  </div>
                               </div>
                               <button onClick={() => setShowProModal(true)} className="mt-4 bg-white text-indigo-600 w-fit px-6 py-2 rounded-full font-black text-xs uppercase tracking-widest hover:bg-indigo-50 transition-colors shadow-md">
                                   Manage Subscription
@@ -695,7 +645,7 @@ const SettingsScreen: React.FC = () => {
 
                       {/* Password Reset Section */}
                       <section className="bg-gray-50 dark:bg-surface-darker rounded-3xl p-8 border border-border-light dark:border-border-dark/30 flex flex-col items-center text-center">
-                          <h3 className="text-xs font-black uppercase tracking-[0.2em] text-light-main mb-8 w-full text-left">Password</h3>
+                          <h3 className="text-xs font-black uppercase tracking-[0.2em] text-text-light-main mb-8 w-full text-left">Password</h3>
                           <div className="flex flex-col gap-6 w-full">
                               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                   <div className="flex flex-col gap-2 text-left">
@@ -820,7 +770,7 @@ const SettingsScreen: React.FC = () => {
                                       <span className="material-symbols-outlined">verified_user</span>
                                   </div>
                                   <div>
-                                      <p className="font-black text-text-light-main dark:text-white uppercase tracking-tight">Email Verification</p>
+                                      <p className="font-black text-text-light-main dark:text-white uppercase tracking-tight">Email MFA Bridge</p>
                                       <p className="text-xs text-text-light-muted">Verify email for enhanced security</p>
                                   </div>
                               </div>
@@ -919,41 +869,24 @@ const SettingsScreen: React.FC = () => {
                       </div>
 
                       {/* Socials & Links */}
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                      {/* Twitter / X */}
-                      <a href="#" className="flex flex-col items-center justify-center gap-2 p-6 rounded-3xl bg-gray-50 dark:bg-surface-darker border border-border-light dark:border-border-dark hover:bg-gray-100 dark:hover:bg-border-dark transition-all group">
-                        <svg viewBox="0 0 24 24" className="w-7 h-7 fill-gray-400 group-hover:fill-[#1DA1F2] transition-colors">
-                          <path d="M23.954 4.569c-.885.392-1.83.656-2.825.775 1.014-.608 1.794-1.574 2.163-2.724-.949.564-2.005.974-3.127 1.195-.897-.957-2.178-1.555-3.594-1.555-2.723 0-4.928 2.205-4.928 4.93 0 .39.045.765.127 1.124-4.094-.205-7.725-2.165-10.148-5.144-.424.722-.666 1.561-.666 2.475 0 1.708.87 3.213 2.188 4.096-.807-.026-1.566-.248-2.228-.616v.061c0 2.385 1.693 4.374 3.946 4.827-.413.111-.849.171-1.296.171-.314 0-.615-.03-.916-.086.631 1.953 2.445 3.377 4.6 3.419-1.68 1.319-3.809 2.105-6.102 2.105-.39 0-.779-.023-1.17-.067 2.189 1.394 4.768 2.209 7.557 2.209 9.054 0 14-7.496 14-13.986 0-.21 0-.423-.016-.637.961-.689 1.8-1.56 2.46-2.548z"/>
-                        </svg>
-                        <span className="text-[10px] font-black uppercase tracking-widest">Twitter</span>
-                      </a>
-
-                      {/* Instagram */}
-                      <a href="#" className="flex flex-col items-center justify-center gap-2 p-6 rounded-3xl bg-gray-50 dark:bg-surface-darker border border-border-light dark:border-border-dark hover:bg-gray-100 dark:hover:bg-border-dark transition-all group">
-                        <svg viewBox="0 0 24 24" className="w-7 h-7 fill-gray-400 group-hover:fill-[#E1306C] transition-colors">
-                          <path d="M7.75 2h8.5C19.44 2 22 4.56 22 7.75v8.5C22 19.44 19.44 22 16.25 22h-8.5C4.56 22 2 19.44 2 16.25v-8.5C2 4.56 4.56 2 7.75 2zm0 1.5C5.46 3.5 3.5 5.46 3.5 7.75v8.5c0 2.29 1.96 4.25 4.25 4.25h8.5c2.29 0 4.25-1.96 4.25-4.25v-8.5c0-2.29-1.96-4.25-4.25-4.25h-8.5z"/>
-                          <path d="M12 7.25A4.75 4.75 0 1 0 12 16.75 4.75 4.75 0 0 0 12 7.25zm0 1.5A3.25 3.25 0 1 1 12 15.25 3.25 3.25 0 0 1 12 8.75z"/>
-                          <circle cx="17.25" cy="6.75" r="1"/>
-                        </svg>
-                        <span className="text-[10px] font-black uppercase tracking-widest">Instagram</span>
-                      </a>
-
-                      {/* GitHub */}
-                      <a href="#" className="flex flex-col items-center justify-center gap-2 p-6 rounded-3xl bg-gray-50 dark:bg-surface-darker border border-border-light dark:border-border-dark hover:bg-gray-100 dark:hover:bg-border-dark transition-all group">
-                        <svg viewBox="0 0 24 24" className="w-7 h-7 fill-gray-400 group-hover:fill-white transition-colors">
-                          <path d="M12 .5C5.65.5.5 5.65.5 12c0 5.08 3.29 9.39 7.86 10.91.58.11.79-.25.79-.56v-2c-3.2.69-3.87-1.38-3.87-1.38-.53-1.35-1.29-1.71-1.29-1.71-1.05-.72.08-.71.08-.71 1.16.08 1.77 1.19 1.77 1.19 1.03 1.76 2.7 1.25 3.36.96.1-.75.4-1.25.73-1.54-2.56-.29-5.26-1.28-5.26-5.69 0-1.26.45-2.29 1.19-3.09-.12-.29-.52-1.46.11-3.05 0 0 .97-.31 3.18 1.18.92-.26 1.91-.39 2.89-.39.98 0 1.97.13 2.89.39 2.2-1.49 3.17-1.18 3.17-1.18.64 1.59.24 2.76.12 3.05.74.8 1.18 1.83 1.18 3.09 0 4.42-2.71 5.39-5.29 5.68.41.36.78 1.08.78 2.18v3.23c0 .31.21.68.8.56C20.21 21.39 23.5 17.08 23.5 12 23.5 5.65 18.35.5 12 .5z"/>
-                        </svg>
-                        <span className="text-[10px] font-black uppercase tracking-widest">GitHub</span>
-                      </a>
-
-                      {/* Contact */}
-                      <a href="#" className="flex flex-col items-center justify-center gap-2 p-6 rounded-3xl bg-gray-50 dark:bg-surface-darker border border-border-light dark:border-border-dark hover:bg-gray-100 dark:hover:bg-border-dark transition-all group">
-                        <svg viewBox="0 0 24 24" className="w-7 h-7 fill-gray-400 group-hover:fill-[#2ECC71] transition-colors">
-                          <path d="M2 4a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V4zm2 .5v.511l8 5.333 8-5.333V4.5H4zm16 3.489-8 5.333-8-5.333V19.5h16V7.989z"/>
-                        </svg>
-                        <span className="text-[10px] font-black uppercase tracking-widest">Contact</span>
-                      </a>
-                    </div>
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                          <a href="#" className="flex flex-col items-center justify-center gap-2 p-6 rounded-3xl bg-gray-50 dark:bg-surface-darker border border-border-light dark:border-border-dark hover:bg-gray-100 dark:hover:bg-border-dark transition-all group">
+                              <span className="material-symbols-outlined text-3xl text-gray-400 group-hover:text-[#1DA1F2]">public</span>
+                              <span className="text-[10px] font-black uppercase tracking-widest">Twitter</span>
+                          </a>
+                          <a href="#" className="flex flex-col items-center justify-center gap-2 p-6 rounded-3xl bg-gray-50 dark:bg-surface-darker border border-border-light dark:border-border-dark hover:bg-gray-100 dark:hover:bg-border-dark transition-all group">
+                              <span className="material-symbols-outlined text-3xl text-gray-400 group-hover:text-[#E1306C]">photo_camera</span>
+                              <span className="text-[10px] font-black uppercase tracking-widest">Instagram</span>
+                          </a>
+                          <a href="#" className="flex flex-col items-center justify-center gap-2 p-6 rounded-3xl bg-gray-50 dark:bg-surface-darker border border-border-light dark:border-border-dark hover:bg-gray-100 dark:hover:bg-border-dark transition-all group">
+                              <span className="material-symbols-outlined text-3xl text-gray-400 group-hover:text-white">code</span>
+                              <span className="text-[10px] font-black uppercase tracking-widest">GitHub</span>
+                          </a>
+                          <a href="#" className="flex flex-col items-center justify-center gap-2 p-6 rounded-3xl bg-gray-50 dark:bg-surface-darker border border-border-light dark:border-border-dark hover:bg-gray-100 dark:hover:bg-border-dark transition-all group">
+                              <span className="material-symbols-outlined text-3xl text-gray-400 group-hover:text-primary">mail</span>
+                              <span className="text-[10px] font-black uppercase tracking-widest">Contact</span>
+                          </a>
+                      </div>
 
                       {/* FAQ Accordion */}
                       <div className="flex flex-col gap-3">

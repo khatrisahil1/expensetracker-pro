@@ -1,24 +1,10 @@
+
 <!DOCTYPE html>
 <html lang="en" class="dark">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>ExpenseTracker Pro</title>
-    <script type="importmap">
-{
-  "imports": {
-    "react/": "https://esm.sh/react@19.0.0/",
-    "react": "https://esm.sh/react@19.0.0",
-    "react-dom/": "https://esm.sh/react-dom@19.0.0/",
-    "react-dom": "https://esm.sh/react-dom@19.0.0",
-    "@google/genai": "https://esm.sh/@google/genai@^1.34.0",
-    "firebase/app": "https://esm.sh/firebase@10.12.2/app",
-    "firebase/auth": "https://esm.sh/firebase@10.12.2/auth",
-    "firebase/firestore": "https://esm.sh/firebase@10.12.2/firestore",
-    "firebase/": "https://esm.sh/firebase@^12.8.0/"
-  }
-}
-</script>
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -146,10 +132,23 @@
     </style>
     <!-- DotLottie Player for high performance animations -->
     <script src="https://unpkg.com/@dotlottie/player-component@latest/dist/dotlottie-player.mjs" type="module"></script>
-  </head>
+  <script type="importmap">
+{
+  "imports": {
+    "react/": "https://esm.sh/react@19.0.0/",
+    "react": "https://esm.sh/react@19.0.0",
+    "react-dom/": "https://esm.sh/react-dom@19.0.0/",
+    "react-dom": "https://esm.sh/react-dom@19.0.0",
+    "@google/genai": "https://esm.sh/@google/genai@^1.34.0",
+    "firebase/app": "https://esm.sh/firebase@10.12.2/app",
+    "firebase/auth": "https://esm.sh/firebase@10.12.2/auth",
+    "firebase/firestore": "https://esm.sh/firebase@10.12.2/firestore",
+    "firebase/": "https://esm.sh/firebase@^12.8.0/"
+  }
+}
+</script>
+</head>
   <body class="bg-background-light dark:bg-background-dark text-text-light-main dark:text-text-dark-main font-display antialiased overflow-hidden selection:bg-primary selection:text-white transition-colors duration-300">
     <div id="root"></div>
-    <script type="module" src="/index.tsx"></script>
   </body>
 </html>
-¸
