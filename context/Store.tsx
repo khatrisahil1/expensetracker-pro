@@ -173,9 +173,9 @@ export const useStore = () => {
   return context;
 };
 
-const DEFAULT_EXPENSE_CATS = ["Food", "Housing", "Rent", "Transportation", "Shopping", "Entertainment", "Health", "Utilities", "Other"];
+const DEFAULT_EXPENSE_CATS = ["Food", "Rent", "Transportation", "Shopping", "Entertainment", "Health", "Utilities", "Other"];
 const DEFAULT_INCOME_CATS = ["Salary", "Freelance", "Investments", "Gifts", "Refunds", "Rental", "Other"];
-const DEFAULT_PAYMENT_METHODS = ["HDFC Bank Credit Card", "Cash", "UPI", "Savings Account"];
+const DEFAULT_PAYMENT_METHODS = ["Cash", "UPI", "Savings Account"];
 const DEFAULT_ORDER = ['streak', 'balance', 'income', 'expense', 'breakdown', 'recent', 'quickAdd'];
 
 export const StoreProvider = ({ children }: PropsWithChildren) => {
@@ -190,6 +190,19 @@ export const StoreProvider = ({ children }: PropsWithChildren) => {
   
   // App UI State
   const [isDemo, setIsDemo] = useState(false);
+  // Restore Demo Mode on refresh
+  useEffect(() => {
+    if (localStorage.getItem('demo') === '1') {
+      setIsDemo(true);
+      setUser({
+        uid: 'guest',
+        displayName: 'Guest User',
+        email: null,
+        photoURL: null,
+      } as any);
+      setLoading(false);
+    }
+  }, []);
   const [viewingTransaction, setViewingTransaction] = useState<Transaction | null>(null);
   const [widgets, setWidgets] = useState<Record<string, boolean>>({
     streak: true, balance: true, income: true, expense: true, breakdown: true, recent: true, quickAdd: true
@@ -385,7 +398,14 @@ export const StoreProvider = ({ children }: PropsWithChildren) => {
   };
   
   const logout = async () => {
-    if (isDemo) { setIsDemo(false); setUser(null); window.location.reload(); return; }
+    if (isDemo) {
+      localStorage.removeItem('demo');
+      setIsDemo(false);
+      setUser(null);
+      setUserSettings(null);
+      window.location.reload();
+      return;
+    }
     await signOut(auth);
   };
 
@@ -492,11 +512,15 @@ export const StoreProvider = ({ children }: PropsWithChildren) => {
 
   // --- CRUD ---
   const addTransaction = async (tx: Omit<Transaction, 'id' | 'createdAt'>) => {
+    if (isDemo) return;
     if (!user) throw new Error("User not authenticated");
     await addDoc(collection(db, 'transactions'), { ...tx, userId: user.uid, createdAt: Timestamp.now() });
   };
 
-  const deleteTransaction = async (id: string) => { if (user) await deleteDoc(doc(db, 'transactions', id)); };
+  const deleteTransaction = async (id: string) => {
+    if (isDemo) return;
+    if (user) await deleteDoc(doc(db, 'transactions', id));
+  };
   
   const clearAllTransactions = async () => {
       if (!user) return;
@@ -512,17 +536,19 @@ export const StoreProvider = ({ children }: PropsWithChildren) => {
   const restoreTransaction = async (tx: Transaction) => { if (user) { const { id, ...data } = tx; await setDoc(doc(db, 'transactions', id), data); } };
 
   const addImpulseItem = async (item: Omit<ImpulseItem, 'id' | 'userId'>) => {
+    if (isDemo) return;
     if (!user) throw new Error("User not authenticated");
     await addDoc(collection(db, 'impulse_items'), { ...item, userId: user.uid });
   };
 
-  const deleteImpulseItem = async (id: string, resisted: boolean = false) => { 
+  const deleteImpulseItem = async (id: string, resisted: boolean = false) => {
+    if (isDemo) return;
     if (!user || !userSettings) return;
     if (resisted) {
         const item = impulseItems.find(i => i.id === id);
         if (item) await updateUserSettings({ realizedSavings: (userSettings.realizedSavings || 0) + item.price });
     }
-    await deleteDoc(doc(db, 'impulse_items', id)); 
+    await deleteDoc(doc(db, 'impulse_items', id));
   };
 
   // --- AI ---
@@ -571,7 +597,29 @@ export const StoreProvider = ({ children }: PropsWithChildren) => {
       addImpulseItem, deleteImpulseItem, viewingTransaction, setViewingTransaction,
       widgets, toggleWidget, widgetOrder, updateWidgetOrder, completeOnboarding, updateUserSettings, 
       toggleTheme: async () => { const newTheme = userSettings?.theme === 'light' ? 'dark' : 'light'; updateUserSettings({ theme: newTheme }); },
-      enableDemo: () => setIsDemo(true), isDemo,
+      enableDemo: () => {
+        setIsDemo(true);
+        setUser({
+          uid: 'guest',
+          displayName: 'Guest User',
+          email: null,
+          photoURL: null,
+        } as any);
+        setUserSettings({
+          currency: 'INR',
+          displayName: 'Guest User',
+          hasCompletedOnboarding: true,
+          theme: 'dark',
+          paymentMethods: DEFAULT_PAYMENT_METHODS,
+          expenseCategories: DEFAULT_EXPENSE_CATS,
+          incomeCategories: DEFAULT_INCOME_CATS,
+          categoryBudgets: {},
+          savingsGoals: [],
+          realizedSavings: 0,
+        } as UserSettings);
+        setLoading(false);
+        localStorage.setItem('demo', '1');
+      }, isDemo,
       isPinSet: !!appPin, isAppLocked, setAppPin, removeAppPin, unlockApp, lockApp,
       undoState, showUndo: (tx) => { if (undoTimerRef.current) clearTimeout(undoTimerRef.current); setUndoState({ show: true, item: tx }); undoTimerRef.current = setTimeout(() => setUndoState({ show: false, item: null }), 5000); },
       clearUndo: () => { if (undoTimerRef.current) clearTimeout(undoTimerRef.current); setUndoState({ show: false, item: null }); },
