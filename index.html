@@ -1,10 +1,10 @@
-
 <!DOCTYPE html>
 <html lang="en" class="dark">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>ExpenseTracker Pro</title>
+
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -12,13 +12,16 @@
       href="https://fonts.googleapis.com/css2?family=Manrope:wght@200..800&family=Noto+Sans:wght@400;500;700&display=swap"
       rel="stylesheet"
     />
+
     <!-- Material Symbols -->
     <link
       href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap"
       rel="stylesheet"
     />
-    <!-- Tailwind CSS -->
+
+    <!-- Tailwind CDN -->
     <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+
     <script>
       tailwind.config = {
         darkMode: "class",
@@ -33,17 +36,17 @@
               },
               background: {
                 light: "#F9FAFB",
-                dark: "#0E1111", // Neutral dark (almost black)
+                dark: "#0E1111",
               },
               surface: {
                 light: "#FFFFFF",
                 lighter: "#FFFFFF",
-                dark: "#151A1A", // Neutral card surface
-                darker: "#0B0F0F", // Deep sidebar/section surface
+                dark: "#151A1A",
+                darker: "#0B0F0F",
               },
               border: {
                 light: "#E5E7EB",
-                dark: "rgba(255,255,255,0.06)", // Subtle border
+                dark: "rgba(255,255,255,0.06)",
               },
               text: {
                 light: {
@@ -52,7 +55,7 @@
                   subtle: "#9CA3AF",
                 },
                 dark: {
-                  main: "#E5E7EB", // Not pure white for less eye strain
+                  main: "#E5E7EB",
                   muted: "#9CA3AF",
                   subtle: "#6B7280",
                 },
@@ -60,7 +63,7 @@
               success: { DEFAULT: "#22C55E", dark: "#4ADE80" },
               warning: { DEFAULT: "#F59E0B", dark: "#FBBF24" },
               danger: { DEFAULT: "#EF4444", dark: "#F87171" },
-              info: { DEFAULT: "#3B82F6", dark: "#60A5FA" }
+              info: { DEFAULT: "#3B82F6", dark: "#60A5FA" },
             },
             fontFamily: {
               display: ["Manrope", "sans-serif"],
@@ -73,82 +76,87 @@
               "2xl": "3rem",
             },
             boxShadow: {
-              card: "0 12px 30px rgba(0,0,0,0.3)", // Deep shadow for cards
-              "card-light": "0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03)",
+              card: "0 12px 30px rgba(0,0,0,0.3)",
+              "card-light":
+                "0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -1px rgba(0,0,0,0.03)",
               soft: "0 8px 20px rgba(0,0,0,0.2)",
-              glow: "0 0 24px rgba(46,204,113,0.15)" // Subtle primary glow
+              glow: "0 0 24px rgba(46,204,113,0.15)",
+            },
+            keyframes: {
+              float: {
+                "0%, 100%": { transform: "translateY(0)" },
+                "50%": { transform: "translateY(-10px)" },
+              },
+              slideUp: {
+                from: { opacity: 0, transform: "translateY(20px)" },
+                to: { opacity: 1, transform: "translateY(0)" },
+              },
+              fadeIn: {
+                from: { opacity: 0 },
+                to: { opacity: 1 },
+              },
+            },
+            animation: {
+              float: "float 6s ease-in-out infinite",
+              "slide-up": "slideUp 0.6s ease-out forwards",
+              "fade-in": "fadeIn 0.4s ease-out forwards",
             },
           },
         },
       };
     </script>
+
     <style>
-      ::-webkit-scrollbar {
-        width: 8px;
-        height: 8px;
-      }
-      ::-webkit-scrollbar-track {
-        background: transparent;
-      }
-      ::-webkit-scrollbar-thumb {
-        background: #334155;
-        border-radius: 4px;
-      }
-      html:not(.dark) ::-webkit-scrollbar-thumb {
-        background: #D1D5DB;
-      }
-      ::-webkit-scrollbar-thumb:hover {
-        background: #2ECC71;
-      }
-      .material-symbols-outlined {
-        font-variation-settings: "FILL" 0, "wght" 400, "GRAD" 0, "opsz" 24;
-      }
-      .material-symbols-outlined.fill-1 {
-        font-variation-settings: "FILL" 1;
-      }
-      /* Animation extras */
-      @keyframes float {
-        0% { transform: translateY(0px); }
-        50% { transform: translateY(-10px); }
-        100% { transform: translateY(0px); }
-      }
-      .animate-float {
-        animation: float 6s ease-in-out infinite;
-      }
-      @keyframes slideUp {
-        from { opacity: 0; transform: translateY(20px); }
-        to { opacity: 1; transform: translateY(0); }
-      }
-      .animate-slide-up {
-        animation: slideUp 0.6s ease-out forwards;
-      }
-      @keyframes fadeIn {
-        from { opacity: 0; }
-        to { opacity: 1; }
-      }
-      .animate-fade-in {
-        animation: fadeIn 0.4s ease-out forwards;
-      }
-    </style>
-    <!-- DotLottie Player for high performance animations -->
-    <script src="https://unpkg.com/@dotlottie/player-component@latest/dist/dotlottie-player.mjs" type="module"></script>
-  <script type="importmap">
-{
-  "imports": {
-    "react/": "https://esm.sh/react@19.0.0/",
-    "react": "https://esm.sh/react@19.0.0",
-    "react-dom/": "https://esm.sh/react-dom@19.0.0/",
-    "react-dom": "https://esm.sh/react-dom@19.0.0",
-    "@google/genai": "https://esm.sh/@google/genai@^1.34.0",
-    "firebase/app": "https://esm.sh/firebase@10.12.2/app",
-    "firebase/auth": "https://esm.sh/firebase@10.12.2/auth",
-    "firebase/firestore": "https://esm.sh/firebase@10.12.2/firestore",
-    "firebase/": "https://esm.sh/firebase@^12.8.0/"
-  }
+/* ===== Notion-style auto-hide scrollbar ===== */
+
+::-webkit-scrollbar {
+  width: 4px;
 }
-</script>
-</head>
-  <body class="bg-background-light dark:bg-background-dark text-text-light-main dark:text-text-dark-main font-display antialiased overflow-hidden selection:bg-primary selection:text-white transition-colors duration-300">
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #4f4f4f;
+  border-radius: 999px;
+  opacity: 0;
+  transition: opacity 0.25s ease;
+}
+
+/* Show scrollbar when scrolling */
+body.scrolling ::-webkit-scrollbar-thumb {
+  opacity: 1;
+}
+
+/* Firefox */
+body {
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+
+body.scrolling {
+  scrollbar-color: #4f4f4f transparent;
+}
+    </style>
+  </head>
+
+  <body class="bg-background-light dark:bg-background-dark text-text-light-main dark:text-text-dark-main font-display antialiased">
     <div id="root"></div>
+
+    <!-- Vite entry -->
+    <script type="module" src="/index.tsx"></script>
+    <script>
+      let scrollTimeout;
+
+      window.addEventListener("scroll", () => {
+        document.body.classList.add("scrolling");
+        clearTimeout(scrollTimeout);
+
+        scrollTimeout = setTimeout(() => {
+          document.body.classList.remove("scrolling");
+        }, 250);
+      });
+    </script>
   </body>
 </html>
