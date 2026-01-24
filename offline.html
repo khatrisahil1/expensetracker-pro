@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>You're Offline</title>
+
+  <!-- DotLottie Player -->
+  <script
+    src="https://unpkg.com/@dotlottie/player-component@latest/dist/dotlottie-player.mjs"
+    type="module"
+  ></script>
+
+  <style>
+    body {
+      background: #f6f3ee; /* light bone */
+      color: #1f2937;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+      display: flex;
+      height: 100vh;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      margin: 0;
+    }
+
+    /* Dark mode */
+    @media (prefers-color-scheme: dark) {
+      body {
+        background: #0e1111;
+        color: #e5e7eb;
+      }
+
+      p {
+        color: #9ca3af;
+      }
+    }
+
+    .card {
+      max-width: 480px;
+      padding: 32px;
+    }
+
+    h1 {
+      font-size: 1.8rem;
+      margin-bottom: 0.5rem;
+    }
+
+    p {
+      color: #6b7280;
+      font-size: 0.95rem;
+      margin-bottom: 1.25rem;
+    }
+
+    button {
+      background: #2ecc71;
+      border: none;
+      border-radius: 9999px;
+      padding: 12px 24px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    button:hover {
+      opacity: 0.9;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <dotlottie-player
+      src="https://lottie.host/890c7176-1b4b-4651-9576-a67605de0f7a/qr5BZ0cSwu.lottie"
+      background="transparent"
+      speed="1"
+      loop
+      autoplay
+      style="width: min(80vw, 420px); height: min(80vw, 420px); margin: 0 auto;"
+    ></dotlottie-player>
+
+    <h1>You’re offline</h1>
+    <p>
+      No worries — you can still add expenses.
+      We’ll sync everything automatically once you’re back online.
+    </p>
+
+    <button onclick="location.reload()">Try again</button>
+  </div>
+</body>
+</html>

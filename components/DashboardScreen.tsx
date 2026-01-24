@@ -1,5 +1,6 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
+import { usePWAInstall } from "../usePWAInstall";
 import { DotLottieReact } from "@lottiefiles/dotlottie-react";
 import { useStore, Transaction } from '../context/Store';
 import { View } from '../types';
@@ -281,7 +282,20 @@ const RealWaveGraph: React.FC<{ data: number[], color: string }> = ({ data, colo
 // --- MAIN DASHBOARD COMPONENT ---
 const DashboardScreen: React.FC<DashboardScreenProps> = ({ onNavigate }) => {
   const { user, userSettings, transactions, addTransaction, deleteTransaction, restoreTransaction, loading, toggleTheme, widgets, toggleWidget, widgetOrder, updateWidgetOrder, setViewingTransaction, updateUserSettings, lockApp, showUndo } = useStore();
+  const { isInstallable, install } = usePWAInstall();
+  // Offline state
+  const [isOffline, setIsOffline] = useState(!navigator.onLine);
 
+  useEffect(() => {
+    const goOffline = () => setIsOffline(true);
+    const goOnline = () => setIsOffline(false);
+    window.addEventListener("offline", goOffline);
+    window.addEventListener("online", goOnline);
+    return () => {
+      window.removeEventListener("offline", goOffline);
+      window.removeEventListener("online", goOnline);
+    };
+  }, []);
   // Local State
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [dashboardViewMode, setDashboardViewMode] = useState<'week' | 'month' | 'year'>('month');
@@ -638,6 +652,28 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ onNavigate }) => {
 
   return (
     <div className="max-w-[1400px] mx-auto flex flex-col gap-8 p-4 md:p-6 lg:p-10 pb-20 overflow-visible relative">
+      {isOffline && (
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[999]
+                        bg-yellow-400 text-yellow-950
+                        px-4 py-2 rounded-full
+                        text-xs font-bold tracking-wide
+                        shadow-lg animate-fade-in">
+          🟡 Offline mode — syncing later
+        </div>
+      )}
+      {isInstallable && (
+        <button
+          onClick={install}
+          className="fixed bottom-6 right-6 z-[999]
+                     bg-primary text-[#131811]
+                     px-5 py-3 rounded-full
+                     font-bold shadow-glow
+                     hover:bg-primary-hover
+                     active:scale-95 transition-all"
+        >
+          Install App
+        </button>
+      )}
       {/* Toast Notification */}
       {activeToast && ( <div className="fixed top-20 right-4 z-[60] bg-surface-dark text-white p-4 rounded-xl shadow-2xl animate-slide-in-right flex gap-3 items-start max-w-sm border border-primary/20 backdrop-blur-md"> <span className="material-symbols-outlined text-primary">notifications_active</span> <div><p className="font-bold text-sm">Notification</p><p className="text-xs opacity-90">{activeToast}</p></div> <button onClick={() => setActiveToast(null)} className="ml-auto hover:text-primary"><span className="material-symbols-outlined text-sm">close</span></button> </div> )}
       {/* Budget Goal Modal */}
