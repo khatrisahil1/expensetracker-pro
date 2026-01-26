@@ -9,6 +9,7 @@ interface DashboardScreenProps {
     onNavigate?: (view: View) => void;
 }
 
+
 // Widget Configuration Maps
 const WIDGET_LABELS: Record<string, string> = {
     streak: "Streak",
@@ -658,7 +659,17 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ onNavigate }) => {
                         px-4 py-2 rounded-full
                         text-xs font-bold tracking-wide
                         shadow-lg animate-fade-in">
-          🟡 Offline mode — syncing later
+          Offline mode — syncing later
+        </div>
+      )}
+      {isOffline && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[999]">
+          <button
+            onClick={() => window.location.reload()}
+            className="bg-primary text-[#131811] px-6 py-3 rounded-full font-bold shadow-glow hover:bg-primary-hover active:scale-95 transition-all"
+          >
+            Go to Home
+          </button>
         </div>
       )}
       {isInstallable && (
@@ -674,6 +685,8 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ onNavigate }) => {
           Install App
         </button>
       )}
+
+      
       {/* Toast Notification */}
       {activeToast && ( <div className="fixed top-20 right-4 z-[60] bg-surface-dark text-white p-4 rounded-xl shadow-2xl animate-slide-in-right flex gap-3 items-start max-w-sm border border-primary/20 backdrop-blur-md"> <span className="material-symbols-outlined text-primary">notifications_active</span> <div><p className="font-bold text-sm">Notification</p><p className="text-xs opacity-90">{activeToast}</p></div> <button onClick={() => setActiveToast(null)} className="ml-auto hover:text-primary"><span className="material-symbols-outlined text-sm">close</span></button> </div> )}
       {/* Budget Goal Modal */}
