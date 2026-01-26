@@ -1,6 +1,6 @@
-
 import React from 'react';
 import { View, User } from '../types';
+import { useEffect, useState } from 'react';
 
 interface SidebarProps {
   currentView: View;
@@ -11,6 +11,14 @@ interface SidebarProps {
 }
 
 const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, user, isOpen, onClose }) => {
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 1024);
+    check();
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, []);
   
   const navItemClass = (view: View) => `
     flex items-center gap-3 px-4 py-3 rounded-full transition-all cursor-pointer select-none font-bold
@@ -40,7 +48,9 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, user, isOpen
                         <span className="text-xs text-primary font-bold uppercase tracking-wider">Pro Plan</span>
                     </div>
                 </div>
-                {isMobileMode && (<button onClick={onClose} className="text-text-light-muted dark:text-text-dark-muted hover:text-text-light-main dark:hover:text-text-dark-main"><span className="material-symbols-outlined">close</span></button>)}
+                {isMobileMode && (<button onClick={onClose} className="text-text-light-muted dark:text-text-dark-muted hover:text-text-light-main dark:hover:text-text-dark-main">
+                  <span className="material-symbols-outlined">close</span>
+                </button>)}
             </div>
 
             <nav className="flex flex-col gap-2">
@@ -81,6 +91,41 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, user, isOpen
             </div>
         </div>
       </aside>
+
+      {isMobile && (
+        <nav className="fixed bottom-0 left-0 right-0 z-50 lg:hidden">
+          <div className="mx-4 mb-4 rounded-3xl bg-surface-lighter/90 dark:bg-surface-darker/90 backdrop-blur-xl border border-border-light dark:border-border-dark shadow-2xl flex items-center justify-between px-6 py-3">
+
+            <button onClick={() => onNavigate(View.DASHBOARD)} className="flex flex-col items-center gap-1 text-xs text-text-light-muted dark:text-text-dark-muted hover:text-primary transition">
+              <span className="material-symbols-outlined">grid_view</span>
+              Dashboard
+            </button>
+
+            <button onClick={() => onNavigate(View.VAULT)} className="flex flex-col items-center gap-1 text-xs text-text-light-muted dark:text-text-dark-muted hover:text-primary transition">
+              <span className="material-symbols-outlined">lock</span>
+              Vault
+            </button>
+
+            <button
+              onClick={() => onNavigate(View.SCANNER)}
+              className="-mt-10 size-16 rounded-full bg-primary text-white flex items-center justify-center shadow-[0_10px_30px_rgba(34,197,94,0.45)] border-4 border-surface-lighter dark:border-surface-darker transition hover:scale-105 active:scale-95"
+            >
+              <span className="material-symbols-outlined text-4xl">add</span>
+            </button>
+
+            <button onClick={() => onNavigate(View.GOALS)} className="flex flex-col items-center gap-1 text-xs text-text-light-muted dark:text-text-dark-muted hover:text-primary transition">
+              <span className="material-symbols-outlined">pie_chart</span>
+              Goals
+            </button>
+
+            <button onClick={() => onNavigate(View.SETTINGS)} className="flex flex-col items-center gap-1 text-xs text-text-light-muted dark:text-text-dark-muted hover:text-primary transition">
+              <span className="material-symbols-outlined">account_circle</span>
+              Account
+            </button>
+
+          </div>
+        </nav>
+      )}
     </>
   );
 };
