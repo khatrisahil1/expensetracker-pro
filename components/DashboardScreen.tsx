@@ -577,7 +577,7 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ onNavigate }) => {
             </span>
             <span className="mt-1 text-xs md:text-sm font-bold uppercase tracking-widest text-yellow-600 dark:text-yellow-500">
               days
-            </span>
+            </span>+
           </div>
           {/* right: lottie */}
           <div className="w-18 h-18 md:w-28 md:h-28 flex items-center justify-center shrink-0">
