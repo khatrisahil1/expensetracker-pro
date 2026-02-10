@@ -566,7 +566,7 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ onNavigate }) => {
             justify-center
             gap-3 md:gap-6
             flex-1
-            mt-4
+            mt-6
                     "
                 >
         <div className="flex items-center justify-center gap-4 md:gap-6 w-full">
@@ -577,7 +577,7 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ onNavigate }) => {
             </span>
             <span className="mt-1 text-xs md:text-sm font-bold uppercase tracking-widest text-yellow-600 dark:text-yellow-500">
               days
-            </span>+
+            </span>
           </div>
           {/* right: lottie */}
           <div className="w-18 h-18 md:w-28 md:h-28 flex items-center justify-center shrink-0">
@@ -653,29 +653,12 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ onNavigate }) => {
 
   return (
     <div className="max-w-[1400px] mx-auto flex flex-col gap-8 p-4 md:p-6 lg:p-10 pb-20 overflow-visible relative">
-      {isOffline && (
-        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[999]
-                        bg-yellow-400 text-yellow-950
-                        px-4 py-2 rounded-full
-                        text-xs font-bold tracking-wide
-                        shadow-lg animate-fade-in">
-          Offline mode — syncing later
-        </div>
-      )}
-      {isOffline && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[999]">
-          <button
-            onClick={() => window.location.reload()}
-            className="bg-primary text-[#131811] px-6 py-3 rounded-full font-bold shadow-glow hover:bg-primary-hover active:scale-95 transition-all"
-          >
-            Go to Home
-          </button>
-        </div>
-      )}
+   
+     
       {isInstallable && (
         <button
           onClick={install}
-          className="fixed bottom-6 right-6 z-[999]
+          className="fixed bottom-10 right-6 z-[999]
                      bg-primary text-[#131811]
                      px-5 py-3 rounded-full
                      font-bold shadow-glow
@@ -684,7 +667,7 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ onNavigate }) => {
         >
           Install App
         </button>
-      )}
+    )}
 
       
       {/* Toast Notification */}

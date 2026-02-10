@@ -465,7 +465,7 @@ const SettingsScreen: React.FC = () => {
         {/* Settings Content Area */}
         <div className={`flex-1 min-h-[600px] animate-fade-out ${!showMobileContent ? 'hidden lg:block' : 'block'}`}>
           <button onClick={() => setShowMobileContent(false)} className="lg:hidden flex items-center gap-2 mb-6 text-primary font-bold">
-              <span className="material-symbols-outlined">arrow_back</span>
+              <span className="material-symbols-outlined">chevron_left</span>
               Back
           </button>
 
