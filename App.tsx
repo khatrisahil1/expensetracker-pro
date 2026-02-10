@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { View, User } from './types';
 // Component Imports
@@ -83,7 +82,7 @@ const AppContent: React.FC = () => {
   const displayUser: User = {
     name: userSettings?.displayName || user?.email?.split('@')[0] || "Guest",
     email: user?.email || "guest@example.com",
-    avatar: userSettings?.avatar || "https://lh3.googleusercontent.com/aida-public/AB6AXuAcAEnws9rS2HbwbG3qPnV8_qGytOlvQRoBUvYhiaVPLZIa4g3zNkVrS3z4C1R2Gbq0OTL5idod4LZAASaT5biqRGu3mxbSwJOhbRO5OShUb_GRgTbznnKyUQuwDW35BXcZC0Oh1UqghJzMaO0lgpHY-rRRUimUx5fPDfdb9MWmfRrowenbz-VjWW0l9lHfFVohrsyEmZihRRFDCHDBn-vAL2HRkGjV-GKMJPZT0H4sfVYDg3Y74VjQTGSHFveW2NZVgTRxbW1aSCI",
+    avatar: userSettings?.avatar || "/public/avatar-placeholder.png",
     plan: "Pro Plan"
   };
 
@@ -106,24 +105,23 @@ const AppContent: React.FC = () => {
       <main className="flex-1 flex flex-col h-full overflow-hidden relative">
          
          {/* Mobile Header */}
-         <header className="lg:hidden flex items-center justify-between p-4 border-b border-border-light dark:border-border-dark bg-surface-darker z-30">
-            <div className="flex items-center gap-3">
-              <span className="material-symbols-outlined text-primary text-2xl">account_balance_wallet</span>
-              <h1 className="text-white font-bold">ExpenseTracker</h1>
-            </div>
-            <button onClick={() => setMobileMenuOpen(true)} className="text-white p-2 hover:bg-surface-dark rounded-full transition-colors"><span className="material-symbols-outlined">menu</span></button>
-        </header>
+         
 
         {/* Dynamic View Rendering */}
         <div className="flex-1 overflow-y-auto overflow-x-hidden relative scroll-smooth">
-          {currentView === View.DASHBOARD && <DashboardScreen onNavigate={handleNavigate} />}
-          {currentView === View.TRANSACTIONS_CALENDAR && <TransactionsCalendarScreen onNavigate={handleNavigate} />}
-          {currentView === View.SIMULATOR && <SimulatorScreen />}
-          {currentView === View.VAULT && <ImpulseVaultScreen />}
-          {currentView === View.SPLIT_BILL && <SplitBillScreen />}
-          {currentView === View.SCANNER && <ScannerScreen onNavigate={handleNavigate} />}
-          {currentView === View.SETTINGS && <SettingsScreen />}
-          {currentView === View.GOALS && <BudgetGoalsScreen />}
+          <div
+            key={currentView}
+            className="animate-page-transition"
+          >
+            {currentView === View.DASHBOARD && <DashboardScreen onNavigate={handleNavigate} />}
+            {currentView === View.TRANSACTIONS_CALENDAR && <TransactionsCalendarScreen onNavigate={handleNavigate} />}
+            {currentView === View.SIMULATOR && <SimulatorScreen />}
+            {currentView === View.VAULT && <ImpulseVaultScreen />}
+            {currentView === View.SPLIT_BILL && <SplitBillScreen />}
+            {currentView === View.SCANNER && <ScannerScreen onNavigate={handleNavigate} />}
+            {currentView === View.SETTINGS && <SettingsScreen />}
+            {currentView === View.GOALS && <BudgetGoalsScreen />}
+          </div>
         </div>
         
         {/* Global Overlays */}

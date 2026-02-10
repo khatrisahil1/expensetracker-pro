@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useStore, Transaction } from '../context/Store';
+import { DotLottieReact } from "@lottiefiles/dotlottie-react";
 
 const SettingsScreen: React.FC = () => {
   const { logout, user, updateUserSettings, userSettings, toggleTheme, updatePassword, deleteAccount, setAppPin, removeAppPin, sendVerificationEmail, refreshUser, requestNotificationPermission, sendLocalNotification, transactions, addTransaction, clearAllTransactions } = useStore();
@@ -354,8 +355,12 @@ const SettingsScreen: React.FC = () => {
                   
                   {/* Confetti / Graphic Placeholder */}
                   <div className="w-full h-40 bg-gradient-to-br from-indigo-500 to-purple-600 relative flex items-center justify-center">
-                      <div className="absolute inset-0 opacity-20 bg-[url('https://www.transparenttextures.com/patterns/stardust.png')]"></div>
-                      <span className="text-6xl animate-bounce">🎉</span>
+                      <DotLottieReact
+                       src="https://lottie.host/548611e1-3f2c-47f1-bd7b-7f1261f6ab4d/Vg9bT4b9gq.lottie"
+                       autoplay
+                       loop={true}
+                       className="w-full h-full scale-"
+                      />
                   </div>
 
                   <div className="p-8 flex flex-col gap-4">
@@ -430,7 +435,7 @@ const SettingsScreen: React.FC = () => {
       )}
 
       <div className="flex flex-col gap-1 mb-8 md:mb-12">
-          <h1 className="text-3xl md:text-5xl font-black tracking-tight text-text-light-main dark:text-text-dark-main uppercase">Settings</h1>
+          <h3 className="text-3xl md:text-5xl font-black tracking-tight text-text-light-main dark:text-text-dark-main">Profile</h3>
           <p className="text-text-light-muted dark:text-text-dark-muted text-sm md:text-lg">Fine-tune your finances.</p>
       </div>
 
@@ -458,10 +463,10 @@ const SettingsScreen: React.FC = () => {
         </div>
 
         {/* Settings Content Area */}
-        <div className={`flex-1 min-h-[600px] animate-fade-in ${!showMobileContent ? 'hidden lg:block' : 'block'}`}>
+        <div className={`flex-1 min-h-[600px] animate-fade-out ${!showMobileContent ? 'hidden lg:block' : 'block'}`}>
           <button onClick={() => setShowMobileContent(false)} className="lg:hidden flex items-center gap-2 mb-6 text-primary font-bold">
               <span className="material-symbols-outlined">arrow_back</span>
-              Back to Tabs
+              Back
           </button>
 
           <div className="bg-surface-light dark:bg-surface-dark border border-border-light dark:border-border-dark rounded-[2.5rem] p-6 md:p-12 shadow-sm">

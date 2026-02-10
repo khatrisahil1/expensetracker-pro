@@ -724,10 +724,81 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ onNavigate }) => {
       )}
       
       {/* Header Toolbar */}
-      <div className="flex flex-row justify-between items-center gap-4 animate-slide-up relative z-20 mb-2"> <div className="flex flex-col gap-1"> <h1 className="text-text-light-main dark:text-text-dark-main text-3xl lg:text-5xl font-black tracking-tight leading-tight">Dashboard</h1> <p className="text-text-light-muted dark:text-text-dark-muted text-sm md:text-base lg:text-lg block">Your financial overview. </p> </div> <div className="flex justify-end items-center gap-2"> <button onClick={lockApp} className="flex items-center justify-center size-10 rounded-full bg-surface-light dark:bg-surface-dark border border-border-light dark:border-border-dark text-text-light-muted dark:text-text-dark-muted hover:text-primary hover:border-primary transition-all shadow-sm active:scale-95 group" title="Lock App" > <span className="material-symbols-outlined text-[20px] group-hover:scale-110 transition-transform">lock</span> </button> <div className="relative"> <button onClick={() => setShowNotifDropdown(!showNotifDropdown)} className="flex items-center justify-center size-10 rounded-full bg-surface-light dark:bg-surface-dark border border-border-light dark:border-border-dark text-text-light-muted dark:text-text-dark-muted hover:text-primary hover:border-primary transition-all shadow-sm relative group" title="Notifications"> <span className="material-symbols-outlined text-[22px] group-hover:animate-swing">notifications</span> {unreadCount > 0 && <span className="absolute top-2 right-2 size-2 bg-red-500 rounded-full border border-surface-light dark:border-surface-dark animate-pulse"></span>} </button> {showNotifDropdown && ( <div className="absolute top-12 right-0 w-80 bg-surface-light dark:bg-surface-dark border border-border-light dark:border-border-dark rounded-2xl shadow-2xl p-4 z-50 animate-fade-in"> <div className="flex justify-between items-center mb-3"><h3 className="font-bold text-text-light-main dark:text-text-dark-main">Notifications</h3><button onClick={() => setNotifications([])} className="text-xs text-primary font-bold hover:underline">Clear All</button> </div> <div className="flex flex-col gap-3 max-h-[300px] overflow-y-auto custom-scrollbar"> {notifications.length > 0 ? notifications.map(n => ( <div key={n.id} className={`flex gap-3 p-3 rounded-xl transition-colors ${n.read ? 'bg-transparent hover:bg-gray-50 dark:hover:bg-surface-darker' : 'bg-primary/5'}`}> <div className="size-8 rounded-full bg-surface-light dark:bg-surface-darker flex items-center justify-center text-text-light-main dark:text-text-dark-main border border-border-light dark:border-border-dark"><span className="material-symbols-outlined text-sm">{n.icon}</span></div> <div className="flex flex-col"> <p className="text-sm font-bold text-text-light-main dark:text-text-dark-main leading-tight">{n.title}</p> <p className="text-xs text-text-light-muted dark:text-text-dark-muted leading-tight mt-0.5">{n.msg}</p> <p className="text-[10px] text-text-light-muted dark:text-text-dark-muted mt-1 opacity-60">{n.time}</p> </div> </div> )) : ( <div className="py-8 text-center text-text-light-muted dark:text-text-dark-muted text-xs">No new notifications</div> )} </div> </div> )} </div> <div className="hidden md:flex items-center gap-2 bg-surface-light dark:bg-surface-dark border border-border-light dark:border-border-dark rounded-full p-1.5 shadow-sm"> <button onClick={() => toggleTheme()} className="flex items-center gap-2 px-3 py-2 rounded-full hover:bg-gray-100 dark:hover:bg-surface-darker transition-colors text-text-light-muted dark:text-text-dark-muted hover:text-primary"><span className="material-symbols-outlined text-[20px]">{userSettings?.theme === 'light' ? 'dark_mode' : 'light_mode'}</span><span className="hidden lg:inline text-sm font-bold">Theme</span></button> <div className="w-px h-5 bg-border-light dark:bg-border-dark"></div> <button onClick={() => setShowExportModal(true)} className="flex items-center gap-2 px-3 py-2 rounded-full hover:bg-gray-100 dark:hover:bg-surface-darker transition-colors text-text-light-muted dark:text-text-dark-muted hover:text-primary"><span className="material-symbols-outlined text-[20px]">download</span><span className="hidden lg:inline text-sm font-bold">Export</span></button> <div className="w-px h-5 bg-border-light dark:bg-border-dark"></div> <button onClick={() => setShowWidgetEditor(true)} className="flex items-center gap-2 px-3 py-2 rounded-full hover:bg-gray-100 dark:hover:bg-surface-darker transition-colors text-text-light-muted dark:text-text-dark-muted hover:text-primary"><span className="material-symbols-outlined text-[20px]">edit</span><span className="hidden lg:inline text-sm font-bold">Customize</span></button> </div> <div className="md:hidden relative"> <button onClick={() => setShowMobileHeaderMenu(!showMobileHeaderMenu)} className="flex items-center justify-center size-8 rounded-full bg-surface-light dark:bg-surface-dark text-text-light-muted dark:text-text-dark-muted border border-border-light dark:border-border-dark hover:text-primary transition-all shadow-sm active:scale-95"><span className="material-symbols-outlined text-[18px]">more_vert</span></button> {showMobileHeaderMenu && ( <div className="absolute right-0 top-10 bg-surface-light dark:bg-surface-dark border border-border-light dark:border-border-dark rounded-2xl shadow-xl p-2 flex flex-col gap-1 min-w-[160px] z-50 animate-fade-in"> <button onClick={() => { toggleTheme(); setShowMobileHeaderMenu(false); }} className="flex items-center gap-3 px-4 py-3 hover:bg-gray-100 dark:hover:bg-surface-darker rounded-xl text-sm font-bold text-text-light-main dark:text-text-dark-main"><span className="material-symbols-outlined text-[20px]">{userSettings?.theme === 'light' ? 'dark_mode' : 'light_mode'}</span> Theme</button> <button onClick={() => { setShowExportModal(true); setShowMobileHeaderMenu(false); }} className="flex items-center gap-3 px-4 py-3 hover:bg-gray-100 dark:hover:bg-surface-darker rounded-xl text-sm font-bold text-text-light-main dark:text-text-dark-main"><span className="material-symbols-outlined text-[20px]">download</span> Export</button> <button onClick={() => { setShowWidgetEditor(true); setShowMobileHeaderMenu(false); }} className="flex items-center gap-3 px-4 py-3 hover:bg-gray-100 dark:hover:bg-surface-darker rounded-xl text-sm font-bold text-text-light-main dark:text-text-dark-main"><span className="material-symbols-outlined text-[20px]">edit</span> Customize</button> </div> )} </div> </div> </div>
+      <div className="flex flex-row justify-between items-center gap-4 animate-slide-up relative z-20 mb-2">
+        <div className="flex flex-col gap-1">
+          <h5 className="text-text-light-main dark:text-text-dark-main text-3xl lg:text-5xl font-black tracking-tight leading-tight">Dashboard</h5>
+
+        </div>
+        <div className="flex justify-end items-center gap-2">
+          
+          <div className="relative">
+            <button onClick={() => setShowNotifDropdown(!showNotifDropdown)} className="flex items-center justify-center size-10 rounded-full bg-surface-light dark:bg-surface-dark border border-border-light dark:border-border-dark text-text-light-muted dark:text-text-dark-muted hover:text-primary hover:border-primary transition-all shadow-sm relative group" title="Notifications">
+              <span className="material-symbols-outlined text-[22px] group-hover:animate-swing">notifications</span>
+              {unreadCount > 0 && <span className="absolute top-2 right-2 size-2 bg-red-500 rounded-full border border-surface-light dark:border-surface-dark animate-pulse"></span>}
+            </button>
+            {showNotifDropdown && (
+              <div className="absolute top-12 right-0 w-80 bg-surface-light dark:bg-surface-dark border border-border-light dark:border-border-dark rounded-2xl shadow-2xl p-4 z-50 animate-fade-in">
+                <div className="flex justify-between items-center mb-3"><h3 className="font-bold text-text-light-main dark:text-text-dark-main">Notifications</h3><button onClick={() => setNotifications([])} className="text-xs text-primary font-bold hover:underline">Clear All</button></div>
+                <div className="flex flex-col gap-3 max-h-[300px] overflow-y-auto custom-scrollbar">
+                  {notifications.length > 0 ? notifications.map(n => (
+                    <div key={n.id} className={`flex gap-3 p-3 rounded-xl transition-colors ${n.read ? 'bg-transparent hover:bg-gray-50 dark:hover:bg-surface-darker' : 'bg-primary/5'}`}>
+                      <div className="size-8 rounded-full bg-surface-light dark:bg-surface-darker flex items-center justify-center text-text-light-main dark:text-text-dark-main border border-border-light dark:border-border-dark"><span className="material-symbols-outlined text-sm">{n.icon}</span></div>
+                      <div className="flex flex-col">
+                        <p className="text-sm font-bold text-text-light-main dark:text-text-dark-main leading-tight">{n.title}</p>
+                        <p className="text-xs text-text-light-muted dark:text-text-dark-muted leading-tight mt-0.5">{n.msg}</p>
+                        <p className="text-[10px] text-text-light-muted dark:text-text-dark-muted mt-1 opacity-60">{n.time}</p>
+                      </div>
+                    </div>
+                  )) : (
+                    <div className="py-8 text-center text-text-light-muted dark:text-text-dark-muted text-xs">No new notifications</div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        
+          <div className="hidden md:flex items-center gap-2 bg-surface-light dark:bg-surface-dark border border-border-light dark:border-border-dark rounded-full p-1.5 shadow-sm">
+            <button onClick={() => toggleTheme()} className="flex items-center gap-2 px-3 py-2 rounded-full hover:bg-gray-100 dark:hover:bg-surface-darker transition-colors text-text-light-muted dark:text-text-dark-muted hover:text-primary"><span className="material-symbols-outlined text-[20px]">{userSettings?.theme === 'light' ? 'dark_mode' : 'light_mode'}</span><span className="hidden lg:inline text-sm font-bold">Theme</span></button>
+            <div className="w-px h-5 bg-border-light dark:bg-border-dark"></div>
+            <button onClick={() => setShowExportModal(true)} className="flex items-center gap-2 px-3 py-2 rounded-full hover:bg-gray-100 dark:hover:bg-surface-darker transition-colors text-text-light-muted dark:text-text-dark-muted hover:text-primary"><span className="material-symbols-outlined text-[20px]">download</span><span className="hidden lg:inline text-sm font-bold">Export</span></button>
+            <div className="w-px h-5 bg-border-light dark:bg-border-dark"></div>
+            <button onClick={() => setShowWidgetEditor(true)} className="flex items-center gap-2 px-3 py-2 rounded-full hover:bg-gray-100 dark:hover:bg-surface-darker transition-colors text-text-light-muted dark:text-text-dark-muted hover:text-primary"><span className="material-symbols-outlined text-[20px]">edit</span><span className="hidden lg:inline text-sm font-bold">Customize</span></button>
+          </div>
+          <div className="md:hidden relative">
+            <button onClick={() => setShowMobileHeaderMenu(!showMobileHeaderMenu)} className="flex items-center justify-center size-8 rounded-full bg-surface-light dark:bg-surface-dark text-text-light-muted dark:text-text-dark-muted border border-border-light dark:border-border-dark hover:text-primary transition-all shadow-sm active:scale-95"><span className="material-symbols-outlined text-[18px]">more_vert</span></button>
+            {showMobileHeaderMenu && (
+              <div className="absolute right-0 top-10 bg-surface-light dark:bg-surface-dark border border-border-light dark:border-border-dark rounded-2xl shadow-xl p-2 flex flex-col gap-1 min-w-[160px] z-50 animate-fade-in">
+                <button onClick={() => { toggleTheme(); setShowMobileHeaderMenu(false); }} className="flex items-center gap-3 px-4 py-3 hover:bg-gray-100 dark:hover:bg-surface-darker rounded-xl text-sm font-bold text-text-light-main dark:text-text-dark-main"><span className="material-symbols-outlined text-[20px]">{userSettings?.theme === 'light' ? 'dark_mode' : 'light_mode'}</span> Theme</button>
+                <button onClick={() => { setShowExportModal(true); setShowMobileHeaderMenu(false); }} className="flex items-center gap-3 px-4 py-3 hover:bg-gray-100 dark:hover:bg-surface-darker rounded-xl text-sm font-bold text-text-light-main dark:text-text-dark-main"><span className="material-symbols-outlined text-[20px]">download</span> Export</button>
+                <button onClick={lockApp} className="flex items-center gap-3 px-4 py-3 hover:bg-gray-100 dark:hover:bg-surface-darker rounded-xl text-sm font-bold text-text-light-main dark:text-text-dark-main"><span className="material-symbols-outlined text-[20px]">lock</span> App lock</button>
+                <button onClick={() => { setShowWidgetEditor(true); setShowMobileHeaderMenu(false); }} className="flex items-center gap-3 px-4 py-3 hover:bg-gray-100 dark:hover:bg-surface-darker rounded-xl text-sm font-bold text-text-light-main dark:text-text-dark-main"><span className="material-symbols-outlined text-[20px]">edit</span> Customize</button>
+              </div>
+            )}
+          </div>
+
+            {/* Mobile Profile Avatar */}
+          <button
+            onClick={() => onNavigate?.(View.SETTINGS)}
+            className="md:hidden relative ml-1 active:scale-95 transition-transform"
+          >
+            <img
+              src={userSettings?.avatar && userSettings.avatar.trim() !== '' ? userSettings.avatar : '/public/avatar-placeholder.png'}
+              onError={(e) => {
+                (e.currentTarget as HTMLImageElement).src = '/avatar-placeholder.png';
+              }}
+              alt="Profile"
+              className="size-10 rounded-full object-cover
+                         border-2 border-primary/90
+                         shadow-md"
+            />
+            
+          </button>
+        </div>
+      </div>
       
+
       {/* Welcome Message */}
-      <div className="mb-12 animate-slide-up mt-4"> <div className="flex items-center flex-wrap gap-x-4 gap-y-2 mb-3"> <h1 className="text-5xl md:text-6xl font-black text-text-light-main dark:text-text-dark-main tracking-tight leading-none"> Hello, <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-emerald-600">{userSettings?.displayName?.split(' ')[0] || "SAHIL"}</span> </h1> </div> <p className="text-xl font-medium text-text-light-muted dark:text-text-dark-muted">Your finances are looking good.</p> </div>
+      <div className="mb-2 animate-slide-up mt-4"> <div className="flex items-center flex-wrap gap-x-4 gap-y-2 mb-3"> <h1 className="text-5xl md:text-6xl font-black text-text-light-main dark:text-text-dark-main tracking-tight leading-none"> Hello, <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-emerald-600">{userSettings?.displayName?.split(' ')[0] || "Guest"}</span> </h1> </div> <p className="text-xxl font-small text-text-light-muted dark:text-text-dark-muted">Your finances are looking good.</p> </div>
       
       {/* Widget Grid */}
       <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-12 gap-6 animate-slide-up delay-100"> 
