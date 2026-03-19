@@ -40,6 +40,9 @@ const SettingsScreen: React.FC = () => {
   const [geminiKeyInput, setGeminiKeyInput] = useState('');
   const [geminiKeyStored, setGeminiKeyStored] = useState<string | null>(null);
 
+  // Notifications
+  const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>('default');
+
   // List states
   const [paymentMethods, setPaymentMethods] = useState<string[]>([]);
   const [expenseCategories, setExpenseCategories] = useState<string[]>([]);
@@ -65,6 +68,12 @@ const SettingsScreen: React.FC = () => {
     setGeminiKeyStored(envKey);
     setGeminiKeyInput(envKey || '');
   }, [userSettings, user]);
+
+  useEffect(() => {
+    if (typeof Notification !== 'undefined') {
+      setNotificationPermission(Notification.permission);
+    }
+  }, []);
 
   const showToast = (msg: string) => {
       setSaveMessage(msg);
@@ -189,13 +198,48 @@ const SettingsScreen: React.FC = () => {
       showToast(`${(key as string).replace(/([A-Z])/g, ' $1')} ${!currentState ? 'Enabled' : 'Disabled'}`);
   };
 
+  const handleToggleNotificationsMaster = async () => {
+      if (!userSettings) return;
+      const willEnable = !userSettings.notifications;
+
+      if (willEnable) {
+          if (typeof Notification === 'undefined') {
+              alert('This browser does not support desktop notifications.');
+              return;
+          }
+
+          const granted = await requestNotificationPermission();
+          setNotificationPermission(Notification.permission);
+          if (!granted) {
+              alert('Please enable notifications in your browser settings to receive alerts.');
+              return;
+          }
+      }
+
+      await updateUserSettings({ notifications: willEnable });
+      showToast(`Notifications ${willEnable ? 'Enabled' : 'Disabled'}`);
+  };
+
   const handleTestNotification = async () => {
-      const granted = await requestNotificationPermission();
+      if (typeof Notification === 'undefined') {
+          alert('This browser does not support desktop notifications.');
+          return;
+      }
+
+      // Keep the UI in-sync with the browser's permission state
+      setNotificationPermission(Notification.permission);
+
+      let granted = Notification.permission === 'granted';
+      if (!granted) {
+          granted = await requestNotificationPermission();
+          setNotificationPermission(Notification.permission);
+      }
+
       if (granted) {
           sendLocalNotification("Test Alert 🔔", "This is how your financial updates will appear.");
           showToast("Notification Sent");
       } else {
-          alert("Permission denied. Check browser settings.");
+          alert("Permission denied. Please enable notifications in your browser settings.");
       }
   };
 
@@ -722,15 +766,28 @@ const SettingsScreen: React.FC = () => {
               {/* TAB: NOTIFICATIONS */}
               {activeTab === 'notifications' && (
                   <div className="flex flex-col gap-8 animate-fade-in">
-                      <div className="bg-primary/5 border border-primary/20 p-6 rounded-3xl flex justify-between items-center">
+                      <div className="bg-primary/5 border border-primary/20 p-6 rounded-3xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                           <div className="flex gap-4 items-start">
                               <span className="material-symbols-outlined text-primary">notifications_active</span>
                               <div>
                                   <h3 className="text-sm font-bold text-text-light-main dark:text-text-dark-main">Smart Alerts</h3>
                                   <p className="text-xs text-text-light-muted mt-1">Direct to your browser. No spam.</p>
+                                  <p className="text-xs text-text-light-muted mt-2">
+                                      Permission: <span className="font-bold capitalize">{notificationPermission}</span>
+                                      <span className="mx-1">·</span>
+                                      Status: <span className="font-bold">{userSettings?.notifications ? 'Enabled' : 'Disabled'}</span>
+                                  </p>
                               </div>
                           </div>
-                          <button onClick={handleTestNotification} className="text-[10px] font-bold uppercase tracking-widest bg-primary text-black px-4 py-2 rounded-full hover:bg-primary-hover shadow-sm">Test Alert</button>
+
+                          <div className="flex flex-col sm:flex-row gap-2 items-stretch sm:items-center w-full md:w-auto">
+                              <button onClick={handleToggleNotificationsMaster} className="flex-1 sm:flex-none text-[10px] font-bold uppercase tracking-widest bg-white/80 text-black px-4 py-2 rounded-full hover:bg-white dark:bg-white/10 dark:hover:bg-white/20 transition-all shadow-sm">
+                                  {userSettings?.notifications ? 'Turn Off' : 'Turn On'}
+                              </button>
+                              <button onClick={handleTestNotification} className="flex-1 sm:flex-none text-[10px] font-bold uppercase tracking-widest bg-primary text-black px-4 py-2 rounded-full hover:bg-primary-hover shadow-sm">
+                                  Test Alert
+                              </button>
+                          </div>
                       </div>
 
                       <div className="flex flex-col gap-4">
