@@ -60,18 +60,24 @@ const Sidebar: React.FC<SidebarProps> = ({
         <div className="flex flex-col gap-8">
           {/* Brand */}
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="size-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center">
-                <span className="material-symbols-outlined">account_balance_wallet</span>
-              </div>
-              <div>
-                <h1 className="text-lg font-bold">ExpenseTracker</h1>
-                <span className="text-xs text-primary font-semibold">Pro Plan</span>
+            <div 
+              onClick={() => onNavigate(View.DASHBOARD)}
+              className="flex items-center gap-3 cursor-pointer group"
+            >
+              <img src="/icon-hero.svg" alt="logo" className="w-10 h-10 object-contain group-hover:scale-105 transition-transform" />
+              <div className="flex items-center gap-2">
+                <h1 className="text-lg font-bold leading-tight group-hover:text-primary transition-colors">ExpenseTracker</h1>
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-gradient-to-r from-green-400 to-emerald-500 text-black font-bold tracking-wide shadow-md">
+                  PRO+
+                </span>
               </div>
             </div>
 
             {isMobileMode && (
-              <button onClick={onClose}>
+              <button
+                onClick={onClose}
+                className="size-9 flex items-center justify-center rounded-full hover:bg-gray-100 dark:hover:bg-surface-dark transition"
+              >
                 <span className="material-symbols-outlined">close</span>
               </button>
             )}
@@ -80,7 +86,7 @@ const Sidebar: React.FC<SidebarProps> = ({
           {/* Navigation */}
           <nav className="flex flex-col gap-2">
             <div onClick={() => onNavigate(View.DASHBOARD)} className={navItemClass(View.DASHBOARD)}>
-              <span className="material-symbols-outlined">grid_view</span>
+              <span className="material-symbols-outlined">home</span>
               Dashboard
             </div>
 
@@ -90,12 +96,12 @@ const Sidebar: React.FC<SidebarProps> = ({
             </div>
 
             <div onClick={() => onNavigate(View.VAULT)} className={navItemClass(View.VAULT)}>
-              <span className="material-symbols-outlined">lock</span>
+              <span className="material-symbols-outlined">savings</span>
               Vault
             </div>
 
             <div onClick={() => onNavigate(View.GOALS)} className={navItemClass(View.GOALS)}>
-              <span className="material-symbols-outlined">pie_chart</span>
+              <span className="material-symbols-outlined">money_bag</span>
               Budget
             </div>
           </nav>

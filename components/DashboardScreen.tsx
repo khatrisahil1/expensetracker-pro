@@ -29,7 +29,7 @@ const CATEGORY_STYLES: Record<string, { icon: string, colorClass: string, hex: s
     "Transportation": { icon: "directions_car", colorClass: "text-purple-500 bg-purple-500/10 border-purple-500/20", hex: "#a855f7" },
     "Entertainment": { icon: "movie", colorClass: "text-pink-500 bg-pink-500/10 border-pink-500/20", hex: "#ec4899" },
     "Shopping": { icon: "shopping_bag", colorClass: "text-yellow-500 bg-yellow-500/10 border-yellow-500/20", hex: "#eab308" },
-    "Subscription": { icon: "Subscriptions", colorClass: "text-red-500 bg-red-500/10 border-red-500/20", hex: "#FF0000" },
+    "Subscription": { icon: "Subscriptions", colorClass: "text-red-500 bg-red-500/10 border-red-500/20", hex: "#ad1c43" },
     "Health": { icon: "medical_services", colorClass: "text-red-400 bg-red-400/10 border-red-400/20", hex: "#f87171" },
     "Utilities": { icon: "bolt", colorClass: "text-cyan-400 bg-cyan-400/10 border-cyan-400/20", hex: "#22d3ee" },
     "Salary": { icon: "payments", colorClass: "text-emerald-500 bg-emerald-500/10 border-emerald-500/20", hex: "#10b981" },
@@ -967,7 +967,16 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ onNavigate }) => {
                     {unreadCount > 0 && (
                       <button onClick={async () => { await markAllNotificationsRead(); setShowNotifDropdown(false); }} className="text-xs text-primary font-bold hover:underline">Mark all read</button>
                     )}
-                    <button onClick={async () => { await clearNotifications(); setShowNotifDropdown(false); }} className="text-xs text-primary font-bold hover:underline">Clear All</button>
+                    <button
+                      onClick={async (e) => {
+                        e.stopPropagation();
+                        await clearNotifications();
+                        setShowNotifDropdown(false);
+                      }}
+                      className="text-xs text-primary font-bold hover:underline"
+                    >
+                      Clear All
+                    </button>
                   </div>
                 </div>
                   <div className="flex flex-col gap-3 max-h-[300px] overflow-y-auto custom-scrollbar">

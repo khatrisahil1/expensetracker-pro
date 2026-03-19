@@ -2,6 +2,8 @@
 import React, { createContext, useContext, useEffect, useState, ReactNode, PropsWithChildren, useRef } from 'react';
 // Firebase Imports
 import firebase from 'firebase/compat/app';
+import 'firebase/compat/messaging';
+import { getMessaging, getToken } from 'firebase/messaging';
 import { 
   getAuth, 
   signInWithEmailAndPassword, 
@@ -171,6 +173,8 @@ interface StoreContextType {
   markAllNotificationsRead: () => Promise<void>;
   clearNotifications: () => Promise<void>;
   addNotification: (notification: Omit<AppNotification, 'id' | 'createdAt'>, id?: string) => Promise<void>;
+  pushToken: string | null;
+  registerPushNotifications: () => Promise<string | null>;
   // Settings & Security
   completeOnboarding: (data: { name: string, age: string, gender: string, currency: string, initialBalance: number, income: number, budget: number, goal: string }) => Promise<void>;
   updateUserSettings: (settings: Partial<UserSettings>) => Promise<void>;
@@ -219,6 +223,7 @@ export const StoreProvider = ({ children }: PropsWithChildren) => {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [impulseItems, setImpulseItems] = useState<ImpulseItem[]>([]);
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
+  const [pushToken, setPushToken] = useState<string | null>(null);
   const notificationTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const notificationSchedulerRef = useRef<{ lastDailyId?: string; lastMonthlyId?: string; lastBudgetId?: string }>({});
   
@@ -338,7 +343,12 @@ export const StoreProvider = ({ children }: PropsWithChildren) => {
         const initial = {
             currency: 'INR', displayName: user.displayName || 'User', hasCompletedOnboarding: false, theme: 'dark' as const,
             paymentMethods: DEFAULT_PAYMENT_METHODS, expenseCategories: DEFAULT_EXPENSE_CATS, incomeCategories: DEFAULT_INCOME_CATS,
-            categoryBudgets: {}, realizedSavings: 0, savingsGoals: [], notificationPreferences: { dailyReminder: true, budgetAlerts: true, monthlyReport: true, marketing: false }
+            categoryBudgets: {}, realizedSavings: 0, savingsGoals: [], notificationPreferences: {
+                                                                                                  dailyReminder: true,
+                                                                                                  budgetAlerts: true,
+                                                                                                  monthlyReport: true,
+                                                                                                  marketing: false
+                                                                                                }
         };
         setUserSettings(initial as UserSettings);
         document.documentElement.classList.add('dark');
@@ -877,13 +887,69 @@ Respond with JSON only.`;
       return permission === 'granted';
   };
 
-  const sendLocalNotification = (title: string, body: string) => {
-      if (Notification.permission === 'granted') {
+  const sendLocalNotification = async (title: string, body: string) => {
+      if (typeof Notification === 'undefined') return;
+      if (Notification.permission !== 'granted') return;
+
+      try {
+          // If a service worker is registered, use it for better delivery (background/focus handling).
+          if ('serviceWorker' in navigator) {
+              const registration = await navigator.serviceWorker.getRegistration();
+              if (registration) {
+                  registration.showNotification(title, {
+                      body,
+                      icon: '/icon.png',
+                      silent: false
+                  });
+                  return;
+              }
+          }
+
+          // Fallback to the standard Notification constructor.
           new Notification(title, {
               body,
-              icon: '/icon.png', // Fallback or placeholder
+              icon: '/icon.png',
               silent: false
           });
+      } catch (e) {
+          console.warn('sendLocalNotification failed', e);
+      }
+  };
+
+  const registerPushNotifications = async () => {
+      // Requires browser notifications and service worker support.
+      if (typeof Notification === 'undefined' || !('serviceWorker' in navigator)) return null;
+      const granted = await requestNotificationPermission();
+      if (!granted) return null;
+
+      try {
+          // Register the firebase messaging service worker (used for background push delivery).
+          const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
+
+          // Use the modular Firebase Messaging API (more reliable for token generation).
+          const messaging = getMessaging(app);
+          const vapidKey = import.meta.env.VITE_FCM_VAPID_KEY || import.meta.env.VITE_VAPID_KEY;
+
+          if (!vapidKey) {
+              console.warn('VAPID key not configured (VITE_FCM_VAPID_KEY or VITE_VAPID_KEY). Push notifications will not work without it.');
+              return null;
+          }
+
+          console.log('registerPushNotifications: using VAPID key?', Boolean(vapidKey));
+
+          const token = await getToken(messaging, { vapidKey, serviceWorkerRegistration: registration });
+          console.log('registerPushNotifications: getToken returned', token);
+          if (token && user) {
+              setPushToken(token);
+              // Persist the token to Firestore so you can send messages from a backend/Cloud Function.
+              const tokenRef = doc(db, 'users', user.uid, 'fcmTokens', token);
+              await setDoc(tokenRef, { createdAt: Timestamp.now() });
+          }
+
+          return token;
+      } catch (e) {
+          console.warn('registerPushNotifications failed', e);
+          return null;
       }
   };
 
@@ -919,6 +985,7 @@ Respond with JSON only.`;
         localStorage.setItem('demo', '1');
       }, isDemo,
       notifications, markNotificationRead, markAllNotificationsRead, clearNotifications, addNotification,
+      pushToken, registerPushNotifications,
       isPinSet: !!appPin, isAppLocked, setAppPin, removeAppPin, unlockApp, lockApp,
       undoState, showUndo, clearUndo,
       generateFinancialAudit, verifyBiometric, sendVerificationEmail,

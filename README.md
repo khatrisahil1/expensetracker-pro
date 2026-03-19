@@ -1,24 +1,67 @@
-<<<<<<< HEAD
 <div align="center">
 <img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
 </div>
 
-# Run and deploy your AI Studio app
+# ExpenseTracker Pro
 
-This contains everything you need to run your app locally.
+Track your expenses, set budgets, and get smart insights powered by Gemini.
 
-View your app in AI Studio: https://ai.studio/apps/drive/1BFjnXK1tBTijt1qM1GcM_T7RpqVWEfzk
+---
 
 ## Run Locally
 
-**Prerequisites:**  Node.js
-
+**Prerequisites:** Node.js
 
 1. Install dependencies:
-   `npm install`
-2. Copy `.env.example` to `.env.local` and set `GEMINI_API_KEY` to your Gemini API key, or enter it from within the app under **Settings → General → AI / Gemini**.
+   ```bash
+   npm install
+   ```
+2. Copy `.env.example` to `.env.local` and set your keys:
+   - `GEMINI_API_KEY` (Gemini AI integration)
+   - `VITE_FCM_VAPID_KEY` (Firebase Push notifications)
 3. Run the app:
-   `npm run dev`
-=======
-Track your expense!
->>>>>>> 85ae93557ce3954afa378c0bcdfeb943f03c29e2
+   ```bash
+   npm run dev
+   ```
+
+---
+
+## Sending a test push notification (device-level)
+
+To verify device-level push notifications, you need:
+
+1. A **push token** (shown in Settings → Notifications after enabling notifications).
+2. An **FCM server key** (from Firebase Console → Project settings → Cloud Messaging).
+
+### Option A: Run a local script (recommended)
+
+1. Add `FCM_SERVER_KEY` to your environment (don’t commit this key):
+   ```bash
+   export FCM_SERVER_KEY="YOUR_SERVER_KEY"
+   ```
+2. Run the helper script:
+   ```bash
+   npm run send-push -- <DEVICE_TOKEN> --title "Test Push" --body "Hello from ExpenseTracker"
+   ```
+
+### Option B: Use curl directly
+
+```bash
+curl -X POST https://fcm.googleapis.com/fcm/send \
+  -H "Authorization: key=YOUR_SERVER_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "to": "<DEVICE_TOKEN>",
+    "notification": {
+      "title": "Test Push",
+      "body": "Hello from ExpenseTracker"
+    }
+  }'
+```
+
+---
+
+## Notes
+
+- Push notifications require **HTTPS** (or localhost).
+- iOS Safari does not support web push, so this only works in supported browsers (Chrome/Edge/Firefox on desktop/mobile).

@@ -5,7 +5,7 @@ import { DotLottieReact } from "@lottiefiles/dotlottie-react";
 import { getGeminiApiKey, setGeminiApiKey, clearGeminiApiKey } from '../utils/gemini';
 
 const SettingsScreen: React.FC = () => {
-  const { logout, user, updateUserSettings, userSettings, toggleTheme, updatePassword, deleteAccount, setAppPin, removeAppPin, sendVerificationEmail, refreshUser, requestNotificationPermission, sendLocalNotification, transactions, addTransaction, clearAllTransactions } = useStore();
+  const { logout, user, updateUserSettings, userSettings, toggleTheme, updatePassword, deleteAccount, setAppPin, removeAppPin, sendVerificationEmail, refreshUser, requestNotificationPermission, sendLocalNotification, registerPushNotifications, pushToken, transactions, addTransaction, clearAllTransactions } = useStore();
   const [activeTab, setActiveTab] = useState('general');
   const [showMobileContent, setShowMobileContent] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -42,6 +42,7 @@ const SettingsScreen: React.FC = () => {
 
   // Notifications
   const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>('default');
+  const [pushRegistrationError, setPushRegistrationError] = useState<string | null>(null);
 
   // List states
   const [paymentMethods, setPaymentMethods] = useState<string[]>([]);
@@ -74,6 +75,22 @@ const SettingsScreen: React.FC = () => {
       setNotificationPermission(Notification.permission);
     }
   }, []);
+
+  useEffect(() => {
+    if (userSettings?.notifications && !pushToken) {
+      // Try to register again if the user has notifications enabled but we don't have a token yet.
+      registerPushNotifications?.().then((token) => {
+        if (!token) {
+          setPushRegistrationError('Push token not generated yet.');
+        } else {
+          setPushRegistrationError(null);
+        }
+      }).catch((e) => {
+        console.warn('registerPushNotifications (auto) failed', e);
+        setPushRegistrationError(String(e));
+      });
+    }
+  }, [userSettings?.notifications, pushToken, registerPushNotifications]);
 
   const showToast = (msg: string) => {
       setSaveMessage(msg);
@@ -218,6 +235,14 @@ const SettingsScreen: React.FC = () => {
 
       await updateUserSettings({ notifications: willEnable });
       showToast(`Notifications ${willEnable ? 'Enabled' : 'Disabled'}`);
+
+      // If notifications are enabled, register for push (device-level) so we can receive messages even when the app is in the background.
+      if (willEnable) {
+          const token = await registerPushNotifications?.();
+          if (token) {
+              showToast('Push notifications enabled');
+          }
+      }
   };
 
   const handleTestNotification = async () => {
@@ -240,6 +265,46 @@ const SettingsScreen: React.FC = () => {
           showToast("Notification Sent");
       } else {
           alert("Permission denied. Please enable notifications in your browser settings.");
+      }
+  };
+
+  const sendPushFromApp = async () => {
+      if (!pushToken) {
+          alert('No push token available yet. Enable notifications first and refresh.');
+          return;
+      }
+
+      let serverKey = import.meta.env.VITE_FCM_SERVER_KEY;
+      if (!serverKey) {
+          serverKey = window.prompt('Paste your FCM server key (from Firebase Console):');
+      }
+      if (!serverKey) return;
+
+      const title = window.prompt('Notification title:', 'Test Push') || 'Test Push';
+      const body = window.prompt('Notification body:', 'This is a test push.') || 'This is a test push.';
+
+      try {
+          const res = await fetch('https://fcm.googleapis.com/fcm/send', {
+              method: 'POST',
+              headers: {
+                  'Authorization': `key=${serverKey}`,
+                  'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                  to: pushToken,
+                  notification: { title, body },
+              }),
+          });
+
+          if (!res.ok) {
+              const text = await res.text();
+              throw new Error(`FCM error ${res.status}: ${text}`);
+          }
+
+          showToast('Push sent (check your device)');
+      } catch (e: any) {
+          console.error('sendPushFromApp failed', e);
+          alert(`Failed to send push: ${e.message || e}`);
       }
   };
 
@@ -777,6 +842,18 @@ const SettingsScreen: React.FC = () => {
                                       <span className="mx-1">·</span>
                                       Status: <span className="font-bold">{userSettings?.notifications ? 'Enabled' : 'Disabled'}</span>
                                   </p>
+
+                                  {pushToken ? (
+                                      <p className="text-xs text-text-light-muted mt-2 break-all">
+                                          Device token: <span className="font-bold">{pushToken}</span>
+                                      </p>
+                                  ) : (
+                                      <p className="text-xs text-text-light-muted mt-2">No push token available yet.</p>
+                                  )}
+
+                                  {pushRegistrationError && (
+                                      <p className="text-xs text-danger mt-2">Token error: {pushRegistrationError}</p>
+                                  )}
                               </div>
                           </div>
 
@@ -786,6 +863,9 @@ const SettingsScreen: React.FC = () => {
                               </button>
                               <button onClick={handleTestNotification} className="flex-1 sm:flex-none text-[10px] font-bold uppercase tracking-widest bg-primary text-black px-4 py-2 rounded-full hover:bg-primary-hover shadow-sm">
                                   Test Alert
+                              </button>
+                              <button onClick={sendPushFromApp} className="flex-1 sm:flex-none text-[10px] font-bold uppercase tracking-widest bg-primary/80 text-black px-4 py-2 rounded-full hover:bg-primary-hover shadow-sm">
+                                  Send Push
                               </button>
                           </div>
                       </div>

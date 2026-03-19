@@ -9,7 +9,7 @@ const CATEGORY_STYLES: Record<string, { hex: string, icon: string, color: string
     "Transportation": { hex: "#a855f7", icon: "directions_car", color: "text-purple-500", bg: "bg-purple-500/10" },
     "Entertainment": { hex: "#ec4899", icon: "movie", color: "text-pink-500", bg: "bg-pink-500/10" },
     "Shopping": { hex: "#eab308", icon: "shopping_bag", color: "text-yellow-500", bg: "bg-yellow-500/10" },
-    "Subscription": { hex: "#FF0000", icon: "subscriptions", color: "text-red-500", bg: "bg-red-500/10" },
+    "Subscription": { hex: "#ad1c43", icon: "subscriptions", color: "text-red-500", bg: "bg-red-500/10" },
     "Health": { hex: "#f87171", icon: "medical_services", color: "text-red-400", bg: "bg-red-400/10" },
     "Utilities": { hex: "#22d3ee", icon: "bolt", color: "text-cyan-400", bg: "bg-cyan-400/10" },
     "Other": { hex: "#9ca3af", icon: "receipt", color: "text-gray-400", bg: "bg-gray-400/10" }
