@@ -1,6 +1,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { GoogleGenAI, Type } from "@google/genai";
+import { Type } from "@google/genai";
+import { createGeminiClient } from '../utils/gemini';
 import { useStore } from '../context/Store';
 import { View } from '../types';
 
@@ -107,7 +108,7 @@ export const ScannerScreen: React.FC<ScannerScreenProps> = ({ onNavigate }) => {
   const analyzeReceipt = async (base64Image: string) => {
     setIsProcessing(true);
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+      const ai = createGeminiClient();
       // Use Gemini Flash for speed and cost efficiency
       const response = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',
@@ -131,8 +132,8 @@ export const ScannerScreen: React.FC<ScannerScreenProps> = ({ onNavigate }) => {
         date: data.date || prev.date,
         category: data.category || prev.category
       }));
-    } catch (e) {
-      alert("Analysis failed.");
+    } catch (e: any) {
+      alert(e?.message || "Analysis failed.");
     } finally { setIsProcessing(false); }
   };
 

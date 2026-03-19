@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { useStore, Transaction } from '../context/Store';
 import { DotLottieReact } from "@lottiefiles/dotlottie-react";
+import { getGeminiApiKey, setGeminiApiKey, clearGeminiApiKey } from '../utils/gemini';
 
 const SettingsScreen: React.FC = () => {
   const { logout, user, updateUserSettings, userSettings, toggleTheme, updatePassword, deleteAccount, setAppPin, removeAppPin, sendVerificationEmail, refreshUser, requestNotificationPermission, sendLocalNotification, transactions, addTransaction, clearAllTransactions } = useStore();
@@ -35,6 +36,10 @@ const SettingsScreen: React.FC = () => {
   // Local state for password
   const [passForm, setPassForm] = useState({ current: '', new: '', confirm: '' });
 
+  // API key for Gemini (AI)
+  const [geminiKeyInput, setGeminiKeyInput] = useState('');
+  const [geminiKeyStored, setGeminiKeyStored] = useState<string | null>(null);
+
   // List states
   const [paymentMethods, setPaymentMethods] = useState<string[]>([]);
   const [expenseCategories, setExpenseCategories] = useState<string[]>([]);
@@ -55,6 +60,10 @@ const SettingsScreen: React.FC = () => {
       setExpenseCategories(userSettings.expenseCategories || []);
       setIncomeCategories(userSettings.incomeCategories || []);
     }
+
+    const envKey = getGeminiApiKey();
+    setGeminiKeyStored(envKey);
+    setGeminiKeyInput(envKey || '');
   }, [userSettings, user]);
 
   const showToast = (msg: string) => {
@@ -124,6 +133,19 @@ const SettingsScreen: React.FC = () => {
       } finally {
           setIsSaving(false);
       }
+  };
+
+  const handleGeminiKeySave = () => {
+      setGeminiApiKey(geminiKeyInput.trim());
+      setGeminiKeyStored(geminiKeyInput.trim() || null);
+      showToast("Gemini API key saved locally");
+  };
+
+  const handleGeminiKeyClear = () => {
+      clearGeminiApiKey();
+      setGeminiKeyInput('');
+      setGeminiKeyStored(null);
+      showToast("Gemini API key cleared");
   };
 
   const handleListSave = async () => {
@@ -526,42 +548,61 @@ const SettingsScreen: React.FC = () => {
                           </div>
                       </section>
 
-                      <section>
-                          <div className="flex justify-between items-center mb-8 border-b border-border-light dark:border-border-dark pb-3">
-                            <h3 className="text-sm font-black uppercase tracking-[0.2em] text-primary">Category Sync</h3>
-                            <button onClick={handleListSave} className="text-[10px] font-black uppercase tracking-widest bg-primary/10 text-primary px-4 py-2 rounded-full border border-primary/20 hover:bg-primary hover:text-black transition-all shadow-glow">Apply Lists</button>
+                  <section>
+                      <h3 className="text-sm font-black uppercase tracking-[0.2em] text-primary mb-8 border-b border-border-light dark:border-border-dark pb-3">AI / Gemini</h3>
+                      <div className="flex flex-col gap-4">
+                          <p className="text-sm text-text-light-muted dark:text-text-dark-muted">Enter your Gemini API key to enable AI features like receipt scanning and financial audits. The key is stored locally in your browser.</p>
+                          <div className="flex gap-3 flex-col md:flex-row">
+                              <input
+                                type="password"
+                                value={geminiKeyInput}
+                                onChange={e => setGeminiKeyInput(e.target.value)}
+                                className="flex-1 bg-gray-50 dark:bg-surface-darker border border-border-light dark:border-border-dark rounded-xl p-4 font-bold outline-none focus:border-primary"
+                                placeholder="Paste your Gemini API key here"
+                              />
+                              <button onClick={handleGeminiKeySave} className="bg-primary text-black px-6 py-3 rounded-xl font-bold uppercase tracking-widest hover:bg-primary-hover transition-all">Save</button>
+                              <button onClick={handleGeminiKeyClear} className="bg-gray-100 dark:bg-surface-darker text-text-light-muted px-6 py-3 rounded-xl font-bold uppercase tracking-widest hover:bg-gray-200 dark:hover:bg-surface-darker transition-all">Clear</button>
                           </div>
-                          
-                          <div className="space-y-10">
-                              {([
-                                { key: 'exp', label: 'Expense Categories', list: expenseCategories },
-                                { key: 'inc', label: 'Income Sources', list: incomeCategories },
-                                { key: 'pay', label: 'Settlement Channels', list: paymentMethods }
-                              ] as const).map(item => (
-                                <div key={item.key} className="flex flex-col gap-4">
-                                    <label className="text-xs font-black uppercase tracking-widest text-text-light-muted opacity-60">{item.label}</label>
-                                    <div className="flex flex-wrap gap-2">
-                                        {item.list.map(v => (
-                                            <div key={v} className="flex items-center gap-2 px-4 py-2 rounded-full bg-gray-100 dark:bg-surface-darker border border-border-light dark:border-border-dark text-[11px] font-bold group hover:border-danger/30 transition-all">
-                                                {v}
-                                                <button onClick={() => removeListItem(item.key, v)} className="material-symbols-outlined text-[14px] opacity-40 group-hover:opacity-100 hover:text-danger">close</button>
-                                            </div>
-                                        ))}
-                                    </div>
-                                    <div className="flex gap-2">
-                                        <input 
-                                            type="text" 
-                                            value={newItems[item.key]} 
-                                            onChange={e => setNewItems({...newItems, [item.key]: e.target.value})} 
-                                            className="flex-1 bg-gray-50 dark:bg-surface-darker border border-border-light dark:border-border-dark rounded-xl px-4 py-3 text-sm outline-none focus:border-primary"
-                                            placeholder={`New ${item.key}...`}
-                                        />
-                                        <button onClick={() => addListItem(item.key)} className="bg-primary/10 text-primary border border-primary/20 size-12 rounded-xl flex items-center justify-center hover:bg-primary hover:text-black transition-all"><span className="material-symbols-outlined">add</span></button>
-                                    </div>
-                                </div>
-                              ))}
-                          </div>
-                      </section>
+                          <p className="text-xs text-text-light-muted dark:text-text-dark-muted">
+                              Current key: <span className="font-bold">{geminiKeyStored ? '••••••••••••••••' : 'Not set'}</span>
+                          </p>
+                      </div>
+                  </section>
+
+                  <div className="my-8 border-t border-border-light dark:border-border-dark" />
+
+                  <section>
+                      <h3 className="text-sm font-black uppercase tracking-[0.2em] text-primary mb-8 border-b border-border-light dark:border-border-dark pb-3">Custom Lists</h3>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-h-[420px] overflow-y-auto pr-2">
+                          {([
+                            { key: 'exp', label: 'Expense Categories', list: expenseCategories },
+                            { key: 'inc', label: 'Income Sources', list: incomeCategories },
+                            { key: 'pay', label: 'Settlement Channels', list: paymentMethods }
+                          ] as const).map(item => (
+                              <div key={item.key} className="flex flex-col gap-4">
+                                  <label className="text-xs font-black uppercase tracking-widest text-text-light-muted opacity-60">{item.label}</label>
+                                  <div className="flex flex-wrap gap-2">
+                                      {item.list.map(v => (
+                                          <div key={v} className="flex items-center gap-2 px-4 py-2 rounded-full bg-gray-100 dark:bg-surface-darker border border-border-light dark:border-border-dark text-[11px] font-bold group hover:border-danger/30 transition-all">
+                                              {v}
+                                              <button onClick={() => removeListItem(item.key, v)} className="material-symbols-outlined text-[14px] opacity-40 group-hover:opacity-100 hover:text-danger">close</button>
+                                          </div>
+                                      ))}
+                                  </div>
+                                  <div className="flex gap-2">
+                                      <input 
+                                          type="text" 
+                                          value={newItems[item.key]} 
+                                          onChange={e => setNewItems({...newItems, [item.key]: e.target.value})} 
+                                          className="flex-1 bg-gray-50 dark:bg-surface-darker border border-border-light dark:border-border-dark rounded-xl px-4 py-3 text-sm outline-none focus:border-primary"
+                                          placeholder={`New ${item.key}...`}
+                                      />
+                                      <button onClick={() => addListItem(item.key)} className="bg-primary/10 text-primary border border-primary/20 size-12 rounded-xl flex items-center justify-center hover:bg-primary hover:text-black transition-all"><span className="material-symbols-outlined">add</span></button>
+                                  </div>
+                              </div>
+                          ))}
+                      </div>
+                  </section>
                   </div>
               )}
 

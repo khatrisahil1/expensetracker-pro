@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useStore, Transaction } from '../context/Store';
+import ReceiptScannerModal, { ReceiptScanResult } from './ReceiptScannerModal';
 
 const TransactionDetailsPanel: React.FC = () => {
     const { viewingTransaction, setViewingTransaction, updateTransaction, deleteTransaction, userSettings, showUndo } = useStore();
     const [isEditing, setIsEditing] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
+    const [showScanner, setShowScanner] = useState(false);
     const [formData, setFormData] = useState<Partial<Transaction>>({});
 
     useEffect(() => {
@@ -29,6 +31,16 @@ const TransactionDetailsPanel: React.FC = () => {
         }
     };
 
+    const applyScanResult = (result: ReceiptScanResult) => {
+        setFormData(prev => ({
+            ...prev,
+            title: result.merchant || prev.title,
+            amount: result.totalAmount ?? prev.amount,
+            date: result.date || prev.date,
+            category: result.category || prev.category,
+        }));
+    };
+
     const currencySymbol = userSettings?.currency === 'USD' ? '$' : userSettings?.currency === 'EUR' ? '€' : '₹';
     const categories = formData.type === 'income' ? userSettings?.incomeCategories : userSettings?.expenseCategories;
 
@@ -40,7 +52,14 @@ const TransactionDetailsPanel: React.FC = () => {
                 <div className="flex items-center justify-between px-8 py-4 md:py-8 border-b border-border-light dark:border-border-dark bg-surface-light dark:bg-surface-dark">
                     <h2 className="text-xl font-black text-text-light-main dark:text-text-dark-main uppercase tracking-tight">{isEditing ? 'Edit Entry' : 'Transaction Info'}</h2>
                     <div className="flex gap-2">
-                        {!isEditing && !isDeleting && (<button onClick={() => setIsEditing(true)} className="size-10 rounded-full hover:bg-gray-100 dark:hover:bg-surface-darker text-text-light-muted flex items-center justify-center transition-all"><span className="material-symbols-outlined">edit</span></button>)}
+                        {!isEditing && !isDeleting && (
+                            <button onClick={() => setIsEditing(true)} className="size-10 rounded-full hover:bg-gray-100 dark:hover:bg-surface-darker text-text-light-muted flex items-center justify-center transition-all"><span className="material-symbols-outlined">edit</span></button>
+                        )}
+                        {isEditing && (
+                            <button onClick={() => setShowScanner(true)} className="size-10 rounded-full hover:bg-gray-100 dark:hover:bg-surface-darker text-text-light-muted flex items-center justify-center transition-all" title="Scan receipt to autofill">
+                                <span className="material-symbols-outlined">photo_camera</span>
+                            </button>
+                        )}
                         <button onClick={handleClose} className="size-10 rounded-full hover:bg-gray-100 dark:hover:bg-surface-darker text-text-light-muted flex items-center justify-center transition-all"><span className="material-symbols-outlined">close</span></button>
                     </div>
                 </div>
@@ -119,18 +138,56 @@ const TransactionDetailsPanel: React.FC = () => {
                             <button onClick={() => setIsEditing(false)} className="flex-1 py-4 rounded-2xl font-black text-xs uppercase tracking-widest text-text-light-muted hover:bg-gray-100 transition-colors">Cancel</button>
                             <button onClick={handleSave} className="flex-1 py-4 rounded-2xl font-black text-xs uppercase tracking-widest bg-primary text-[#131811] hover:bg-primary-hover shadow-glow transition-all">Apply Changes</button>
                         </div>
-                    ) : isDeleting ? (
-                        <div className="flex flex-col gap-4 animate-fade-in text-center">
-                            <p className="text-sm font-black uppercase tracking-widest text-text-light-main">Purge this record?</p>
-                            <div className="flex gap-4">
-                                <button onClick={() => setIsDeleting(false)} className="flex-1 py-4 rounded-2xl font-black text-xs uppercase tracking-widest border border-border-light">Keep It</button>
-                                <button onClick={async () => { if(viewingTransaction){ await deleteTransaction(viewingTransaction.id); handleClose(); } }} className="flex-1 py-4 rounded-2xl font-black text-xs uppercase tracking-widest bg-danger text-white shadow-lg shadow-danger/20">Delete</button>
-                            </div>
-                        </div>
                     ) : (
-                        <button onClick={() => setIsDeleting(true)} className="w-full py-4 rounded-2xl font-black text-xs uppercase tracking-widest text-danger border border-danger/30 hover:bg-danger hover:text-white transition-all flex items-center justify-center gap-2"><span className="material-symbols-outlined text-[20px]">delete_forever</span>Delete Transaction</button>
+                        <button onClick={() => setIsDeleting(true)} className="w-full py-4 rounded-2xl font-black text-xs uppercase tracking-widest text-danger border border-danger/30 hover:bg-danger hover:text-white transition-all flex items-center justify-center gap-2"><span className="material-symbols-outlined text-[20px]">delete</span>Delete </button>
                     )}
                 </div>
+                {/* Receipt Scanner Modal */}
+                {showScanner && (
+                  <ReceiptScannerModal
+                    onClose={() => setShowScanner(false)}
+                    onResult={(result) => {
+                      applyScanResult(result);
+                      setShowScanner(false);
+                    }}
+                  />
+                )}
+
+                {/* Delete Confirmation Modal */}
+                {isDeleting && (
+                  <div className="fixed inset-0 z-[120] flex items-center justify-center">
+                    <div className="absolute inset-0 bg-black/60 backdrop-blur-md" onClick={() => setIsDeleting(false)}></div>
+                    <div className="relative bg-surface-light dark:bg-surface-dark border border-danger/30 rounded-3xl px-8 py-8 w-[90%] max-w-md shadow-2xl flex flex-col items-center gap-6 animate-fade-in">
+                      <div className="size-14 rounded-full bg-danger/10 flex items-center justify-center">
+                        <span className="material-symbols-outlined text-danger text-2xl">delete</span>
+                      </div>
+                      <h2 className="text-lg font-bold text-text-light-main dark:text-text-dark-main text-center">
+                        Delete Transaction?
+                      </h2>
+                      <div className="flex gap-4 w-full">
+                        <button
+                          onClick={() => setIsDeleting(false)}
+                          className="flex-1 py-3 rounded-full border border-border-light dark:border-border-dark text-text-light-main dark:text-text-dark-main font-bold hover:bg-gray-100 dark:hover:bg-surface-darker transition-all"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          onClick={async () => {
+                            if (viewingTransaction) {
+                              const item = viewingTransaction;
+                              await deleteTransaction(viewingTransaction.id);
+                              showUndo(item);
+                              handleClose();
+                            }
+                          }}
+                          className="flex-1 py-3 rounded-full bg-danger text-white font-bold hover:bg-red-600 transition-all"
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
             </div>
         </div>
     );

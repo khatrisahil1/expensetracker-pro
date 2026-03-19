@@ -80,8 +80,9 @@ export default defineConfig(({ mode }) => {
           })
       ],
       define: {
-        'process.env.API_KEY': JSON.stringify(env.GEMINI_API_KEY),
-        'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY)
+        // Support both `GEMINI_API_KEY` and `VITE_GEMINI_API_KEY` env var naming conventions.
+        'process.env.API_KEY': JSON.stringify(env.GEMINI_API_KEY || env.VITE_GEMINI_API_KEY),
+        'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY || env.VITE_GEMINI_API_KEY)
       },
       resolve: {
         alias: {

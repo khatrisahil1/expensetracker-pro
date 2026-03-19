@@ -29,6 +29,7 @@ const CATEGORY_STYLES: Record<string, { icon: string, colorClass: string, hex: s
     "Transportation": { icon: "directions_car", colorClass: "text-purple-500 bg-purple-500/10 border-purple-500/20", hex: "#a855f7" },
     "Entertainment": { icon: "movie", colorClass: "text-pink-500 bg-pink-500/10 border-pink-500/20", hex: "#ec4899" },
     "Shopping": { icon: "shopping_bag", colorClass: "text-yellow-500 bg-yellow-500/10 border-yellow-500/20", hex: "#eab308" },
+    "Subscription": { icon: "Subscriptions", colorClass: "text-red-500 bg-red-500/10 border-red-500/20", hex: "#FF0000" },
     "Health": { icon: "medical_services", colorClass: "text-red-400 bg-red-400/10 border-red-400/20", hex: "#f87171" },
     "Utilities": { icon: "bolt", colorClass: "text-cyan-400 bg-cyan-400/10 border-cyan-400/20", hex: "#22d3ee" },
     "Salary": { icon: "payments", colorClass: "text-emerald-500 bg-emerald-500/10 border-emerald-500/20", hex: "#10b981" },
@@ -40,7 +41,7 @@ const CATEGORY_STYLES: Record<string, { icon: string, colorClass: string, hex: s
     "Other": { icon: "receipt", colorClass: "text-gray-400 bg-gray-400/10 border-gray-400/20", hex: "#9ca3af" }
 };
 
-const EXPENSE_CATEGORIES = ["Food", "Housing", "Rent", "Transportation", "Entertainment", "Shopping", "Health", "Utilities", "Other"];
+const EXPENSE_CATEGORIES = ["Food", "Housing", "Rent", "Transportation", "Entertainment", "Shopping","Subscription", "Health", "Utilities", "Other"];
 const INCOME_CATEGORIES = ["Salary", "Freelance", "Investments", "Gifts", "Refunds", "Rental", "Other"];
 
 // Helper: Short Date Format
@@ -96,13 +97,13 @@ const STREAK_LOTTIE_MAP: Record<StreakTier, string> = {
 
   single: "https://lottie.host/bd4943b7-a504-4f64-a6ae-72ce6a96dfa2/7v4kl3Ndl7.lottie",
 
-  stack: "https://lottie.host/bd4943b7-a504-4f64-a6ae-72ce6a96dfa2/7v4kl3Ndl7.lottie",
+  stack: "https://lottie.host/dacd1761-1fdb-4c67-a1d7-dce9f7098a68/fauCFJWZYw.lottie",
 
-  bag: "https://lottie.host/bd4943b7-a504-4f64-a6ae-72ce6a96dfa2/7v4kl3Ndl7.lottie",
+  bag: "https://lottie.host/2e644b69-9681-4cb2-99f1-152dae265f70/ZuOQRrUnBh.lottie",
 
-  reward: "https://lottie.host/bd4943b7-a504-4f64-a6ae-72ce6a96dfa2/7v4kl3Ndl7.lottie",
+  reward: "https://lottie.host/dacd1761-1fdb-4c67-a1d7-dce9f7098a68/fauCFJWZYw.lottie",
 
-  vault: "https://lottie.host/bd4943b7-a504-4f64-a6ae-72ce6a96dfa2/7v4kl3Ndl7.lottie",
+  vault: "https://lottie.host/67583866-07de-4549-8398-7344814496a4/VCEkeOmolA.lottie",
 
   legend: "https://lottie.host/bd4943b7-a504-4f64-a6ae-72ce6a96dfa2/7v4kl3Ndl7.lottie",
 
@@ -282,7 +283,7 @@ const RealWaveGraph: React.FC<{ data: number[], color: string }> = ({ data, colo
 
 // --- MAIN DASHBOARD COMPONENT ---
 const DashboardScreen: React.FC<DashboardScreenProps> = ({ onNavigate }) => {
-  const { user, userSettings, transactions, addTransaction, deleteTransaction, restoreTransaction, loading, toggleTheme, widgets, toggleWidget, widgetOrder, updateWidgetOrder, setViewingTransaction, updateUserSettings, lockApp, showUndo } = useStore();
+  const { user, userSettings, transactions, addTransaction, deleteTransaction, loading, toggleTheme, widgets, toggleWidget, widgetOrder, updateWidgetOrder, setViewingTransaction, updateUserSettings, lockApp, showUndo, notifications, markNotificationRead, markAllNotificationsRead, clearNotifications, generateFinancialAudit } = useStore();
   const { isInstallable, install } = usePWAInstall();
   // Offline state
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
@@ -310,6 +311,13 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ onNavigate }) => {
   const [editingTarget, setEditingTarget] = useState<'income' | 'expense' | null>(null);
   const [targetInput, setTargetInput] = useState('');
   const [showNotifDropdown, setShowNotifDropdown] = useState(false);
+
+  const [insightOpen, setInsightOpen] = useState(false);
+  const [insightText, setInsightText] = useState<string | null>(null);
+  const [insightJson, setInsightJson] = useState<any | null>(null);
+  const [insightLoading, setInsightLoading] = useState(false);
+  const [insightError, setInsightError] = useState<string | null>(null);
+  const [insightParseError, setInsightParseError] = useState<string | null>(null);
   
   // Quick Add Form State
   const [breakdownType, setBreakdownType] = useState<'income' | 'expense'>('expense');
@@ -318,12 +326,6 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ onNavigate }) => {
     category: 'Food', type: 'expense' as 'income' | 'expense', paymentMethod: 'UPI', note: '', tags: ''
   });
   const [isAdding, setIsAdding] = useState(false);
-  const [notifications, setNotifications] = useState([
-      { id: 1, title: 'Daily Reminder', msg: "Don't forget to add your today's expenses!", time: '10:30 AM', icon: 'edit_note', read: false },
-      { id: 2, title: 'Monthly Report', msg: "Your January report is ready to view.", time: 'Yesterday', icon: 'pie_chart', read: false },
-      { id: 3, title: 'Impulse Vault', msg: "2 items are ready to review.", time: '2d ago', icon: 'lock_open', read: true }
-  ]);
-  const [activeToast, setActiveToast] = useState<string | null>(null);
 
   // Sync widget editor order with store when opened
   useEffect(() => {
@@ -530,6 +532,72 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ onNavigate }) => {
   };
 
   const formatCompact = (val: number) => { if(val >= 1000000) return `${(val/1000000).toFixed(1)}M`; if(val >= 1000) return `${(val/1000).toFixed(1)}k`; return val.toLocaleString('en-IN', { maximumFractionDigits: 0 }); };
+
+  const tryParseJson = (raw: string) => {
+    if (!raw) return null;
+    const trimmed = raw.trim();
+    try {
+      return JSON.parse(trimmed);
+    } catch {
+      const first = trimmed.indexOf('{');
+      const last = trimmed.lastIndexOf('}');
+      if (first >= 0 && last > first) {
+        const candidate = trimmed.slice(first, last + 1);
+        try {
+          return JSON.parse(candidate);
+        } catch {
+          return null;
+        }
+      }
+      return null;
+    }
+  };
+
+  const handleInsight = async () => {
+    setInsightLoading(true);
+    setInsightError(null);
+    setInsightParseError(null);
+    try {
+      const res = await generateFinancialAudit();
+      setInsightText(res);
+      const parsed = res ? tryParseJson(res) : null;
+      if (parsed) {
+        setInsightJson(parsed);
+      } else {
+        setInsightJson(null);
+        if (res) setInsightParseError('Could not parse JSON output; showing raw response.');
+      }
+    } catch (e) {
+      setInsightError('Unable to reach Gemini AI.');
+      setInsightJson(null);
+    } finally {
+      setInsightLoading(false);
+    }
+  };
+
+  const copyInsightJson = async () => {
+    if (!insightJson) return;
+    try {
+      await navigator.clipboard.writeText(JSON.stringify(insightJson, null, ));
+      setInsightParseError('Copied insight JSON to clipboard.');
+      setTimeout(() => setInsightParseError(null), 2500);
+    } catch {
+      setInsightParseError('Clipboard copy failed.');
+      setTimeout(() => setInsightParseError(null), 2500);
+    }
+  };
+
+  const exportInsightJson = () => {
+    if (!insightJson) return;
+    const blob = new Blob([JSON.stringify(insightJson, null, 2)], { type: 'application/json' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'insight.json';
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   const filteredList = transactions.sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 5);
 
   // Widget Renderer: Dynamically renders components based on key
@@ -670,12 +738,33 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ onNavigate }) => {
     )}
 
       
-      {/* Toast Notification */}
-      {activeToast && ( <div className="fixed top-20 right-4 z-[60] bg-surface-dark text-white p-4 rounded-xl shadow-2xl animate-slide-in-right flex gap-3 items-start max-w-sm border border-primary/20 backdrop-blur-md"> <span className="material-symbols-outlined text-primary">notifications_active</span> <div><p className="font-bold text-sm">Notification</p><p className="text-xs opacity-90">{activeToast}</p></div> <button onClick={() => setActiveToast(null)} className="ml-auto hover:text-primary"><span className="material-symbols-outlined text-sm">close</span></button> </div> )}
       {/* Budget Goal Modal */}
       {editingTarget && ( <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-fade-in"> <div className="bg-surface-light dark:bg-surface-dark border border-border-light dark:border-border-dark rounded-3xl p-8 w-[90vw] max-w-[480px] shadow-2xl animate-slide-up"> <h3 className="text-xl font-bold text-text-light-main dark:text-text-dark-main mb-1">Set Monthly {editingTarget === 'income' ? 'Goal' : 'Limit'}</h3> <p className="text-sm text-text-light-muted dark:text-text-dark-muted mb-6">Update your base monthly target.</p> <div className="relative mb-6"> <span className="absolute left-4 top-1/2 -translate-y-1/2 font-bold text-lg text-text-light-muted dark:text-text-dark-muted">{currencySymbol}</span> <input type="number" value={targetInput} onChange={(e) => setTargetInput(e.target.value)} className="w-full bg-background-light dark:bg-surface-darker border border-border-light dark:border-border-dark rounded-xl p-4 pl-10 text-xl font-bold focus:border-primary outline-none" autoFocus /> </div> <div className="flex gap-3"> <button onClick={() => setEditingTarget(null)} className="flex-1 py-3 rounded-xl font-bold text-text-light-muted dark:text-text-dark-muted hover:bg-gray-100 dark:hover:bg-surface-darker transition-colors">Cancel</button> <button onClick={saveTarget} className="flex-1 py-3 rounded-xl font-bold bg-primary text-[#131811] hover:bg-primary-hover shadow-glow transition-colors">Save</button> </div> </div> </div> )}
       {/* Delete Confirmation */}
-      {deleteId && ( <div className="fixed inset-0 bg-black/60 z-[110] flex items-center justify-center p-4 backdrop-blur-sm animate-fade-in"> <div className="bg-surface-light dark:bg-surface-dark border border-danger/30 rounded-3xl p-8 w-full max-sm shadow-2xl animate-slide-up text-center"> <div className="size-16 rounded-full bg-danger/10 flex items-center justify-center mx-auto mb-4"><span className="material-symbols-outlined text-3xl text-danger">delete_forever</span></div> <h2 className="text-xl font-bold text-text-light-main dark:text-text-dark-main mb-2">Delete Transaction?</h2> <div className="flex gap-3"> <button onClick={() => setDeleteId(null)} className="flex-1 py-3 rounded-xl border border-border-light dark:border-border-dark text-text-light-main dark:text-text-dark-main hover:bg-gray-100 dark:hover:bg-surface-darker font-bold transition-colors">Cancel</button> <button onClick={handleDelete} className="flex-1 py-3 rounded-xl bg-danger text-white hover:bg-red-600 font-bold transition-colors">Delete</button> </div> </div> </div> )}
+      {deleteId && (
+        <div className="fixed inset-0 bg-black/60 z-[110] flex items-center justify-center p-4 backdrop-blur-sm animate-fade-in">
+          <div className="bg-surface-light dark:bg-surface-dark border border-danger/30 rounded-[2rem] sm:rounded-3xl p-6 sm:p-8 w-full max-w-[92%] sm:max-w-sm md:max-w-md lg:max-w-lg shadow-2xl animate-slide-up text-center">
+            <div className="size-16 rounded-full bg-danger/10 flex items-center justify-center mx-auto mb-4">
+              <span className="material-symbols-outlined text-3xl text-danger">delete_forever</span>
+            </div>
+            <h2 className="text-xl font-bold text-text-light-main dark:text-text-dark-main mb-2">Delete Transaction?</h2>
+            <div className="flex flex-col sm:flex-row gap-3">
+              <button
+                onClick={() => setDeleteId(null)}
+                className="flex-1 py-3 sm:py-4 rounded-xl border border-border-light dark:border-border-dark text-text-light-main dark:text-text-dark-main hover:bg-gray-100 dark:hover:bg-surface-darker font-bold transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDelete}
+                className="flex-1 py-3 sm:py-4 rounded-xl bg-danger text-white hover:bg-red-600 font-bold transition-colors active:scale-[0.98]"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       {/* Widget Customization Modal */}
       {showWidgetEditor && ( <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm"> <div className="bg-surface-light dark:bg-surface-dark border border-border-light dark:border-border-dark rounded-3xl p-6 w-[calc(100vw-32px)] md:w-[80vw] lg:max-w-[400px] shadow-2xl animate-slide-up"><div className="flex justify-between items-center mb-4"> <h2 className="text-xl font-bold text-text-light-main dark:text-text-dark-main">Customize Bento</h2> <button onClick={() => setShowWidgetEditor(false)} className="text-text-light-muted dark:text-text-dark-muted hover:text-text-light-main dark:hover:text-text-dark-main"><span className="material-symbols-outlined">close</span></button> </div> <div className="flex flex-col gap-2 max-h-[50vh] overflow-y-auto custom-scrollbar mb-4"> {editorOrder.map((id, idx) => ( <div key={id} className={`flex items-center justify-between p-3 bg-background-light dark:bg-surface-darker rounded-xl border border-border-light dark:border-border-dark transition-opacity ${!widgets[id] ? 'opacity-60' : 'opacity-100'}`}> <div className="flex items-center gap-3"> <div className="flex flex-col gap-1"> <button onClick={() => handleEditorReorder(id, 'up')} disabled={idx === 0} className="size-7 flex items-center justify-center rounded-lg bg-gray-200 dark:bg-border-dark hover:bg-gray-300 dark:hover:bg-border-dark/80 disabled:opacity-20 transition-colors"><span className="material-symbols-outlined text-sm font-bold">keyboard_arrow_up</span></button> <button onClick={() => handleEditorReorder(id, 'down')} disabled={idx === editorOrder.length - 1} className="size-7 flex items-center justify-center rounded-lg bg-gray-200 dark:bg-border-dark hover:bg-gray-300 dark:hover:bg-border-dark/80 disabled:opacity-20 transition-colors"><span className="material-symbols-outlined text-sm font-bold">keyboard_arrow_down</span></button> </div> <span className="text-text-light-main dark:text-text-dark-main font-medium text-sm">{WIDGET_LABELS[id] || id}</span> </div> <div onClick={() => toggleWidget(id)} className={`w-12 h-6 rounded-full cursor-pointer relative transition-colors ${widgets[id] ? 'bg-primary' : 'bg-gray-300 dark:bg-border-dark'}`}><div className={`absolute top-1 size-4 bg-white rounded-full shadow-md transition-all ${widgets[id] ? 'left-7' : 'left-1'}`}></div></div> </div> ))} </div> <button onClick={handleSaveLayout} className="w-full py-3 bg-primary text-[#131811] font-bold rounded-xl shadow-glow hover:bg-primary-hover transition-colors">Save Layout</button> </div> </div> )}
       {/* Export Modal */}
@@ -705,6 +794,153 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ onNavigate }) => {
             </div>
         </div>
       )}
+
+      {/* AI Insight Modal */}
+      {insightOpen && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/70 backdrop-blur-xl p-4 pt-16 md:pt-20 overflow-y-auto">
+          <div className="w-full max-w-2xl rounded-[2.5rem] bg-gradient-to-br from-[#0f172a] via-[#020617] to-[#020617] border border-white/10 shadow-[0_20px_80px_rgba(0,0,0,0.6)] p-6 md:p-8 flex flex-col gap-6 animate-slide-up mt-2">
+
+            {/* HEADER */}
+            <div className="flex items-start justify-between">
+              <div>
+                <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                  <span className="material-symbols-outlined text-indigo-400">auto_awesome</span>
+                  Gemini Insight
+                </h3>
+                <p className="text-xs text-white/60 mt-1">AI-generated financial insights</p>
+              </div>
+              <button onClick={() => setInsightOpen(false)} className="size-9 rounded-full hover:bg-white/10 flex items-center justify-center">
+                <span className="material-symbols-outlined text-white/60">close</span>
+              </button>
+            </div>
+
+            {/* CONTENT */}
+            <div className="rounded-3xl bg-black/40 border border-white/10 p-5 flex flex-col gap-5 min-h-[260px]">
+
+              {insightLoading ? (
+                <div className="flex flex-col items-center justify-center h-full gap-4 text-indigo-400">
+                  <div className="size-14 border-4 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin"></div>
+                  <p className="text-xs uppercase tracking-widest animate-pulse">Analyzing your finances...</p>
+                </div>
+              ) : insightJson ? (
+
+                <>
+                  {/* STATUS */}
+                  {insightJson.status && (
+                    <div className="flex items-center justify-between bg-white/5 border border-white/10 rounded-2xl px-4 py-3">
+                      <div className="flex items-center gap-3">
+                        <span className="text-5xl">{insightJson.status.emoji}</span>
+                        <div>
+                          <p className="text-sm font-bold text-white">{insightJson.status.label}</p>
+                          <p className="text-xs text-white/60">{insightJson.status.message}</p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* SUMMARY */}
+                  <div className="text-lg font-bold text-white leading-snug">
+                    {insightJson.summary}
+                  </div>
+
+                  {/* METRICS */}
+                  {insightJson.metrics && (
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                      {Object.entries(insightJson.metrics).map(([k, v]) => (
+                        <div key={k} className="bg-white/5 border border-white/10 rounded-xl p-3">
+                          <p className="text-[10px] uppercase text-white/50">{k}</p>
+                          <p className="text-sm font-bold text-white mt-1">{String(v)}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* INSIGHTS */}
+                  {insightJson.insights && (
+                    <div className="flex flex-col gap-3">
+                      {insightJson.insights.map((ins: any, idx: number) => (
+                        <div key={idx} className="flex gap-3 p-4 bg-white/5 border border-white/10 rounded-xl">
+                          <span className="text-xl">{ins.emoji}</span>
+                          <div>
+                            <p className="text-sm font-bold text-white">{ins.title}</p>
+                            <p className="text-xs text-white/60">{ins.message}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* ACTIONS */}
+                  {insightJson.actions && (
+                    <div className="flex flex-wrap gap-2">
+                      {insightJson.actions.map((act: any, idx: number) => (
+                        <div key={idx} className="px-3 py-2 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-xs text-indigo-300 flex items-center gap-2">
+                          <span>{act.emoji}</span>
+                          {act.text}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* TONE */}
+                  {insightJson.tone && (
+                    <div className="text-xs text-white/50 italic border-t border-white/10 pt-3">
+                      {insightJson.tone.one_liner || insightJson.tone.vibe}
+                    </div>
+                  )}
+
+                  {insightParseError && (
+                    <div className="text-xs text-red-300">{insightParseError}</div>
+                  )}
+
+                  {/* Secondary actions: copy/export JSON */}
+                  <div className="flex flex-wrap gap-2 mt-4">
+                    <button
+                      onClick={copyInsightJson}
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="#999999"><path d="M120-220v-80h80v80h-80Zm0-140v-80h80v80h-80Zm0-140v-80h80v80h-80ZM260-80v-80h80v80h-80Zm100-160q-33 0-56.5-23.5T280-320v-480q0-33 23.5-56.5T360-880h360q33 0 56.5 23.5T800-800v480q0 33-23.5 56.5T720-240H360Zm0-80h360v-480H360v480Zm40 240v-80h80v80h-80Zm-200 0q-33 0-56.5-23.5T120-160h80v80Zm340 0v-80h80q0 33-23.5 56.5T540-80ZM120-640q0-33 23.5-56.5T200-720v80h-80Zm420 80Z"/></svg>
+                    </button>
+                    <button
+                      onClick={exportInsightJson}
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="#999999"><path d="M440-320v-326L336-542l-56-58 200-200 200 200-56 58-104-104v326h-80ZM240-160q-33 0-56.5-23.5T160-240v-120h80v120h480v-120h80v120q0 33-23.5 56.5T720-160H240Z"/></svg>
+
+                    </button>
+                  </div>
+                </>
+
+              ) : insightText ? (
+                <div className="text-sm text-white/70 whitespace-pre-line">
+                  {insightText}
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center text-center text-white/40 h-full">
+                  <span className="material-symbols-outlined text-4xl mb-2">analytics</span>
+                  <p className="text-sm font-bold">Generate AI Insight</p>
+                </div>
+              )}
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={handleInsight}
+                disabled={insightLoading}
+                className="flex-1 py-3 rounded-xl bg-indigo-500 text-white font-bold text-xs uppercase tracking-widest hover:bg-indigo-400 transition-all"
+              >
+                {insightLoading ? "Analyzing..." : "Generate"}
+              </button>
+
+              <button
+                onClick={() => { setInsightText(null); setInsightJson(null); }}
+                className="flex-1 py-3 rounded-xl border border-white/10 text-white/60 text-xs font-bold uppercase hover:bg-white/5"
+              >
+                Back
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
       
       {/* Header Toolbar */}
       <div className="flex flex-row justify-between items-center gap-4 animate-slide-up relative z-20 mb-2">
@@ -713,28 +949,43 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ onNavigate }) => {
 
         </div>
         <div className="flex justify-end items-center gap-2">
-          
+          <button onClick={() => { setInsightOpen(true); setInsightText(null); setInsightJson(null); setInsightError(null); setInsightParseError(null); handleInsight(); }} className="flex items-center justify-center size-10 rounded-full bg-surface-light dark:bg-surface-dark border border-border-light dark:border-border-dark text-text-light-muted dark:text-text-dark-muted hover:text-primary hover:border-primary transition-all duration-200 ease-out shadow-sm relative overflow-hidden hover:scale-[1.05] active:scale-[0.95]" title="Gemini Neural Insight">
+            <span className="material-symbols-outlined text-[22px]">magic_button</span>
+          </button>
+
           <div className="relative">
-            <button onClick={() => setShowNotifDropdown(!showNotifDropdown)} className="flex items-center justify-center size-10 rounded-full bg-surface-light dark:bg-surface-dark border border-border-light dark:border-border-dark text-text-light-muted dark:text-text-dark-muted hover:text-primary hover:border-primary transition-all shadow-sm relative group" title="Notifications">
+            <button onClick={() => setShowNotifDropdown(!showNotifDropdown)} className="flex items-center justify-center size-10 rounded-full bg-surface-light dark:bg-surface-dark border border-border-light dark:border-border-dark text-text-light-muted dark:text-text-dark-muted hover:text-primary hover:border-primary transition-all duration-200 ease-out shadow-sm relative overflow-hidden hover:scale-[1.05] active:scale-[0.95]" title="Notifications">
               <span className="material-symbols-outlined text-[22px] group-hover:animate-swing">notifications</span>
               {unreadCount > 0 && <span className="absolute top-2 right-2 size-2 bg-red-500 rounded-full border border-surface-light dark:border-surface-dark animate-pulse"></span>}
             </button>
             {showNotifDropdown && (
-              <div className="absolute top-12 right-0 w-80 bg-surface-light dark:bg-surface-dark border border-border-light dark:border-border-dark rounded-2xl shadow-2xl p-4 z-50 animate-fade-in">
-                <div className="flex justify-between items-center mb-3"><h3 className="font-bold text-text-light-main dark:text-text-dark-main">Notifications</h3><button onClick={() => setNotifications([])} className="text-xs text-primary font-bold hover:underline">Clear All</button></div>
-                <div className="flex flex-col gap-3 max-h-[300px] overflow-y-auto custom-scrollbar">
-                  {notifications.length > 0 ? notifications.map(n => (
-                    <div key={n.id} className={`flex gap-3 p-3 rounded-xl transition-colors ${n.read ? 'bg-transparent hover:bg-gray-50 dark:hover:bg-surface-darker' : 'bg-primary/5'}`}>
-                      <div className="size-8 rounded-full bg-surface-light dark:bg-surface-darker flex items-center justify-center text-text-light-main dark:text-text-dark-main border border-border-light dark:border-border-dark"><span className="material-symbols-outlined text-sm">{n.icon}</span></div>
-                      <div className="flex flex-col">
-                        <p className="text-sm font-bold text-text-light-main dark:text-text-dark-main leading-tight">{n.title}</p>
-                        <p className="text-xs text-text-light-muted dark:text-text-dark-muted leading-tight mt-0.5">{n.msg}</p>
-                        <p className="text-[10px] text-text-light-muted dark:text-text-dark-muted mt-1 opacity-60">{n.time}</p>
+              <div className="fixed inset-x-0 top-16 z-50 flex justify-center md:absolute md:inset-auto md:top-12 md:right-0 md:flex-none">
+                <div className="w-[92vw] max-w-sm md:w-80 bg-surface-light dark:bg-surface-dark border border-border-light dark:border-border-dark rounded-2xl shadow-2xl p-4 animate-fade-in">
+                  <div className="flex justify-between items-center mb-3">
+                  <h3 className="font-bold text-text-light-main dark:text-text-dark-main">Notifications</h3>
+                  <div className="flex items-center gap-3">
+                    {unreadCount > 0 && (
+                      <button onClick={async () => { await markAllNotificationsRead(); setShowNotifDropdown(false); }} className="text-xs text-primary font-bold hover:underline">Mark all read</button>
+                    )}
+                    <button onClick={async () => { await clearNotifications(); setShowNotifDropdown(false); }} className="text-xs text-primary font-bold hover:underline">Clear All</button>
+                  </div>
+                </div>
+                  <div className="flex flex-col gap-3 max-h-[300px] overflow-y-auto custom-scrollbar">
+                    {notifications.length > 0 ? notifications.map(n => (
+                      <div key={n.id} onClick={() => {
+                        if (!n.read) markNotificationRead(n.id);
+                    }} className={`flex gap-3 p-3 rounded-xl transition-colors cursor-pointer active:bg-white/10 dark:active:bg-white/10 ${n.read ? 'bg-transparent hover:bg-gray-50 dark:hover:bg-surface-darker' : 'bg-primary/5'}`}>
+                        <div className="size-8 rounded-full bg-surface-light dark:bg-surface-darker flex items-center justify-center text-text-light-main dark:text-text-dark-main border border-border-light dark:border-border-dark"><span className="material-symbols-outlined text-sm">{n.icon}</span></div>
+                        <div className="flex flex-col">
+                          <p className="text-sm font-bold text-text-light-main dark:text-text-dark-main leading-tight">{n.title}</p>
+                          <p className="text-xs text-text-light-muted dark:text-text-dark-muted leading-tight mt-0.5">{n.msg}</p>
+                          <p className="text-[10px] text-text-light-muted dark:text-text-dark-muted mt-1 opacity-60">{n.time}</p>
+                        </div>
                       </div>
-                    </div>
-                  )) : (
-                    <div className="py-8 text-center text-text-light-muted dark:text-text-dark-muted text-xs">No new notifications</div>
-                  )}
+                    )) : (
+                      <div className="py-8 text-center text-text-light-muted dark:text-text-dark-muted text-xs">No new notifications</div>
+                    )}
+                  </div>
                 </div>
               </div>
             )}
@@ -796,3 +1047,4 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ onNavigate }) => {
 };
 
 export default DashboardScreen;
+

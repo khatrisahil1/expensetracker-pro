@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useStore, ImpulseItem } from '../context/Store';
-import { GoogleGenAI } from "@google/genai";
+import { createGeminiClient } from '../utils/gemini';
 
 const ImpulseVaultScreen: React.FC = () => {
   const { userSettings, addTransaction, impulseItems, addImpulseItem, deleteImpulseItem } = useStore();
@@ -122,7 +122,7 @@ const ImpulseVaultScreen: React.FC = () => {
       setIsAnalyzing(true); setAnalyzingSource('image');
       try {
           const base64Data = base64String.split(',')[1];
-          const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+          const ai = createGeminiClient();
           const response = await ai.models.generateContent({
               model: 'gemini-3-pro-preview',
               contents: { parts: [ { inlineData: { mimeType: 'image/jpeg', data: base64Data } }, { text: "Identify product: name, price (number) in JSON." } ] },
@@ -130,14 +130,14 @@ const ImpulseVaultScreen: React.FC = () => {
           });
           const data = JSON.parse(response.text);
           setNewItem(prev => ({ ...prev, name: data.name || prev.name, price: data.price?.toString() || prev.price }));
-      } catch (err) { alert("Manual entry required."); } finally { setIsAnalyzing(false); setAnalyzingSource(null); }
+      } catch (err: any) { alert(err?.message || "Manual entry required."); } finally { setIsAnalyzing(false); setAnalyzingSource(null); }
   };
 
   const analyzeLink = async () => {
     if (!newItem.link) return;
     setIsAnalyzing(true); setAnalyzingSource('link');
     try {
-        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+        const ai = createGeminiClient();
         const response = await ai.models.generateContent({
             model: 'gemini-3-flash-preview',
             contents: `Search product link: ${newItem.link}. Extract name and price in JSON.`,
@@ -146,7 +146,7 @@ const ImpulseVaultScreen: React.FC = () => {
         const jsonStr = response.text.replace(/```json/g, '').replace(/```/g, '').trim();
         const data = JSON.parse(jsonStr.substring(jsonStr.indexOf('{'), jsonStr.lastIndexOf('}') + 1));
         setNewItem(prev => ({ ...prev, name: data.name || prev.name, price: data.price?.toString() || prev.price }));
-    } catch (e) { alert("Could not fetch link details."); } finally { setIsAnalyzing(false); setAnalyzingSource(null); }
+    } catch (e: any) { alert(e?.message || "Could not fetch link details."); } finally { setIsAnalyzing(false); setAnalyzingSource(null); }
   };
 
   const handleDelete = async (id: string, price: number) => {
@@ -177,8 +177,9 @@ const ImpulseVaultScreen: React.FC = () => {
     <div className="px-2 md:px-10 lg:px-20 flex flex-1 justify-center py-4 md:py-8 pb-24 overflow-y-auto">
       <div className="flex flex-col max-w-[1400px] flex-1">
         {showAddModal && (
-            <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-fade-in">
-                <div className="bg-surface-light dark:bg-surface-dark border border-border-light dark:border-border-dark rounded-3xl p-6 w-full max-w-md shadow-2xl animate-slide-up max-h-[90vh] overflow-y-auto custom-scrollbar">
+            <div className="fixed inset-0 z-[999] bg-black/60 backdrop-blur-sm animate-fade-in">
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-md px-4">
+                    <div className="relative w-full bg-surface-light dark:bg-surface-dark border border-border-light dark:border-border-dark rounded-[2rem] md:rounded-3xl p-5 md:p-6 shadow-2xl animate-slide-up max-h-[90vh] overflow-y-auto custom-scrollbar">
                     <div className="flex justify-between items-center mb-6"><h2 className="text-xl font-bold">Add Impulse Item</h2><button onClick={closeModal}><span className="material-symbols-outlined">close</span></button></div>
                     {showCamera ? (
                          <div className="relative w-full aspect-[4/3] rounded-2xl overflow-hidden bg-black mb-6">
@@ -214,6 +215,7 @@ const ImpulseVaultScreen: React.FC = () => {
                             <div><label className="text-xs font-bold uppercase mb-1 block opacity-60">Duration</label><select className="w-full bg-background-light dark:bg-surface-darker border border-border-light rounded-xl p-3 outline-none appearance-none" value={newItem.duration} onChange={e => setNewItem({...newItem, duration: e.target.value})}><option value="24">24 Hours</option><option value="168">1 Week</option></select></div>
                         </div>
                         <button onClick={handleAddItem} disabled={isAnalyzing} className="w-full bg-primary text-[#131811] font-bold py-3 rounded-xl mt-2 shadow-glow">Lock It Away</button>
+                    </div>
                     </div>
                 </div>
             </div>
@@ -268,3 +270,4 @@ const ImpulseVaultScreen: React.FC = () => {
 };
 
 export default ImpulseVaultScreen;
+

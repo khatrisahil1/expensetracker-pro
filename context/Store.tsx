@@ -16,9 +16,9 @@ import {
   signInWithPopup,
   sendEmailVerification as fbSendEmailVerification
 } from 'firebase/auth';
-import { getFirestore, collection, addDoc, query, where, onSnapshot, orderBy, doc, deleteDoc, Timestamp, setDoc, getDoc, updateDoc, deleteField, writeBatch } from 'firebase/firestore';
-// Google GenAI SDK
-import { GoogleGenAI } from "@google/genai";
+import { getFirestore, enableIndexedDbPersistence, collection, addDoc, query, where, onSnapshot, orderBy, doc, deleteDoc, Timestamp, setDoc, getDoc, updateDoc, deleteField, writeBatch } from 'firebase/firestore';
+// Gemini API helpers
+import { createGeminiClient } from "../utils/gemini";
 
 // --- FIREBASE CONFIGURATION ---
 const firebaseConfig = {
@@ -35,6 +35,19 @@ const firebaseConfig = {
 const app = firebase.initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
+
+// Enable offline persistence (IndexedDB) for Firestore.
+// Firestore will cache reads/writes locally and sync when connectivity returns.
+enableIndexedDbPersistence(db).catch((err) => {
+  // Multiple tabs open can cause persistence failures.
+  if (err?.code === 'failed-precondition') {
+    console.warn('Firestore persistence failed (multiple tabs open).');
+  } else if (err?.code === 'unimplemented') {
+    console.warn('Firestore persistence is not supported in this browser.');
+  } else {
+    console.warn('Firestore persistence error:', err);
+  }
+});
 
 // --- TYPE DEFINITIONS ---
 export interface Transaction {
@@ -69,6 +82,18 @@ export interface SavingsGoal {
   currentAmount: number;
   targetDate: string;
   icon: string;
+}
+
+export interface AppNotification {
+  id: string;
+  title: string;
+  msg: string;
+  time: string; // human readable
+  icon: string;
+  read: boolean;
+  createdAt: { seconds: number; nanoseconds: number } | Date;
+  type?: string;
+  meta?: Record<string, any>;
 }
 
 export interface UserSettings {
@@ -140,6 +165,12 @@ interface StoreContextType {
   toggleWidget: (key: string) => void;
   updateWidgetOrder: (newOrder: string[]) => void; 
   widgetOrder: string[];
+  // Notifications
+  notifications: AppNotification[];
+  markNotificationRead: (id: string) => Promise<void>;
+  markAllNotificationsRead: () => Promise<void>;
+  clearNotifications: () => Promise<void>;
+  addNotification: (notification: Omit<AppNotification, 'id' | 'createdAt'>, id?: string) => Promise<void>;
   // Settings & Security
   completeOnboarding: (data: { name: string, age: string, gender: string, currency: string, initialBalance: number, income: number, budget: number, goal: string }) => Promise<void>;
   updateUserSettings: (settings: Partial<UserSettings>) => Promise<void>;
@@ -152,7 +183,7 @@ interface StoreContextType {
   removeAppPin: () => Promise<void>;
   unlockApp: (pin: string) => boolean;
   lockApp: () => void;
-  // Undo Logic
+  // Undo Support
   undoState: UndoState;
   showUndo: (tx: Transaction) => void;
   clearUndo: () => void;
@@ -160,7 +191,7 @@ interface StoreContextType {
   generateFinancialAudit: () => Promise<string>;
   verifyBiometric: () => Promise<boolean>;
   sendVerificationEmail: () => Promise<void>;
-  // Notifications
+  // Notifications (browser)
   requestNotificationPermission: () => Promise<boolean>;
   sendLocalNotification: (title: string, body: string) => void;
 }
@@ -187,6 +218,9 @@ export const StoreProvider = ({ children }: PropsWithChildren) => {
   // Data Collections
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [impulseItems, setImpulseItems] = useState<ImpulseItem[]>([]);
+  const [notifications, setNotifications] = useState<AppNotification[]>([]);
+  const notificationTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const notificationSchedulerRef = useRef<{ lastDailyId?: string; lastMonthlyId?: string; lastBudgetId?: string }>({});
   
   // App UI State
   const [isDemo, setIsDemo] = useState(false);
@@ -213,9 +247,8 @@ export const StoreProvider = ({ children }: PropsWithChildren) => {
   const [appPin, setPinState] = useState<string | null>(null);
   const [isAppLocked, setIsAppLocked] = useState(false);
   const [undoState, setUndoState] = useState<UndoState>({ show: false, item: null });
-  
-  const settingsLoadedRef = useRef(false);
   const undoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const settingsLoadedRef = useRef(false);
 
   // 1. Auth Listener
   useEffect(() => {
@@ -315,6 +348,134 @@ export const StoreProvider = ({ children }: PropsWithChildren) => {
     });
     return unsubscribe;
   }, [user, isDemo]);
+
+  // 4. Notifications listener (Firestore)
+  useEffect(() => {
+    if (isDemo) return;
+    if (!user) return;
+
+    const q = query(collection(db, 'users', user.uid, 'notifications'), orderBy('createdAt', 'desc'));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const notifs = snapshot.docs.map(doc => ({ id: doc.id, ...(doc.data() as any) })) as AppNotification[];
+      setNotifications(notifs);
+    });
+
+    return unsubscribe;
+  }, [user, isDemo]);
+
+  // 5. Scheduled/auto notifications (daily reminders, monthly report, budget alerts)
+  useEffect(() => {
+    // Always clear any existing scheduler when deps change
+    if (notificationTimerRef.current) clearInterval(notificationTimerRef.current);
+
+    if (!user || isDemo) return;
+    if (!userSettings?.notifications) return;
+
+    notificationSchedulerRef.current = {};
+
+    const scheduleCheck = async () => {
+      try {
+        const now = new Date();
+        const today = now.toISOString().split('T')[0];
+
+        const hasNotification = (id: string) => notifications.some(n => n.id === id) || !!notificationSchedulerRef.current[id];
+
+        const createIfMissing = async (id: string, payload: Omit<AppNotification, 'id' | 'createdAt'>) => {
+          if (hasNotification(id)) return;
+          notificationSchedulerRef.current[id] = true;
+          await addNotification(payload, id);
+          if (userSettings?.notifications) {
+            await sendLocalNotification(payload.title, payload.msg);
+          }
+        };
+
+        // DAILY REMINDERS (11am, 4pm, 10pm)
+        if (userSettings.notificationPreferences?.dailyReminder) {
+          const slots = [11, 16, 22];
+          slots.forEach(hour => {
+            const id = `daily-${today}-${hour}`;
+            const target = new Date(now);
+            target.setHours(hour, 0, 0, 0);
+            if (now >= target) {
+              createIfMissing(id, {
+                title: 'Daily Check-in',
+                msg: `Hey! Take a quick moment to log today’s spending.`,
+                time: target.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                icon: 'check_circle',
+                read: false,
+                type: 'dailyReminder'
+              });
+            }
+          });
+        }
+
+        // MONTHLY REPORT (1st at 9am, summarizing previous month)
+        if (userSettings.notificationPreferences?.monthlyReport) {
+          const monthStart = new Date(now.getFullYear(), now.getMonth(), 1, 9, 0, 0);
+          const reportMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+          const reportId = `monthly-${reportMonth.getFullYear()}-${String(reportMonth.getMonth() + 1).padStart(2, '0')}`;
+          if (now >= monthStart) {
+            // build summary for previous month
+            const prevMonth = reportMonth.getMonth();
+            const prevYear = reportMonth.getFullYear();
+            const monthTransactions = transactions.filter(t => {
+              const d = new Date(t.date);
+              return d.getFullYear() === prevYear && d.getMonth() === prevMonth;
+            });
+            const totalExpense = monthTransactions.filter(t => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0);
+            const totalIncome = monthTransactions.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0);
+            const topCategory = Object.entries(monthTransactions.reduce((acc, t) => {
+              if (t.type !== 'expense') return acc;
+              acc[t.category] = (acc[t.category] || 0) + t.amount;
+              return acc;
+            }, {} as Record<string, number>)).sort(([,a],[,b]) => b-a)[0]?.[0] || 'various';
+
+            await createIfMissing(reportId, {
+              title: 'Monthly Report Ready',
+              msg: `Last month you spent ${userSettings.currency || '₹'}${totalExpense.toFixed(0)} and earned ${userSettings.currency || '₹'}${totalIncome.toFixed(0)}. Top spend: ${topCategory}.`,
+              time: monthStart.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+              icon: 'assessment',
+              read: false,
+              type: 'monthlyReport'
+            });
+          }
+        }
+
+        // BUDGET ALERTS (month expense exceeds limit)
+        if (userSettings.notificationPreferences?.budgetAlerts && userSettings.monthlyExpenseLimit && userSettings.monthlyExpenseLimit > 0) {
+          const currentMonth = now.getMonth();
+          const currentYear = now.getFullYear();
+          const monthExpense = transactions.filter(t => {
+            const d = new Date(t.date);
+            return t.type === 'expense' && d.getFullYear() === currentYear && d.getMonth() === currentMonth;
+          }).reduce((sum, t) => sum + t.amount, 0);
+
+          if (monthExpense >= userSettings.monthlyExpenseLimit) {
+            const budgetId = `budget-exceeded-${currentYear}-${String(currentMonth + 1).padStart(2, '0')}`;
+            await createIfMissing(budgetId, {
+              title: 'Budget Limit Reached',
+              msg: `You have exceeded your monthly budget of ${userSettings.currency || '₹'}${userSettings.monthlyExpenseLimit.toFixed(0)}.`,
+              time: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+              icon: 'warning',
+              read: false,
+              type: 'budgetAlert'
+            });
+          }
+        }
+      } catch (e) {
+        console.error('Notification scheduler error', e);
+      }
+    };
+
+    // Run immediately, then every minute
+    scheduleCheck();
+    if (notificationTimerRef.current) clearInterval(notificationTimerRef.current);
+    notificationTimerRef.current = setInterval(scheduleCheck, 60_000);
+
+    return () => {
+      if (notificationTimerRef.current) clearInterval(notificationTimerRef.current);
+    };
+  }, [user, isDemo, userSettings, transactions, notifications]);
 
   // --- ACTIONS ---
   const login = async (email: string, pass: string) => { await signInWithEmailAndPassword(auth, email, pass); };
@@ -535,6 +696,81 @@ export const StoreProvider = ({ children }: PropsWithChildren) => {
   const updateTransaction = async (id: string, updates: Partial<Transaction>) => { if (user) await setDoc(doc(db, 'transactions', id), updates, { merge: true }); };
   const restoreTransaction = async (tx: Transaction) => { if (user) { const { id, ...data } = tx; await setDoc(doc(db, 'transactions', id), data); } };
 
+  const addNotification = async (notification: Omit<AppNotification, 'id' | 'createdAt'>, id?: string) => {
+    if (isDemo) {
+      setNotifications(prev => [{ id: id ?? crypto.randomUUID(), createdAt: new Date(), ...notification }, ...prev]);
+      return;
+    }
+    if (!user) return;
+    const docId = id || crypto.randomUUID();
+    await setDoc(doc(db, 'users', user.uid, 'notifications', docId), {
+      ...notification,
+      read: notification.read ?? false,
+      createdAt: Timestamp.now()
+    }, { merge: true });
+  };
+
+  const markNotificationRead = async (id: string) => {
+    if (isDemo) {
+      setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
+      return;
+    }
+    if (!user) return;
+
+    // Optimistically update UI
+    setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
+
+    try {
+      await updateDoc(doc(db, 'users', user.uid, 'notifications', id), { read: true });
+    } catch (e) {
+      console.error('Failed to mark notification read', e);
+    }
+  };
+
+  const clearNotifications = async () => {
+    if (isDemo) {
+      setNotifications([]);
+      return;
+    }
+    if (!user) return;
+    const batch = writeBatch(db);
+    notifications.forEach(n => batch.delete(doc(db, 'users', user.uid, 'notifications', n.id)));
+    await batch.commit();
+  };
+
+  const markAllNotificationsRead = async () => {
+    if (isDemo) {
+      setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+      return;
+    }
+    if (!user) return;
+
+    const unread = notifications.filter(n => !n.read);
+    if (unread.length === 0) return;
+
+    // Optimistically update UI
+    setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+
+    const batch = writeBatch(db);
+    unread.forEach(n => batch.update(doc(db, 'users', user.uid, 'notifications', n.id), { read: true }));
+    try {
+      await batch.commit();
+    } catch (e) {
+      console.error('Failed to mark all notifications read', e);
+    }
+  };
+
+  const showUndo = (tx: Transaction) => {
+    if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
+    setUndoState({ show: true, item: tx });
+    undoTimerRef.current = setTimeout(() => setUndoState({ show: false, item: null }), 4000);
+  };
+
+  const clearUndo = () => {
+    if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
+    setUndoState({ show: false, item: null });
+  };
+
   const addImpulseItem = async (item: Omit<ImpulseItem, 'id' | 'userId'>) => {
     if (isDemo) return;
     if (!user) throw new Error("User not authenticated");
@@ -555,7 +791,7 @@ export const StoreProvider = ({ children }: PropsWithChildren) => {
   const generateFinancialAudit = async () => {
       if (!userSettings || transactions.length === 0) return "Not enough data for an audit.";
       try {
-          const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+          const ai = createGeminiClient();
           const recentTx = transactions.slice(0, 30).map(t => ({ title: String(t.title), amt: Number(t.amount), cat: String(t.category), type: String(t.type) }));
           const budgetSummary: Record<string, number> = {};
           if (userSettings.categoryBudgets) {
@@ -563,10 +799,72 @@ export const StoreProvider = ({ children }: PropsWithChildren) => {
                   budgetSummary[String(key)] = Number(value);
               }
           }
-          const prompt = `Act as a senior financial advisor. Analyze: ${JSON.stringify(recentTx)} against Budgets: ${JSON.stringify(budgetSummary)} in ${String(userSettings.currency)}. Provide 3 actionable, punchy tips.`;
+          const prompt = `You are a premium fintech AI embedded inside a modern expense tracking app.
+You must RESPOND WITH A SINGLE VALID JSON OBJECT ONLY (no markdown, no explanation, no extra text). The JSON must follow the exact structure described below.
+
+REQUIRED JSON STRUCTURE:
+{
+  "summary": "1-line sharp insight",
+  "status": {
+    "label": "Healthy / Warning / Critical",
+    "emoji": "Choose status based on spending_ratio: < 70 → 🤩 Excellent; 70–90 → 😍 Good; 90–110 → 😁 Moderate; 110–140 → 😭 Warning; > 140 → ☠️ Critical , <only emoji icon not anything text>",
+    "message": "short quick action message"
+  },
+  "visual": {
+    "type": "fire / leak / growth / crash / control",
+    "headline": "short attention-grabbing phrase"
+  },
+  "metrics": {
+    "income": number,
+    "expense": number,
+    "net": number,
+    "spending_ratio": number
+  },
+  "insights": [
+    {
+      "emoji": "🔥 / 💰 / ⚠️ / 🧠 / 🧾",
+      "title": "very short title",
+      "message": "1-line explanation"
+    },
+    {
+      "emoji": "💡",
+      "title": "another insight",
+      "message": "1-line explanation"
+    }
+  ],
+  "actions": [
+    {
+      "emoji": "✅",
+      "text": "short action step"
+    },
+    {
+      "emoji": "⚡",
+      "text": "another action"
+    }
+  ],
+  "tone": {
+    "vibe": "strict / motivating / warning",
+    "one_liner": "Tip : final punchline"
+  }
+}
+
+Style:
+- Keep output concise and UI-friendly.
+- Avoid clutter, keep it scannable in 5 seconds.
+- Use emotional metaphors like "money leak", "spending fire", "stable zone".
+
+Here is the input data:
+Transactions: ${JSON.stringify(recentTx)}
+Budgets: ${JSON.stringify(budgetSummary)}
+Currency: ${String(userSettings.currency)}
+
+Respond with JSON only.`;
           const response = await ai.models.generateContent({ model: 'gemini-3-flash-preview', contents: prompt });
           return response.text || "Could not generate audit.";
-      } catch (e) { return "Financial AI node is currently offline."; }
+      } catch (e: any) {
+          console.warn('generateFinancialAudit failed:', e);
+          return "Financial AI is currently unavailable. Please check your API key.";
+      }
   };
 
   // --- NOTIFICATIONS ---
@@ -620,9 +918,9 @@ export const StoreProvider = ({ children }: PropsWithChildren) => {
         setLoading(false);
         localStorage.setItem('demo', '1');
       }, isDemo,
+      notifications, markNotificationRead, markAllNotificationsRead, clearNotifications, addNotification,
       isPinSet: !!appPin, isAppLocked, setAppPin, removeAppPin, unlockApp, lockApp,
-      undoState, showUndo: (tx) => { if (undoTimerRef.current) clearTimeout(undoTimerRef.current); setUndoState({ show: true, item: tx }); undoTimerRef.current = setTimeout(() => setUndoState({ show: false, item: null }), 5000); },
-      clearUndo: () => { if (undoTimerRef.current) clearTimeout(undoTimerRef.current); setUndoState({ show: false, item: null }); },
+      undoState, showUndo, clearUndo,
       generateFinancialAudit, verifyBiometric, sendVerificationEmail,
       requestNotificationPermission, sendLocalNotification
     }}>

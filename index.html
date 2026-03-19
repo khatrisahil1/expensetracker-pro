@@ -99,11 +99,17 @@
                 from: { opacity: 0 },
                 to: { opacity: 1 },
               },
+              pageTransition: {
+                "0%": { opacity: 0, transform: "translateY(16px)" },
+                "60%": { opacity: 0.7, transform: "translateY(-8px)" },
+                "100%": { opacity: 1, transform: "translateY(0)" },
+              },
             },
             animation: {
               float: "float 6s ease-in-out infinite",
               "slide-up": "slideUp 0.6s ease-out forwards",
               "fade-in": "fadeIn 0.4s ease-out forwards",
+              "page-transition": "pageTransition 0.45s ease-out forwards",
             },
           },
         },
@@ -150,7 +156,18 @@ body.scrolling {
 
     <!-- Vite entry -->
     <script type="module" src="/index.tsx"></script>
+
+    <!-- Service worker registration for offline support -->
     <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker
+            .register('/sw.js')
+            .then(() => console.log('Service Worker registered.'))
+            .catch((err) => console.warn('Service Worker registration failed:', err));
+        });
+      }
+
       let scrollTimeout;
 
       window.addEventListener("scroll", () => {
