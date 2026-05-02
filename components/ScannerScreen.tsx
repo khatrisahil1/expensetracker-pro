@@ -88,10 +88,12 @@ export const ScannerScreen: React.FC<ScannerScreenProps> = ({ onNavigate }) => {
           throw new Error("NOT_SUPPORTED");
       }
       
-      // Request access to rear camera
+      // Request access to rear camera with high-quality constraints
       const constraints = { 
         video: { 
-            facingMode: 'environment'
+            facingMode: { ideal: 'environment' },
+            width: { ideal: 1920 },
+            height: { ideal: 1080 }
         } 
       };
 
