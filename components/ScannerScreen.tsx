@@ -70,26 +70,54 @@ export const ScannerScreen: React.FC<ScannerScreenProps> = ({ onNavigate }) => {
   }, [userSettings, formData.type]);
 
   // --- CAMERA LOGIC ---
+  useEffect(() => {
+    // Proactively check permission status if supported
+    if (navigator.permissions && navigator.permissions.query) {
+        navigator.permissions.query({ name: 'camera' as any }).then(status => {
+            console.log("Camera permission status:", status.state);
+        }).catch(e => console.warn("Permissions API not supported for camera."));
+    }
+  }, []);
+
   const startCamera = async () => {
+    console.log("Starting camera...");
     try {
-      // First check if mediaDevices is supported (often missing in insecure contexts or WKWebView)
+      // First check if mediaDevices is supported
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-          throw new Error("getUserMedia not supported");
+          console.warn("getUserMedia not supported in this browser/context.");
+          throw new Error("NOT_SUPPORTED");
       }
       
       // Request access to rear camera
-      const mediaStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+      const constraints = { 
+        video: { 
+            facingMode: { ideal: 'environment' },
+            width: { ideal: 1920 },
+            height: { ideal: 1080 }
+        } 
+      };
+
+      const mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
+      console.log("Camera access granted.");
       setStream(mediaStream);
       setShowCamera(true);
+      
       // Wait for video element to mount then assign stream
-      setTimeout(() => { if (videoRef.current) videoRef.current.srcObject = mediaStream; }, 100);
-    } catch (err) {
-      console.warn("Camera access failed, falling back to file picker:", err);
+      setTimeout(() => { 
+        if (videoRef.current) {
+            videoRef.current.srcObject = mediaStream;
+            videoRef.current.play().catch(e => console.error("Video play failed:", e));
+        } 
+      }, 100);
+    } catch (err: any) {
+      console.error("Camera error:", err);
+      
       // Fallback to native OS camera/file picker
       if (fallbackInputRef.current) {
+          console.log("Falling back to native file input...");
           fallbackInputRef.current.click();
       } else {
-          alert("Could not access camera or file picker.");
+          alert("Camera access is blocked or not supported. Please enable it in settings.");
       }
     }
   };
