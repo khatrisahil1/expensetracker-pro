@@ -92,12 +92,23 @@ export const ScannerScreen: React.FC<ScannerScreenProps> = ({ onNavigate }) => {
       const constraints = { 
         video: { 
             facingMode: { ideal: 'environment' },
-            width: { ideal: 1920 },
-            height: { ideal: 1080 }
+            width: { min: 1280, ideal: 1920 },
+            height: { min: 720, ideal: 1080 }
         } 
       };
 
       const mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
+      
+      // Log actual track settings to verify resolution
+      const track = mediaStream.getVideoTracks()[0];
+      if (track) {
+          const settings = track.getSettings();
+          console.log(`Camera active: ${settings.width}x${settings.height} @ ${settings.frameRate}fps`);
+          if (settings.width && settings.width < 1280) {
+              console.warn("Camera resolution is lower than HD. The device might not support it.");
+          }
+      }
+
       console.log("Camera access granted.");
       setStream(mediaStream);
       setShowCamera(true);
