@@ -91,9 +91,7 @@ export const ScannerScreen: React.FC<ScannerScreenProps> = ({ onNavigate }) => {
       // Request access to rear camera
       const constraints = { 
         video: { 
-            facingMode: { ideal: 'environment' },
-            width: { ideal: 1920 },
-            height: { ideal: 1080 }
+            facingMode: 'environment'
         } 
       };
 
@@ -106,18 +104,28 @@ export const ScannerScreen: React.FC<ScannerScreenProps> = ({ onNavigate }) => {
       setTimeout(() => { 
         if (videoRef.current) {
             videoRef.current.srcObject = mediaStream;
-            videoRef.current.play().catch(e => console.error("Video play failed:", e));
+            videoRef.current.play().catch(e => {
+                console.error("Video play failed:", e);
+                alert("Camera feed could not start: " + e.message);
+            });
         } 
       }, 100);
     } catch (err: any) {
       console.error("Camera error:", err);
       
+      // Detailed error for debugging
+      const errorMsg = err.name === 'NotAllowedError' ? "Permission Denied: Please enable camera access in your browser settings." :
+                       err.name === 'NotFoundError' ? "No camera found on this device." :
+                       err.message || "Unknown camera error";
+
       // Fallback to native OS camera/file picker
       if (fallbackInputRef.current) {
           console.log("Falling back to native file input...");
+          // Only show alert if it's a permission issue, otherwise just fallback
+          if (err.name === 'NotAllowedError') alert(errorMsg);
           fallbackInputRef.current.click();
       } else {
-          alert("Camera access is blocked or not supported. Please enable it in settings.");
+          alert("Camera Error: " + errorMsg);
       }
     }
   };
