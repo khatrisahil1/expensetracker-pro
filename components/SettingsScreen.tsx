@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { useStore, Transaction } from '../context/Store';
 import { DotLottieReact } from "@lottiefiles/dotlottie-react";
-import { getGeminiApiKey, setGeminiApiKey, clearGeminiApiKey } from '../utils/gemini';
+
 
 const SettingsScreen: React.FC = () => {
   const { logout, user, updateUserSettings, userSettings, toggleTheme, updatePassword, deleteAccount, setAppPin, removeAppPin, sendVerificationEmail, refreshUser, transactions, addTransaction, clearAllTransactions } = useStore();
@@ -60,9 +60,7 @@ const SettingsScreen: React.FC = () => {
   // Local state for password
   const [passForm, setPassForm] = useState({ current: '', new: '', confirm: '' });
 
-  // API key for Gemini (AI)
-  const [geminiKeyInput, setGeminiKeyInput] = useState('');
-  const [geminiKeyStored, setGeminiKeyStored] = useState<string | null>(null);
+
 
 
   // List states
@@ -97,9 +95,7 @@ const SettingsScreen: React.FC = () => {
       if (userSettings.notificationTune) setNotifTune(userSettings.notificationTune);
     }
 
-    const envKey = getGeminiApiKey();
-    setGeminiKeyStored(envKey);
-    setGeminiKeyInput(envKey || '');
+
   }, [userSettings, user]);
 
 
@@ -173,18 +169,7 @@ const SettingsScreen: React.FC = () => {
       }
   };
 
-  const handleGeminiKeySave = () => {
-      setGeminiApiKey(geminiKeyInput.trim());
-      setGeminiKeyStored(geminiKeyInput.trim() || null);
-      showToast("Gemini API key saved locally");
-  };
 
-  const handleGeminiKeyClear = () => {
-      clearGeminiApiKey();
-      setGeminiKeyInput('');
-      setGeminiKeyStored(null);
-      showToast("Gemini API key cleared");
-  };
 
   const handleListSave = async () => {
       setIsSaving(true);
@@ -622,28 +607,7 @@ const SettingsScreen: React.FC = () => {
                           </div>
                       </section>
 
-                  <section>
-                      <h3 className="text-sm font-black uppercase tracking-[0.2em] text-primary mb-8 border-b border-border-light dark:border-border-dark pb-3">AI / Gemini</h3>
-                      <div className="flex flex-col gap-4">
-                          <p className="text-sm text-text-light-muted dark:text-text-dark-muted">Enter your Gemini API key to enable AI features like receipt scanning and financial audits. The key is stored locally in your browser.</p>
-                          <div className="flex gap-3 flex-col md:flex-row">
-                              <input
-                                type="password"
-                                value={geminiKeyInput}
-                                onChange={e => setGeminiKeyInput(e.target.value)}
-                                className="flex-1 bg-gray-50 dark:bg-surface-darker border border-border-light dark:border-border-dark rounded-xl p-4 font-bold outline-none focus:border-primary"
-                                placeholder="Paste your Gemini API key here"
-                              />
-                              <button onClick={handleGeminiKeySave} className="bg-primary text-black px-6 py-3 rounded-xl font-bold uppercase tracking-widest hover:bg-primary-hover transition-all">Save</button>
-                              <button onClick={handleGeminiKeyClear} className="bg-gray-100 dark:bg-surface-darker text-text-light-muted px-6 py-3 rounded-xl font-bold uppercase tracking-widest hover:bg-gray-200 dark:hover:bg-surface-darker transition-all">Clear</button>
-                          </div>
-                          <p className="text-xs text-text-light-muted dark:text-text-dark-muted">
-                              Current key: <span className="font-bold">{geminiKeyStored ? '••••••••••••••••' : 'Not set'}</span>
-                          </p>
-                      </div>
-                  </section>
 
-                  <div className="my-8 border-t border-border-light dark:border-border-dark" />
 
                   <section>
                       <h3 className="text-sm font-black uppercase tracking-[0.2em] text-primary mb-8 border-b border-border-light dark:border-border-dark pb-3">Custom Lists</h3>
