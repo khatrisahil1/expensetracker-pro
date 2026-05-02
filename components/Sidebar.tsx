@@ -104,6 +104,11 @@ const Sidebar: React.FC<SidebarProps> = ({
               <span className="material-symbols-outlined">money_bag</span>
               Budget
             </div>
+
+            <div onClick={() => onNavigate(View.SUBSCRIPTIONS)} className={navItemClass(View.SUBSCRIPTIONS)}>
+              <span className="material-symbols-outlined">subscriptions</span>
+              Subscriptions
+            </div>
           </nav>
         </div>
 
@@ -132,12 +137,12 @@ const Sidebar: React.FC<SidebarProps> = ({
                   border border-border-light dark:border-border-dark shadow-l
                   grid grid-cols-5 items-center py-3">
             {[
-              { view: View.DASHBOARD, icon: 'home', label: 'Home' },
-              { view: View.SCANNER, icon: 'receipt_long', label: 'Transactions' },
-              { view: View.VAULT, icon: 'savings', label: 'Vault' },
-              { view: View.GOALS, icon: 'money_bag', label: 'Budget' },
-              { view: View.SETTINGS, icon: 'person', label: 'Profile' },
-            ].map(item => (
+               { view: View.DASHBOARD, icon: 'home', label: 'Home' },
+               { view: View.SCANNER, icon: 'receipt_long', label: 'Trans' },
+               { view: View.SUBSCRIPTIONS, icon: 'subscriptions', label: 'Subs' },
+               { view: View.GOALS, icon: 'money_bag', label: 'Budget' },
+               { view: View.SETTINGS, icon: 'person', label: 'Profile' },
+             ].map(item => (
               <button
                 key={item.label}
                 onClick={() => onNavigate(item.view)}

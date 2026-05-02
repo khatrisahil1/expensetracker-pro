@@ -2,8 +2,6 @@
 import React, { createContext, useContext, useEffect, useState, ReactNode, PropsWithChildren, useRef } from 'react';
 // Firebase Imports
 import firebase from 'firebase/compat/app';
-import 'firebase/compat/messaging';
-import { getMessaging, getToken } from 'firebase/messaging';
 import { 
   getAuth, 
   signInWithEmailAndPassword, 
@@ -19,6 +17,7 @@ import {
   sendEmailVerification as fbSendEmailVerification
 } from 'firebase/auth';
 import { getFirestore, enableIndexedDbPersistence, collection, addDoc, query, where, onSnapshot, orderBy, doc, deleteDoc, Timestamp, setDoc, getDoc, updateDoc, deleteField, writeBatch } from 'firebase/firestore';
+import { checkBudgetThresholds, checkDailyReminder, checkMonthlySummary } from '../utils/notifications';
 // Gemini API helpers
 import { createGeminiClient } from "../utils/gemini";
 
@@ -63,6 +62,10 @@ export interface Transaction {
   paymentMethod?: string;
   tags?: string[];
   userId?: string;
+  isSubscription?: boolean;
+  subscriptionFrequency?: 'monthly' | 'yearly' | 'weekly';
+  subscriptionStatus?: 'active' | 'paused';
+  nextRenewalDate?: string;
   createdAt?: { seconds: number, nanoseconds: number };
 }
 
@@ -89,13 +92,10 @@ export interface SavingsGoal {
 export interface AppNotification {
   id: string;
   title: string;
-  msg: string;
-  time: string; // human readable
-  icon: string;
+  body: string;
+  timestamp: number;
   read: boolean;
-  createdAt: { seconds: number; nanoseconds: number } | Date;
-  type?: string;
-  meta?: Record<string, any>;
+  type: 'info' | 'warning' | 'success' | 'alert';
 }
 
 export interface UserSettings {
@@ -106,13 +106,7 @@ export interface UserSettings {
   monthlyIncomeGoal?: number;
   monthlyExpenseLimit?: number;
   theme?: 'light' | 'dark';
-  notifications?: boolean; // Master toggle
-  notificationPreferences?: {
-      dailyReminder: boolean;
-      budgetAlerts: boolean;
-      monthlyReport: boolean;
-      marketing: boolean;
-  };
+
   dateFormat?: 'DD/MM/YYYY' | 'MM/DD/YYYY' | 'YYYY-MM-DD';
   language?: string;
   shakeToLock?: boolean;
@@ -130,6 +124,13 @@ export interface UserSettings {
   location?: string;
   mfaEnabled?: boolean;
   financialGoal?: 'saving' | 'debt' | 'tracking' | 'investing';
+  notificationPrefs: {
+    dailyCheckIn: boolean;
+    budgetThresholds: boolean;
+    monthlyInsights: boolean;
+    tipsAndTricks: boolean;
+  };
+  notificationTune: string;
 }
 
 interface UndoState {
@@ -143,7 +144,7 @@ interface StoreContextType {
   loading: boolean;
   transactions: Transaction[];
   impulseItems: ImpulseItem[]; 
-  // Auth Actions
+  notifications: AppNotification[];  // Auth Actions
   login: (email: string, pass: string) => Promise<void>;
   signup: (email: string, pass: string, name?: string, avatar?: string) => Promise<void>;
   googleLogin: () => Promise<void>;
@@ -167,14 +168,7 @@ interface StoreContextType {
   toggleWidget: (key: string) => void;
   updateWidgetOrder: (newOrder: string[]) => void; 
   widgetOrder: string[];
-  // Notifications
-  notifications: AppNotification[];
-  markNotificationRead: (id: string) => Promise<void>;
-  markAllNotificationsRead: () => Promise<void>;
-  clearNotifications: () => Promise<void>;
-  addNotification: (notification: Omit<AppNotification, 'id' | 'createdAt'>, id?: string) => Promise<void>;
-  pushToken: string | null;
-  registerPushNotifications: () => Promise<string | null>;
+
   // Settings & Security
   completeOnboarding: (data: { name: string, age: string, gender: string, currency: string, initialBalance: number, income: number, budget: number, goal: string }) => Promise<void>;
   updateUserSettings: (settings: Partial<UserSettings>) => Promise<void>;
@@ -187,17 +181,18 @@ interface StoreContextType {
   removeAppPin: () => Promise<void>;
   unlockApp: (pin: string) => boolean;
   lockApp: () => void;
-  // Undo Support
+  sendVerificationEmail: () => Promise<void>;
   undoState: UndoState;
+  // Notifications Actions
+  addNotification: (title: string, body: string, type?: AppNotification['type']) => void;
+  markNotificationsRead: () => void;
+  clearNotifications: () => void;
   showUndo: (tx: Transaction) => void;
   clearUndo: () => void;
   // AI Features
   generateFinancialAudit: () => Promise<string>;
   verifyBiometric: () => Promise<boolean>;
-  sendVerificationEmail: () => Promise<void>;
-  // Notifications (browser)
-  requestNotificationPermission: () => Promise<boolean>;
-  sendLocalNotification: (title: string, body: string) => void;
+
 }
 
 const StoreContext = createContext<StoreContextType | undefined>(undefined);
@@ -223,9 +218,26 @@ export const StoreProvider = ({ children }: PropsWithChildren) => {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [impulseItems, setImpulseItems] = useState<ImpulseItem[]>([]);
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
-  const [pushToken, setPushToken] = useState<string | null>(null);
-  const notificationTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const notificationSchedulerRef = useRef<{ lastDailyId?: string; lastMonthlyId?: string; lastBudgetId?: string }>({});
+
+  // Load notifications from local storage on mount
+  useEffect(() => {
+    const saved = localStorage.getItem('app_notifications');
+    if (saved) {
+      try {
+        setNotifications(JSON.parse(saved));
+      } catch (e) {
+        console.error("Failed to parse notifications", e);
+      }
+    }
+  }, []);
+
+  // Sync notifications to local storage
+  useEffect(() => {
+    localStorage.setItem('app_notifications', JSON.stringify(notifications));
+  }, [notifications]);
+
+  const transactionsRef = useRef<Transaction[]>([]);
+  useEffect(() => { transactionsRef.current = transactions; }, [transactions]);
   
   // App UI State
   const [isDemo, setIsDemo] = useState(false);
@@ -292,7 +304,25 @@ export const StoreProvider = ({ children }: PropsWithChildren) => {
     return () => { unsubTx(); unsubImpulse(); };
   }, [user, isDemo]);
 
-  // 3. User Settings Listener
+  // 3. Notification Observer
+  useEffect(() => {
+    if (!userSettings?.notificationPrefs) return;
+
+    // Check budget thresholds when transactions or limit changes
+    checkBudgetThresholds(transactions, userSettings.monthlyExpenseLimit || 0, userSettings.notificationPrefs, addNotification);
+    
+    // Check monthly summary
+    checkMonthlySummary(transactions, userSettings.notificationPrefs, addNotification);
+
+    // Set up a timer for the daily 9 PM reminder
+    const timer = setInterval(() => {
+        checkDailyReminder(userSettings.notificationPrefs, addNotification);
+    }, 60000); // Check every minute
+
+    return () => clearInterval(timer);
+  }, [transactions.length, userSettings?.monthlyExpenseLimit, userSettings?.notificationPrefs]);
+
+  // 4. User Settings Listener
   useEffect(() => {
     if (isDemo) return;
     if (!user) return;
@@ -309,8 +339,6 @@ export const StoreProvider = ({ children }: PropsWithChildren) => {
           monthlyIncomeGoal: data.monthlyIncomeGoal || 0,
           monthlyExpenseLimit: data.monthlyExpenseLimit || 0,
           theme: data.theme || 'dark',
-          notifications: data.notifications ?? true,
-          notificationPreferences: data.notificationPreferences || { dailyReminder: true, budgetAlerts: true, monthlyReport: true, marketing: false },
           dateFormat: data.dateFormat || 'DD/MM/YYYY',
           language: data.language || 'English',
           shakeToLock: data.shakeToLock ?? false,
@@ -328,6 +356,13 @@ export const StoreProvider = ({ children }: PropsWithChildren) => {
           location: data.location || '',
           mfaEnabled: data.mfaEnabled || false,
           financialGoal: data.financialGoal || 'tracking',
+          notificationPrefs: data.notificationPrefs || {
+            dailyCheckIn: true,
+            budgetThresholds: true,
+            monthlyInsights: true,
+            tipsAndTricks: true
+          },
+          notificationTune: data.notificationTune || 'Aurora'
         };
         setUserSettings(settings);
         setPinState(data.appPin || null);
@@ -343,12 +378,7 @@ export const StoreProvider = ({ children }: PropsWithChildren) => {
         const initial = {
             currency: 'INR', displayName: user.displayName || 'User', hasCompletedOnboarding: false, theme: 'dark' as const,
             paymentMethods: DEFAULT_PAYMENT_METHODS, expenseCategories: DEFAULT_EXPENSE_CATS, incomeCategories: DEFAULT_INCOME_CATS,
-            categoryBudgets: {}, realizedSavings: 0, savingsGoals: [], notificationPreferences: {
-                                                                                                  dailyReminder: true,
-                                                                                                  budgetAlerts: true,
-                                                                                                  monthlyReport: true,
-                                                                                                  marketing: false
-                                                                                                }
+            categoryBudgets: {}, realizedSavings: 0, savingsGoals: []
         };
         setUserSettings(initial as UserSettings);
         document.documentElement.classList.add('dark');
@@ -359,133 +389,7 @@ export const StoreProvider = ({ children }: PropsWithChildren) => {
     return unsubscribe;
   }, [user, isDemo]);
 
-  // 4. Notifications listener (Firestore)
-  useEffect(() => {
-    if (isDemo) return;
-    if (!user) return;
 
-    const q = query(collection(db, 'users', user.uid, 'notifications'), orderBy('createdAt', 'desc'));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const notifs = snapshot.docs.map(doc => ({ id: doc.id, ...(doc.data() as any) })) as AppNotification[];
-      setNotifications(notifs);
-    });
-
-    return unsubscribe;
-  }, [user, isDemo]);
-
-  // 5. Scheduled/auto notifications (daily reminders, monthly report, budget alerts)
-  useEffect(() => {
-    // Always clear any existing scheduler when deps change
-    if (notificationTimerRef.current) clearInterval(notificationTimerRef.current);
-
-    if (!user || isDemo) return;
-    if (!userSettings?.notifications) return;
-
-    notificationSchedulerRef.current = {};
-
-    const scheduleCheck = async () => {
-      try {
-        const now = new Date();
-        const today = now.toISOString().split('T')[0];
-
-        const hasNotification = (id: string) => notifications.some(n => n.id === id) || !!notificationSchedulerRef.current[id];
-
-        const createIfMissing = async (id: string, payload: Omit<AppNotification, 'id' | 'createdAt'>) => {
-          if (hasNotification(id)) return;
-          notificationSchedulerRef.current[id] = true;
-          await addNotification(payload, id);
-          if (userSettings?.notifications) {
-            await sendLocalNotification(payload.title, payload.msg);
-          }
-        };
-
-        // DAILY REMINDERS (11am, 4pm, 10pm)
-        if (userSettings.notificationPreferences?.dailyReminder) {
-          const slots = [11, 16, 22];
-          slots.forEach(hour => {
-            const id = `daily-${today}-${hour}`;
-            const target = new Date(now);
-            target.setHours(hour, 0, 0, 0);
-            if (now >= target) {
-              createIfMissing(id, {
-                title: 'Daily Check-in',
-                msg: `Hey! Take a quick moment to log today’s spending.`,
-                time: target.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-                icon: 'check_circle',
-                read: false,
-                type: 'dailyReminder'
-              });
-            }
-          });
-        }
-
-        // MONTHLY REPORT (1st at 9am, summarizing previous month)
-        if (userSettings.notificationPreferences?.monthlyReport) {
-          const monthStart = new Date(now.getFullYear(), now.getMonth(), 1, 9, 0, 0);
-          const reportMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-          const reportId = `monthly-${reportMonth.getFullYear()}-${String(reportMonth.getMonth() + 1).padStart(2, '0')}`;
-          if (now >= monthStart) {
-            // build summary for previous month
-            const prevMonth = reportMonth.getMonth();
-            const prevYear = reportMonth.getFullYear();
-            const monthTransactions = transactions.filter(t => {
-              const d = new Date(t.date);
-              return d.getFullYear() === prevYear && d.getMonth() === prevMonth;
-            });
-            const totalExpense = monthTransactions.filter(t => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0);
-            const totalIncome = monthTransactions.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0);
-            const topCategory = Object.entries(monthTransactions.reduce((acc, t) => {
-              if (t.type !== 'expense') return acc;
-              acc[t.category] = (acc[t.category] || 0) + t.amount;
-              return acc;
-            }, {} as Record<string, number>)).sort(([,a],[,b]) => b-a)[0]?.[0] || 'various';
-
-            await createIfMissing(reportId, {
-              title: 'Monthly Report Ready',
-              msg: `Last month you spent ${userSettings.currency || '₹'}${totalExpense.toFixed(0)} and earned ${userSettings.currency || '₹'}${totalIncome.toFixed(0)}. Top spend: ${topCategory}.`,
-              time: monthStart.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-              icon: 'assessment',
-              read: false,
-              type: 'monthlyReport'
-            });
-          }
-        }
-
-        // BUDGET ALERTS (month expense exceeds limit)
-        if (userSettings.notificationPreferences?.budgetAlerts && userSettings.monthlyExpenseLimit && userSettings.monthlyExpenseLimit > 0) {
-          const currentMonth = now.getMonth();
-          const currentYear = now.getFullYear();
-          const monthExpense = transactions.filter(t => {
-            const d = new Date(t.date);
-            return t.type === 'expense' && d.getFullYear() === currentYear && d.getMonth() === currentMonth;
-          }).reduce((sum, t) => sum + t.amount, 0);
-
-          if (monthExpense >= userSettings.monthlyExpenseLimit) {
-            const budgetId = `budget-exceeded-${currentYear}-${String(currentMonth + 1).padStart(2, '0')}`;
-            await createIfMissing(budgetId, {
-              title: 'Budget Limit Reached',
-              msg: `You have exceeded your monthly budget of ${userSettings.currency || '₹'}${userSettings.monthlyExpenseLimit.toFixed(0)}.`,
-              time: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-              icon: 'warning',
-              read: false,
-              type: 'budgetAlert'
-            });
-          }
-        }
-      } catch (e) {
-        console.error('Notification scheduler error', e);
-      }
-    };
-
-    // Run immediately, then every minute
-    scheduleCheck();
-    if (notificationTimerRef.current) clearInterval(notificationTimerRef.current);
-    notificationTimerRef.current = setInterval(scheduleCheck, 60_000);
-
-    return () => {
-      if (notificationTimerRef.current) clearInterval(notificationTimerRef.current);
-    };
-  }, [user, isDemo, userSettings, transactions, notifications]);
 
   // --- ACTIONS ---
   const login = async (email: string, pass: string) => { await signInWithEmailAndPassword(auth, email, pass); };
@@ -593,7 +497,14 @@ export const StoreProvider = ({ children }: PropsWithChildren) => {
     await updateUserSettings({
       displayName: data.name, age: data.age, gender: data.gender, currency: data.currency,
       monthlyIncomeGoal: data.income, monthlyExpenseLimit: data.budget,
-      financialGoal: data.goal as any, hasCompletedOnboarding: true
+      financialGoal: data.goal as any, hasCompletedOnboarding: true,
+      notificationPrefs: {
+        dailyCheckIn: true,
+        budgetThresholds: true,
+        monthlyInsights: true,
+        tipsAndTricks: true
+      },
+      notificationTune: 'Aurora'
     });
 
     if (data.initialBalance > 0) {
@@ -690,7 +601,27 @@ export const StoreProvider = ({ children }: PropsWithChildren) => {
 
   const deleteTransaction = async (id: string) => {
     if (isDemo) return;
-    if (user) await deleteDoc(doc(db, 'transactions', id));
+    await deleteDoc(doc(db, 'transactions', id));
+  };
+
+  const addNotification = (title: string, body: string, type: AppNotification['type'] = 'info') => {
+    const newNotif: AppNotification = {
+      id: Math.random().toString(36).substring(7),
+      title,
+      body,
+      timestamp: Date.now(),
+      read: false,
+      type
+    };
+    setNotifications(prev => [newNotif, ...prev].slice(0, 50)); // Keep last 50
+  };
+
+  const markNotificationsRead = () => {
+    setNotifications(prev => prev.map(n => ({...n, read: true})));
+  };
+
+  const clearNotifications = () => {
+    setNotifications([]);
   };
   
   const clearAllTransactions = async () => {
@@ -705,70 +636,6 @@ export const StoreProvider = ({ children }: PropsWithChildren) => {
 
   const updateTransaction = async (id: string, updates: Partial<Transaction>) => { if (user) await setDoc(doc(db, 'transactions', id), updates, { merge: true }); };
   const restoreTransaction = async (tx: Transaction) => { if (user) { const { id, ...data } = tx; await setDoc(doc(db, 'transactions', id), data); } };
-
-  const addNotification = async (notification: Omit<AppNotification, 'id' | 'createdAt'>, id?: string) => {
-    if (isDemo) {
-      setNotifications(prev => [{ id: id ?? crypto.randomUUID(), createdAt: new Date(), ...notification }, ...prev]);
-      return;
-    }
-    if (!user) return;
-    const docId = id || crypto.randomUUID();
-    await setDoc(doc(db, 'users', user.uid, 'notifications', docId), {
-      ...notification,
-      read: notification.read ?? false,
-      createdAt: Timestamp.now()
-    }, { merge: true });
-  };
-
-  const markNotificationRead = async (id: string) => {
-    if (isDemo) {
-      setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
-      return;
-    }
-    if (!user) return;
-
-    // Optimistically update UI
-    setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
-
-    try {
-      await updateDoc(doc(db, 'users', user.uid, 'notifications', id), { read: true });
-    } catch (e) {
-      console.error('Failed to mark notification read', e);
-    }
-  };
-
-  const clearNotifications = async () => {
-    if (isDemo) {
-      setNotifications([]);
-      return;
-    }
-    if (!user) return;
-    const batch = writeBatch(db);
-    notifications.forEach(n => batch.delete(doc(db, 'users', user.uid, 'notifications', n.id)));
-    await batch.commit();
-  };
-
-  const markAllNotificationsRead = async () => {
-    if (isDemo) {
-      setNotifications(prev => prev.map(n => ({ ...n, read: true })));
-      return;
-    }
-    if (!user) return;
-
-    const unread = notifications.filter(n => !n.read);
-    if (unread.length === 0) return;
-
-    // Optimistically update UI
-    setNotifications(prev => prev.map(n => ({ ...n, read: true })));
-
-    const batch = writeBatch(db);
-    unread.forEach(n => batch.update(doc(db, 'users', user.uid, 'notifications', n.id), { read: true }));
-    try {
-      await batch.commit();
-    } catch (e) {
-      console.error('Failed to mark all notifications read', e);
-    }
-  };
 
   const showUndo = (tx: Transaction) => {
     if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
@@ -877,82 +744,6 @@ Respond with JSON only.`;
       }
   };
 
-  // --- NOTIFICATIONS ---
-  const requestNotificationPermission = async () => {
-      if (!('Notification' in window)) {
-          alert('This browser does not support desktop notifications');
-          return false;
-      }
-      const permission = await Notification.requestPermission();
-      return permission === 'granted';
-  };
-
-  const sendLocalNotification = async (title: string, body: string) => {
-      if (typeof Notification === 'undefined') return;
-      if (Notification.permission !== 'granted') return;
-
-      try {
-          // If a service worker is registered, use it for better delivery (background/focus handling).
-          if ('serviceWorker' in navigator) {
-              const registration = await navigator.serviceWorker.getRegistration();
-              if (registration) {
-                  registration.showNotification(title, {
-                      body,
-                      icon: '/icon.png',
-                      silent: false
-                  });
-                  return;
-              }
-          }
-
-          // Fallback to the standard Notification constructor.
-          new Notification(title, {
-              body,
-              icon: '/icon.png',
-              silent: false
-          });
-      } catch (e) {
-          console.warn('sendLocalNotification failed', e);
-      }
-  };
-
-  const registerPushNotifications = async () => {
-      // Requires browser notifications and service worker support.
-      if (typeof Notification === 'undefined' || !('serviceWorker' in navigator)) return null;
-      const granted = await requestNotificationPermission();
-      if (!granted) return null;
-
-      try {
-          // Register the firebase messaging service worker (used for background push delivery).
-          const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
-
-          // Use the modular Firebase Messaging API (more reliable for token generation).
-          const messaging = getMessaging(app);
-          const vapidKey = import.meta.env.VITE_FCM_VAPID_KEY || import.meta.env.VITE_VAPID_KEY;
-
-          if (!vapidKey) {
-              console.warn('VAPID key not configured (VITE_FCM_VAPID_KEY or VITE_VAPID_KEY). Push notifications will not work without it.');
-              return null;
-          }
-
-          console.log('registerPushNotifications: using VAPID key?', Boolean(vapidKey));
-
-          const token = await getToken(messaging, { vapidKey, serviceWorkerRegistration: registration });
-          console.log('registerPushNotifications: getToken returned', token);
-          if (token && user) {
-              setPushToken(token);
-              // Persist the token to Firestore so you can send messages from a backend/Cloud Function.
-              const tokenRef = doc(db, 'users', user.uid, 'fcmTokens', token);
-              await setDoc(tokenRef, { createdAt: Timestamp.now() });
-          }
-
-          return token;
-      } catch (e) {
-          console.warn('registerPushNotifications failed', e);
-          return null;
-      }
-  };
-
   return (
     <StoreContext.Provider value={{
       user, userSettings, loading, transactions, impulseItems, login, signup, googleLogin, logout, 
@@ -984,12 +775,10 @@ Respond with JSON only.`;
         setLoading(false);
         localStorage.setItem('demo', '1');
       }, isDemo,
-      notifications, markNotificationRead, markAllNotificationsRead, clearNotifications, addNotification,
-      pushToken, registerPushNotifications,
       isPinSet: !!appPin, isAppLocked, setAppPin, removeAppPin, unlockApp, lockApp,
       undoState, showUndo, clearUndo,
-      generateFinancialAudit, verifyBiometric, sendVerificationEmail,
-      requestNotificationPermission, sendLocalNotification
+      notifications, addNotification, markNotificationsRead, clearNotifications,
+      generateFinancialAudit, verifyBiometric, sendVerificationEmail
     }}>
       {children}
     </StoreContext.Provider>

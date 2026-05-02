@@ -5,11 +5,35 @@ import { DotLottieReact } from "@lottiefiles/dotlottie-react";
 import { getGeminiApiKey, setGeminiApiKey, clearGeminiApiKey } from '../utils/gemini';
 
 const SettingsScreen: React.FC = () => {
-  const { logout, user, updateUserSettings, userSettings, toggleTheme, updatePassword, deleteAccount, setAppPin, removeAppPin, sendVerificationEmail, refreshUser, requestNotificationPermission, sendLocalNotification, registerPushNotifications, pushToken, transactions, addTransaction, clearAllTransactions } = useStore();
+  const { logout, user, updateUserSettings, userSettings, toggleTheme, updatePassword, deleteAccount, setAppPin, removeAppPin, sendVerificationEmail, refreshUser, transactions, addTransaction, clearAllTransactions } = useStore();
   const [activeTab, setActiveTab] = useState('general');
   const [showMobileContent, setShowMobileContent] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState('');
+
+  const stats = React.useMemo(() => {
+    const expenses = transactions.filter(t => t.type === 'expense');
+    const income = transactions.filter(t => t.type === 'income');
+    
+    const totalExp = expenses.reduce((sum, t) => sum + t.amount, 0);
+    const totalInc = income.reduce((sum, t) => sum + t.amount, 0);
+    
+    const health = totalInc > 0 ? Math.min(100, Math.max(0, Math.round(((totalInc - totalExp) / totalInc) * 100))) : 0;
+    
+    const catMap: Record<string, number> = {};
+    expenses.forEach(e => {
+        catMap[e.category] = (catMap[e.category] || 0) + e.amount;
+    });
+    const topCat = Object.entries(catMap).sort((a,b) => b[1] - a[1])[0]?.[0] || 'N/A';
+
+    let persona = "Newcomer";
+    if (health > 40) persona = "Wealth Builder";
+    else if (health > 20) persona = "Savvy Saver";
+    else if (health > 0) persona = "Balanced";
+    else if (totalExp > 0) persona = "Heavy Spender";
+
+    return { health, topCat, persona, totalExp, totalInc };
+  }, [transactions]);
 
   // Pro Modal State
   const [showProModal, setShowProModal] = useState(false);
@@ -40,15 +64,21 @@ const SettingsScreen: React.FC = () => {
   const [geminiKeyInput, setGeminiKeyInput] = useState('');
   const [geminiKeyStored, setGeminiKeyStored] = useState<string | null>(null);
 
-  // Notifications
-  const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>('default');
-  const [pushRegistrationError, setPushRegistrationError] = useState<string | null>(null);
 
   // List states
   const [paymentMethods, setPaymentMethods] = useState<string[]>([]);
   const [expenseCategories, setExpenseCategories] = useState<string[]>([]);
   const [incomeCategories, setIncomeCategories] = useState<string[]>([]);
   const [newItems, setNewItems] = useState({ pay: '', exp: '', inc: '' });
+
+  // Notification settings local state
+  const [notifPrefs, setNotifPrefs] = useState({
+      dailyCheckIn: true,
+      budgetThresholds: true,
+      monthlyInsights: true,
+      tipsAndTricks: true
+  });
+  const [notifTune, setNotifTune] = useState('Aurora');
 
   useEffect(() => {
     if (userSettings) {
@@ -63,6 +93,8 @@ const SettingsScreen: React.FC = () => {
       setPaymentMethods(userSettings.paymentMethods || []);
       setExpenseCategories(userSettings.expenseCategories || []);
       setIncomeCategories(userSettings.incomeCategories || []);
+      if (userSettings.notificationPrefs) setNotifPrefs(userSettings.notificationPrefs);
+      if (userSettings.notificationTune) setNotifTune(userSettings.notificationTune);
     }
 
     const envKey = getGeminiApiKey();
@@ -70,27 +102,7 @@ const SettingsScreen: React.FC = () => {
     setGeminiKeyInput(envKey || '');
   }, [userSettings, user]);
 
-  useEffect(() => {
-    if (typeof Notification !== 'undefined') {
-      setNotificationPermission(Notification.permission);
-    }
-  }, []);
 
-  useEffect(() => {
-    if (userSettings?.notifications && !pushToken) {
-      // Try to register again if the user has notifications enabled but we don't have a token yet.
-      registerPushNotifications?.().then((token) => {
-        if (!token) {
-          setPushRegistrationError('Push token not generated yet.');
-        } else {
-          setPushRegistrationError(null);
-        }
-      }).catch((e) => {
-        console.warn('registerPushNotifications (auto) failed', e);
-        setPushRegistrationError(String(e));
-      });
-    }
-  }, [userSettings?.notifications, pushToken, registerPushNotifications]);
 
   const showToast = (msg: string) => {
       setSaveMessage(msg);
@@ -196,117 +208,6 @@ const SettingsScreen: React.FC = () => {
       else setIncomeCategories(incomeCategories.filter(i => i !== val));
   };
 
-  // --- NOTIFICATION HANDLERS ---
-  const toggleNotification = async (key: keyof NonNullable<typeof userSettings>['notificationPreferences']) => {
-      if (!userSettings?.notificationPreferences) return;
-      
-      const currentState = userSettings.notificationPreferences[key];
-      // If turning ON, request permission first
-      if (!currentState) {
-          const granted = await requestNotificationPermission();
-          if (!granted) {
-              alert("You must allow notifications in your browser settings first.");
-              return;
-          }
-      }
-
-      const newPrefs = { ...userSettings.notificationPreferences, [key]: !currentState };
-      await updateUserSettings({ notificationPreferences: newPrefs });
-      showToast(`${(key as string).replace(/([A-Z])/g, ' $1')} ${!currentState ? 'Enabled' : 'Disabled'}`);
-  };
-
-  const handleToggleNotificationsMaster = async () => {
-      if (!userSettings) return;
-      const willEnable = !userSettings.notifications;
-
-      if (willEnable) {
-          if (typeof Notification === 'undefined') {
-              alert('This browser does not support desktop notifications.');
-              return;
-          }
-
-          const granted = await requestNotificationPermission();
-          setNotificationPermission(Notification.permission);
-          if (!granted) {
-              alert('Please enable notifications in your browser settings to receive alerts.');
-              return;
-          }
-      }
-
-      await updateUserSettings({ notifications: willEnable });
-      showToast(`Notifications ${willEnable ? 'Enabled' : 'Disabled'}`);
-
-      // If notifications are enabled, register for push (device-level) so we can receive messages even when the app is in the background.
-      if (willEnable) {
-          const token = await registerPushNotifications?.();
-          if (token) {
-              showToast('Push notifications enabled');
-          }
-      }
-  };
-
-  const handleTestNotification = async () => {
-      if (typeof Notification === 'undefined') {
-          alert('This browser does not support desktop notifications.');
-          return;
-      }
-
-      // Keep the UI in-sync with the browser's permission state
-      setNotificationPermission(Notification.permission);
-
-      let granted = Notification.permission === 'granted';
-      if (!granted) {
-          granted = await requestNotificationPermission();
-          setNotificationPermission(Notification.permission);
-      }
-
-      if (granted) {
-          sendLocalNotification("Test Alert 🔔", "This is how your financial updates will appear.");
-          showToast("Notification Sent");
-      } else {
-          alert("Permission denied. Please enable notifications in your browser settings.");
-      }
-  };
-
-  const sendPushFromApp = async () => {
-      if (!pushToken) {
-          alert('No push token available yet. Enable notifications first and refresh.');
-          return;
-      }
-
-      let serverKey = import.meta.env.VITE_FCM_SERVER_KEY;
-      if (!serverKey) {
-          serverKey = window.prompt('Paste your FCM server key (from Firebase Console):');
-      }
-      if (!serverKey) return;
-
-      const title = window.prompt('Notification title:', 'Test Push') || 'Test Push';
-      const body = window.prompt('Notification body:', 'This is a test push.') || 'This is a test push.';
-
-      try {
-          const res = await fetch('https://fcm.googleapis.com/fcm/send', {
-              method: 'POST',
-              headers: {
-                  'Authorization': `key=${serverKey}`,
-                  'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                  to: pushToken,
-                  notification: { title, body },
-              }),
-          });
-
-          if (!res.ok) {
-              const text = await res.text();
-              throw new Error(`FCM error ${res.status}: ${text}`);
-          }
-
-          showToast('Push sent (check your device)');
-      } catch (e: any) {
-          console.error('sendPushFromApp failed', e);
-          alert(`Failed to send push: ${e.message || e}`);
-      }
-  };
 
   // --- DATA HANDLERS ---
   const handleExportData = (format: 'csv' | 'json') => {
@@ -470,7 +371,7 @@ const SettingsScreen: React.FC = () => {
   const tabs = [
       { id: 'general', label: 'General', icon: 'tune' },
       { id: 'account', label: 'Account', icon: 'person' },
-      { id: 'notifications', label: 'Alerts', icon: 'notifications' },
+      { id: 'notifications', label: 'Notifications', icon: 'notifications' },
       { id: 'security', label: 'Security', icon: 'lock' },
       { id: 'data', label: 'Data & Privacy', icon: 'database' },
       { id: 'about', label: 'Support', icon: 'support_agent' }
@@ -565,9 +466,73 @@ const SettingsScreen: React.FC = () => {
           </div>
       )}
 
-      <div className="flex flex-col gap-1 mb-8 md:mb-12">
+
+
+      <div className="flex flex-col gap-1 mb-10 transition-all duration-500">
           <h3 className="text-3xl md:text-5xl font-black tracking-tight text-text-light-main dark:text-text-dark-main">Profile</h3>
-          <p className="text-text-light-muted dark:text-text-dark-muted text-sm md:text-lg">Fine-tune your finances.</p>
+          <p className="text-text-light-muted dark:text-text-dark-muted text-sm md:text-lg">Your financial identity and preferences.</p>
+      </div>
+
+      {/* --- RICH PROFILE HEADER --- */}
+      <div className="mb-12 bg-surface-light dark:bg-surface-dark border border-border-light dark:border-border-dark rounded-[3rem] p-8 md:p-12 shadow-sm relative overflow-hidden group transition-all duration-700">
+          {/* Ambient Background Glow */}
+          <div className="absolute -right-20 -top-20 w-80 h-80 bg-primary/10 blur-[100px] rounded-full pointer-events-none group-hover:bg-primary/15 transition-colors duration-700" />
+          
+          <div className="relative z-10 flex flex-col md:flex-row items-center gap-10">
+              {/* Avatar Section */}
+              <div className="relative">
+                  <div className="size-32 md:size-40 rounded-[2.5rem] bg-gray-100 dark:bg-surface-darker p-1 border-2 border-primary/20 shadow-xl overflow-hidden group-hover:border-primary/40 transition-colors">
+                      {userSettings?.avatar ? (
+                          <img src={userSettings.avatar} alt="Profile" className="w-full h-full object-cover rounded-[2.2rem]" />
+                      ) : (
+                          <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary/20 to-primary/5 text-primary text-5xl font-black">
+                              {userSettings?.displayName?.[0] || user?.email?.[0] || "?"}
+                          </div>
+                      )}
+                  </div>
+                  <div className="absolute -bottom-2 -right-2 size-10 bg-primary text-black rounded-2xl flex items-center justify-center shadow-lg border-4 border-surface-light dark:border-surface-dark">
+                      <span className="material-symbols-outlined text-xl">verified</span>
+                  </div>
+              </div>
+
+              {/* Identity Info */}
+              <div className="flex-1 flex flex-col items-center md:items-start text-center md:text-left gap-4">
+                  <div className="flex flex-col gap-1">
+                      <div className="flex items-center gap-3">
+                        <h2 className="text-3xl md:text-4xl font-black text-text-light-main dark:text-text-dark-main uppercase tracking-tight leading-none">
+                            {userSettings?.displayName || "Expense User"}
+                        </h2>
+                      </div>
+                      <p className="text-text-light-muted dark:text-text-dark-muted font-bold text-lg opacity-60">{user?.email}</p>
+                  </div>
+
+                  <div className="flex flex-wrap items-center justify-center md:justify-start gap-3">
+                      <div className="px-4 py-2 bg-primary/10 border border-primary/20 rounded-full flex items-center gap-2">
+                          <span className="size-2 bg-primary rounded-full animate-pulse" />
+                          <span className="text-[10px] font-black uppercase tracking-widest text-primary">{stats.persona}</span>
+                      </div>
+                      <div className="px-4 py-2 bg-gray-100 dark:bg-surface-darker border border-border-light dark:border-border-dark rounded-full flex items-center gap-2">
+                          <span className="material-symbols-outlined text-base opacity-40">calendar_today</span>
+                          <span className="text-[10px] font-black uppercase tracking-widest opacity-60">Joined Jan 2024</span>
+                      </div>
+                  </div>
+              </div>
+
+              {/* Quick Stats Grid */}
+              <div className="grid grid-cols-2 gap-4 w-full md:w-auto">
+                  <div className="bg-gray-100 dark:bg-surface-darker p-5 rounded-3xl border border-border-light dark:border-border-dark flex flex-col gap-1 items-center md:items-start min-w-[140px]">
+                      <span className="text-[10px] font-black uppercase tracking-widest text-text-light-muted opacity-60">Wallet Health</span>
+                      <div className="flex items-baseline gap-1">
+                        <span className="text-2xl font-black text-primary">{stats.health}%</span>
+                        <span className="material-symbols-outlined text-primary text-lg">trending_up</span>
+                      </div>
+                  </div>
+                  <div className="bg-gray-100 dark:bg-surface-darker p-5 rounded-3xl border border-border-light dark:border-border-dark flex flex-col gap-1 items-center md:items-start min-w-[140px]">
+                      <span className="text-[10px] font-black uppercase tracking-widest text-text-light-muted opacity-60">Top Category</span>
+                      <span className="text-xl font-black uppercase tracking-tight truncate max-w-[100px]">{stats.topCat}</span>
+                  </div>
+              </div>
+          </div>
       </div>
 
       <div className="flex flex-col lg:flex-row gap-10">
@@ -577,13 +542,13 @@ const SettingsScreen: React.FC = () => {
             <button 
                 key={tab.id} 
                 onClick={() => { setActiveTab(tab.id); setShowMobileContent(true); }} 
-                className={`text-left px-6 py-4 rounded-2xl text-sm font-black uppercase tracking-widest transition-all flex items-center justify-between group border ${activeTab === tab.id ? 'bg-primary text-[#131811] border-primary shadow-glow' : 'bg-surface-light dark:bg-surface-dark border-border-light dark:border-border-dark text-text-light-muted hover:border-primary/40'}`}
+                className={`text-left px-6 py-4 rounded-2xl text-sm font-black uppercase tracking-widest transition-all flex items-center justify-between group border backdrop-blur-sm ${activeTab === tab.id ? 'bg-primary text-[#131811] border-primary shadow-glow scale-[1.02]' : 'bg-surface-light/40 dark:bg-surface-dark/40 border-border-light dark:border-border-dark text-text-light-muted hover:border-primary/40 hover:bg-gray-50/50 dark:hover:bg-white/5'}`}
             >
               <div className="flex items-center gap-4">
-                  <span className="material-symbols-outlined text-xl">{tab.icon}</span>
+                  <span className={`material-symbols-outlined text-xl transition-transform group-hover:scale-110 ${activeTab === tab.id ? 'text-[#131811]' : 'text-primary'}`}>{tab.icon}</span>
                   {tab.label}
               </div>
-              <span className="material-symbols-outlined opacity-30 group-hover:translate-x-1 transition-transform">chevron_right</span>
+              <span className={`material-symbols-outlined transition-all ${activeTab === tab.id ? 'opacity-100' : 'opacity-20 group-hover:opacity-100 group-hover:translate-x-1'}`}>chevron_right</span>
             </button>
           ))}
           <div className="mt-8 pt-8 border-t border-border-light dark:border-border-dark flex flex-col gap-4">
@@ -719,38 +684,57 @@ const SettingsScreen: React.FC = () => {
               {activeTab === 'account' && (
                   <div className="flex flex-col gap-12">
                       
-                      {/* Subscription Card - Interactive */}
-                      <div className="bg-gradient-to-r from-indigo-500 to-purple-600 rounded-3xl p-8 text-white relative overflow-hidden shadow-lg group hover:scale-[1.01] transition-transform">
+                       {/* Subscription Card - Interactive */}
+                      <div className="bg-gradient-to-br from-indigo-600 via-purple-600 to-indigo-800 rounded-3xl p-8 text-white relative overflow-hidden shadow-xl group hover:scale-[1.01] transition-all duration-500 border border-white/10">
+                          {/* Animated Shimmer Overlay */}
+                          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000" />
                           <div className="absolute right-0 top-0 opacity-10 p-8"><span className="material-symbols-outlined text-9xl">diamond</span></div>
-                          <div className="relative z-10 flex flex-col gap-4">
+                          
+                          <div className="relative z-10 flex flex-col gap-6">
                               <div className="flex justify-between items-start">
                                   <div>
-                                      <div className="flex items-center gap-2 mb-1">
-                                          <span className="material-symbols-outlined text-yellow-300">verified</span>
-                                          <span className="text-xs font-black uppercase tracking-widest text-indigo-100">Active Plan</span>
+                                      <div className="flex items-center gap-2 mb-2">
+                                          <span className="material-symbols-outlined text-yellow-400 fill-current">verified</span>
+                                          <span className="text-[10px] font-black uppercase tracking-[0.2em] text-indigo-100">Premium Member</span>
                                       </div>
-                                      <h2 className="text-3xl font-black uppercase tracking-tight">Pro Membership</h2>
+                                      <h2 className="text-3xl md:text-4xl font-black uppercase tracking-tighter">Pro Plan</h2>
                                   </div>
-                                  <span className="bg-white/20 px-3 py-1 rounded-lg text-xs font-bold">$9.99/mo</span>
+                                  <div className="bg-white/15 backdrop-blur-md px-4 py-2 rounded-2xl text-[10px] font-black uppercase tracking-widest border border-white/10">Early Access</div>
                               </div>
-                              <div className="flex gap-4 mt-2">
+                              
+                              <div className="grid grid-cols-2 md:grid-cols-4 gap-6 py-4 border-y border-white/10">
                                   <div className="flex flex-col">
-                                      <span className="text-[10px] uppercase font-bold text-indigo-200">Member Since</span>
-                                      <span className="font-bold">Jan 2024</span>
+                                      <span className="text-[10px] uppercase font-bold text-indigo-200 tracking-widest">Savings</span>
+                                      <span className="text-xl font-black">+{stats.health}%</span>
                                   </div>
                                   <div className="flex flex-col">
-                                      <span className="text-[10px] uppercase font-bold text-indigo-200">Next Billing</span>
-                                      <span className="font-bold">Free Forever</span>
+                                      <span className="text-[10px] uppercase font-bold text-indigo-200 tracking-widest">Monthly Exp</span>
+                                      <span className="text-xl font-black">{userSettings?.currency || '₹'}{stats.totalExp.toLocaleString()}</span>
+                                  </div>
+                                  <div className="flex flex-col">
+                                      <span className="text-[10px] uppercase font-bold text-indigo-200 tracking-widest">Monthly Inc</span>
+                                      <span className="text-xl font-black">{userSettings?.currency || '₹'}{stats.totalInc.toLocaleString()}</span>
+                                  </div>
+                                  <div className="flex flex-col">
+                                      <span className="text-[10px] uppercase font-bold text-indigo-200 tracking-widest">Renewal</span>
+                                      <span className="text-xl font-black italic">Free</span>
                                   </div>
                               </div>
-                              <button onClick={() => setShowProModal(true)} className="mt-4 bg-white text-indigo-600 w-fit px-6 py-2 rounded-full font-black text-xs uppercase tracking-widest hover:bg-indigo-50 transition-colors shadow-md">
-                                  Manage Subscription
-                              </button>
+
+                              <div className="flex items-center justify-between">
+                                <button onClick={() => setShowProModal(true)} className="bg-white text-indigo-700 px-8 py-3 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-indigo-50 transition-all shadow-lg active:scale-95">
+                                    Manage Plan
+                                </button>
+                                <span className="text-[10px] font-bold text-white/40 uppercase tracking-widest">Lifetime Validity</span>
+                              </div>
                           </div>
                       </div>
 
                       <section>
-                          <h3 className="text-sm font-black uppercase tracking-[0.2em] text-primary mb-8 border-b border-border-light dark:border-border-dark pb-3">Personal Details</h3>
+                          <div className="flex items-center justify-between mb-8 border-b border-border-light dark:border-border-dark pb-3">
+                            <h3 className="text-sm font-black uppercase tracking-[0.2em] text-primary">Personal Details</h3>
+                            <div className="px-3 py-1 bg-primary/10 rounded-lg text-[10px] font-black text-primary uppercase tracking-widest">Sync Enabled</div>
+                          </div>
                           {/* ... Form inputs (avatar, name, email) same as before ... */}
                           <div className="flex justify-center mb-8">
                               <label className="relative group cursor-pointer">
@@ -768,34 +752,47 @@ const SettingsScreen: React.FC = () => {
                               </label>
                           </div>
 
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                               <div className="flex flex-col gap-2">
-                                  <label className="text-xs font-bold text-text-light-muted">Full Name</label>
-                                  <input type="text" value={accountForm.name} onChange={e => setAccountForm({...accountForm, name: e.target.value})} className="bg-gray-50 dark:bg-surface-darker border border-border-light dark:border-border-dark rounded-xl p-4 font-bold outline-none focus:border-primary" />
+                                  <label className="text-xs font-black uppercase tracking-[0.2em] text-text-light-muted ml-1">Full Name</label>
+                                  <input type="text" value={accountForm.name} onChange={e => setAccountForm({...accountForm, name: e.target.value})} className="bg-gray-50 dark:bg-surface-darker border border-border-light dark:border-border-dark rounded-2xl p-5 font-bold outline-none focus:border-primary transition-all focus:ring-4 focus:ring-primary/5 shadow-sm" />
                               </div>
                               <div className="flex flex-col gap-2">
-                                  <label className="text-xs font-bold text-text-light-muted">Email</label>
-                                  <input type="text" readOnly value={accountForm.email} className="bg-gray-100 dark:bg-border-dark opacity-50 border border-border-light dark:border-border-dark rounded-xl p-4 font-bold outline-none cursor-not-allowed" />
+                                  <label className="text-xs font-black uppercase tracking-[0.2em] text-text-light-muted ml-1">Email (Primary)</label>
+                                  <input type="text" readOnly value={accountForm.email} className="bg-gray-100 dark:bg-border-dark opacity-50 border border-border-light dark:border-border-dark rounded-2xl p-5 font-bold outline-none cursor-not-allowed" />
                               </div>
-                              <div className="md:col-span-2 grid grid-cols-2 gap-6">
+                              <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-3 gap-8">
                                   <div className="flex flex-col gap-2">
-                                    <label className="text-xs font-bold text-text-light-muted">Gender</label>
-                                    <select value={accountForm.gender} onChange={e => setAccountForm({...accountForm, gender: e.target.value})} className="bg-gray-50 dark:bg-surface-darker border border-border-light dark:border-border-dark rounded-xl p-4 font-bold outline-none focus:border-primary appearance-none">
-                                        <option value="">Select</option>
+                                    <label className="text-xs font-black uppercase tracking-[0.2em] text-text-light-muted ml-1">Gender</label>
+                                    <select value={accountForm.gender} onChange={e => setAccountForm({...accountForm, gender: e.target.value})} className="bg-gray-50 dark:bg-surface-darker border border-border-light dark:border-border-dark rounded-2xl p-5 font-bold outline-none focus:border-primary appearance-none cursor-pointer">
+                                        <option value="">Choose...</option>
                                         <option value="Male">Male</option>
                                         <option value="Female">Female</option>
-                                        <option value="Other">Non-binary</option>
+                                        <option value="Non-binary">Non-binary</option>
+                                        <option value="Secret">Prefer not to say</option>
                                     </select>
                                   </div>
                                   <div className="flex flex-col gap-2">
-                                      <label className="text-xs font-bold text-text-light-muted">Date of Birth</label>
-                                      <input type="date" value={accountForm.birthday} onChange={e => setAccountForm({...accountForm, birthday: e.target.value})} className="bg-gray-50 dark:bg-surface-darker border border-border-light dark:border-border-dark rounded-xl p-4 font-bold outline-none focus:border-primary" style={{colorScheme: 'dark'}} />
+                                    <label className="text-xs font-black uppercase tracking-[0.2em] text-text-light-muted ml-1">Birthday</label>
+                                    <input type="date" value={accountForm.birthday} onChange={e => setAccountForm({...accountForm, birthday: e.target.value})} className="bg-gray-50 dark:bg-surface-darker border border-border-light dark:border-border-dark rounded-2xl p-5 font-bold outline-none focus:border-primary" style={{colorScheme: 'dark'}} />
+                                  </div>
+                                  <div className="flex flex-col gap-2">
+                                    <label className="text-xs font-black uppercase tracking-[0.2em] text-text-light-muted ml-1">Location</label>
+                                    <input type="text" value={accountForm.location} onChange={e => setAccountForm({...accountForm, location: e.target.value})} className="bg-gray-50 dark:bg-surface-darker border border-border-light dark:border-border-dark rounded-2xl p-5 font-bold outline-none focus:border-primary" placeholder="City, Country" />
                                   </div>
                               </div>
                           </div>
-                          <button onClick={handleAccountSave} disabled={isSaving} className="mt-8 w-full bg-primary text-[#131811] py-4 rounded-2xl font-black uppercase tracking-widest text-xs shadow-glow transition-all active:scale-[0.98]">
-                              {isSaving ? 'Syncing...' : 'Save Details'}
-                          </button>
+
+                          <div className="mt-12 flex justify-end">
+                            <button 
+                                onClick={handleAccountSave} 
+                                disabled={isSaving}
+                                className="px-12 py-5 bg-primary text-[#131811] font-black uppercase tracking-[0.2em] text-xs rounded-2xl shadow-glow hover:scale-105 transition-all active:scale-95 disabled:opacity-50 flex items-center gap-3"
+                            >
+                                {isSaving ? <span className="material-symbols-outlined animate-spin text-sm">sync</span> : <span className="material-symbols-outlined text-sm">verified_user</span>}
+                                {isSaving ? 'Saving...' : 'Confirm Changes'}
+                            </button>
+                          </div>
                       </section>
 
                       {/* Password Reset Section */}
@@ -828,72 +825,68 @@ const SettingsScreen: React.FC = () => {
                   </div>
               )}
 
+
+
               {/* TAB: NOTIFICATIONS */}
               {activeTab === 'notifications' && (
-                  <div className="flex flex-col gap-8 animate-fade-in">
-                      <div className="bg-primary/5 border border-primary/20 p-6 rounded-3xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                          <div className="flex gap-4 items-start">
-                              <span className="material-symbols-outlined text-primary">notifications_active</span>
-                              <div>
-                                  <h3 className="text-sm font-bold text-text-light-main dark:text-text-dark-main">Smart Alerts</h3>
-                                  <p className="text-xs text-text-light-muted mt-1">Direct to your browser. No spam.</p>
-                                  <p className="text-xs text-text-light-muted mt-2">
-                                      Permission: <span className="font-bold capitalize">{notificationPermission}</span>
-                                      <span className="mx-1">·</span>
-                                      Status: <span className="font-bold">{userSettings?.notifications ? 'Enabled' : 'Disabled'}</span>
-                                  </p>
-
-                                  {pushToken ? (
-                                      <p className="text-xs text-text-light-muted mt-2 break-all">
-                                          Device token: <span className="font-bold">{pushToken}</span>
-                                      </p>
-                                  ) : (
-                                      <p className="text-xs text-text-light-muted mt-2">No push token available yet.</p>
-                                  )}
-
-                                  {pushRegistrationError && (
-                                      <p className="text-xs text-danger mt-2">Token error: {pushRegistrationError}</p>
-                                  )}
-                              </div>
-                          </div>
-
-                          <div className="flex flex-col sm:flex-row gap-2 items-stretch sm:items-center w-full md:w-auto">
-                              <button onClick={handleToggleNotificationsMaster} className="flex-1 sm:flex-none text-[10px] font-bold uppercase tracking-widest bg-white/80 text-black px-4 py-2 rounded-full hover:bg-white dark:bg-white/10 dark:hover:bg-white/20 transition-all shadow-sm">
-                                  {userSettings?.notifications ? 'Turn Off' : 'Turn On'}
-                              </button>
-                              <button onClick={handleTestNotification} className="flex-1 sm:flex-none text-[10px] font-bold uppercase tracking-widest bg-primary text-black px-4 py-2 rounded-full hover:bg-primary-hover shadow-sm">
-                                  Test Alert
-                              </button>
-                              <button onClick={sendPushFromApp} className="flex-1 sm:flex-none text-[10px] font-bold uppercase tracking-widest bg-primary/80 text-black px-4 py-2 rounded-full hover:bg-primary-hover shadow-sm">
-                                  Send Push
-                              </button>
-                          </div>
-                      </div>
-
-                      <div className="flex flex-col gap-4">
-                          {[
-                              { id: 'dailyReminder', title: 'Daily Check-in', desc: 'Reminder to log expenses at 9 PM' },
-                              { id: 'budgetAlerts', title: 'Budget Thresholds', desc: 'Get notified when you hit 80% of category limits' },
-                              { id: 'monthlyReport', title: 'Monthly Insights', desc: 'Summary of spending delivered on the 1st' },
-                              { id: 'marketing', title: 'Tips & Tricks', desc: 'Financial advice and app feature updates' }
-                          ].map((item) => (
-                              <div key={item.id} className="flex items-center justify-between p-6 bg-gray-50 dark:bg-surface-darker rounded-2xl border border-border-light dark:border-border-dark">
-                                  <div>
-                                      <p className="font-bold text-text-light-main dark:text-text-dark-main text-sm">{item.title}</p>
-                                      <p className="text-xs text-text-light-muted dark:text-text-dark-muted mt-1">{item.desc}</p>
+                  <div className="flex flex-col gap-12 animate-fade-in">
+                      <section>
+                          <h3 className="text-sm font-black uppercase tracking-[0.2em] text-primary mb-8 border-b border-border-light dark:border-border-dark pb-3">Notification Preferences</h3>
+                          <div className="flex flex-col gap-6">
+                              {[
+                                  { id: 'dailyCheckIn', label: 'Daily Check-in', desc: 'Reminder to log expenses at 9 PM', icon: 'alarm' },
+                                  { id: 'budgetThresholds', label: 'Budget Thresholds', desc: 'Get notified when you hit 80% of category limits', icon: 'speed' },
+                                  { id: 'monthlyInsights', label: 'Monthly Insights', desc: 'Summary of spending delivered on the 1st', icon: 'insights' },
+                                  { id: 'tipsAndTricks', label: 'Tips & Tricks', desc: 'Financial advice and app feature updates', icon: 'lightbulb' }
+                              ].map(pref => (
+                                  <div key={pref.id} className="flex items-center justify-between p-4 bg-gray-50 dark:bg-surface-darker rounded-[2rem] border border-border-light dark:border-border-dark group hover:border-primary/30 transition-all">
+                                      <div className="flex items-center gap-4">
+                                          <div className="size-12 rounded-2xl bg-white dark:bg-surface-dark flex items-center justify-center text-primary border border-border-light dark:border-border-dark">
+                                              <span className="material-symbols-outlined">{pref.icon}</span>
+                                          </div>
+                                          <div>
+                                              <p className="text-sm font-black uppercase tracking-tight">{pref.label}</p>
+                                              <p className="text-[10px] text-text-light-muted opacity-60 font-bold">{pref.desc}</p>
+                                          </div>
+                                      </div>
+                                      <button 
+                                        onClick={() => {
+                                            const updated = { ...notifPrefs, [pref.id]: !notifPrefs[pref.id as keyof typeof notifPrefs] };
+                                            setNotifPrefs(updated);
+                                            updateUserSettings({ notificationPrefs: updated });
+                                            showToast(`${pref.label} ${updated[pref.id as keyof typeof notifPrefs] ? 'Enabled' : 'Disabled'}`);
+                                        }}
+                                        className={`w-14 h-8 rounded-full relative transition-all duration-300 p-1 ${notifPrefs[pref.id as keyof typeof notifPrefs] ? 'bg-primary' : 'bg-gray-300 dark:bg-border-dark'}`}
+                                      >
+                                          <div className={`size-6 rounded-full bg-white shadow-md transition-all duration-300 transform ${notifPrefs[pref.id as keyof typeof notifPrefs] ? 'translate-x-6' : 'translate-x-0'}`} />
+                                      </button>
                                   </div>
-                                  <label className="relative inline-flex items-center cursor-pointer">
-                                      <input 
-                                        type="checkbox" 
-                                        checked={userSettings?.notificationPreferences?.[item.id as keyof typeof userSettings.notificationPreferences] ?? true} 
-                                        onChange={() => toggleNotification(item.id as any)} 
-                                        className="sr-only peer" 
-                                      />
-                                      <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none dark:bg-border-dark rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
-                                  </label>
+                              ))}
+                          </div>
+                      </section>
+
+                      <section>
+                          <h3 className="text-sm font-black uppercase tracking-[0.2em] text-primary mb-8 border-b border-border-light dark:border-border-dark pb-3">Notification Tune</h3>
+                          <div className="flex flex-col gap-4">
+                              <p className="text-[10px] text-text-light-muted uppercase font-black tracking-widest opacity-60 ml-2">Choose alert sound</p>
+                              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                  {['Aurora', 'Bloom', 'Crystal', 'Deep'].map(tune => (
+                                      <button 
+                                        key={tune} 
+                                        onClick={() => {
+                                            setNotifTune(tune);
+                                            updateUserSettings({ notificationTune: tune });
+                                            showToast(`Tune set to ${tune}`);
+                                        }}
+                                        className={`p-6 rounded-3xl border-2 flex flex-col items-center gap-3 transition-all ${notifTune === tune ? 'border-primary bg-primary/10 text-primary' : 'border-border-light dark:border-border-dark hover:border-primary/30'}`}
+                                      >
+                                          <span className="material-symbols-outlined text-3xl">{notifTune === tune ? 'graphic_eq' : 'music_note'}</span>
+                                          <span className="text-xs font-black uppercase tracking-widest">{tune}</span>
+                                      </button>
+                                  ))}
                               </div>
-                          ))}
-                      </div>
+                          </div>
+                      </section>
                   </div>
               )}
 
@@ -1035,67 +1028,64 @@ const SettingsScreen: React.FC = () => {
                   </div>
               )}
 
-              {/* TAB: SUPPORT (Simplified & Refined) */}
+              {/* TAB: ABOUT (Personalized & Premium) */}
               {activeTab === 'about' && (
                   <div className="flex flex-col gap-10 animate-fade-in">
-                      
-                      {/* About Header */}
-                      <div className="flex flex-col gap-4 text-center items-center py-4">
-                          <div className="size-16 bg-primary/10 rounded-2xl flex items-center justify-center text-primary shadow-glow mb-2">
-                              <span className="material-symbols-outlined text-4xl">account_balance_wallet</span>
+                      <div className="bg-primary/5 border border-primary/20 rounded-[3rem] p-12 flex flex-col items-center text-center gap-8 relative overflow-hidden">
+                          <div className="absolute top-0 right-0 w-40 h-40 bg-primary/10 blur-[80px] rounded-full pointer-events-none" />
+                          
+                          <div className="size-24 rounded-[2rem] bg-primary/10 flex items-center justify-center text-primary shadow-glow ring-4 ring-primary/5">
+                              <span className="material-symbols-outlined text-5xl">verified</span>
                           </div>
-                          <h2 className="text-2xl font-black text-text-light-main dark:text-text-dark-main uppercase tracking-tight">ExpenseTracker Pro</h2>
-                          <p className="text-sm text-text-light-muted max-w-md">
-                              Version 2.5.2 (Stable)<br/>
-                              Designed for privacy-first financial clarity.
+                          <div>
+                              <h2 className="text-3xl font-black uppercase tracking-tighter mb-2">ExpenseTracker Pro</h2>
+                              <p className="text-xs font-bold text-primary tracking-[0.4em] uppercase opacity-60">Personal Edition v2.5.0</p>
+                          </div>
+                          <p className="text-sm text-text-light-muted max-w-sm leading-relaxed">
+                              Your high-fidelity financial command center. Handcrafted for privacy, speed, and deep financial insights.
                           </p>
+                          <div className="flex gap-4">
+                              <div className="px-5 py-2 rounded-2xl bg-surface-dark border border-border-dark text-[10px] font-black uppercase tracking-widest">Mesh Engine</div>
+                              <div className="px-5 py-2 rounded-2xl bg-surface-dark border border-border-dark text-[10px] font-black uppercase tracking-widest">Private Sync</div>
+                          </div>
                       </div>
 
-                      {/* Socials & Links */}
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                          <a href="#" className="flex flex-col items-center justify-center gap-2 p-6 rounded-3xl bg-gray-50 dark:bg-surface-darker border border-border-light dark:border-border-dark hover:bg-gray-100 dark:hover:bg-border-dark transition-all group">
-                              <span className="material-symbols-outlined text-3xl text-gray-400 group-hover:text-[#1DA1F2]">public</span>
-                              <span className="text-[10px] font-black uppercase tracking-widest">Twitter</span>
-                          </a>
-                          <a href="#" className="flex flex-col items-center justify-center gap-2 p-6 rounded-3xl bg-gray-50 dark:bg-surface-darker border border-border-light dark:border-border-dark hover:bg-gray-100 dark:hover:bg-border-dark transition-all group">
-                              <span className="material-symbols-outlined text-3xl text-gray-400 group-hover:text-[#E1306C]">photo_camera</span>
-                              <span className="text-[10px] font-black uppercase tracking-widest">Instagram</span>
-                          </a>
-                          <a href="#" className="flex flex-col items-center justify-center gap-2 p-6 rounded-3xl bg-gray-50 dark:bg-surface-darker border border-border-light dark:border-border-dark hover:bg-gray-100 dark:hover:bg-border-dark transition-all group">
-                              <span className="material-symbols-outlined text-3xl text-gray-400 group-hover:text-white">code</span>
-                              <span className="text-[10px] font-black uppercase tracking-widest">GitHub</span>
-                          </a>
-                          <a href="#" className="flex flex-col items-center justify-center gap-2 p-6 rounded-3xl bg-gray-50 dark:bg-surface-darker border border-border-light dark:border-border-dark hover:bg-gray-100 dark:hover:bg-border-dark transition-all group">
-                              <span className="material-symbols-outlined text-3xl text-gray-400 group-hover:text-primary">mail</span>
-                              <span className="text-[10px] font-black uppercase tracking-widest">Contact</span>
-                          </a>
-                      </div>
-
-                      {/* FAQ Accordion */}
-                      <div className="flex flex-col gap-3">
-                          <h3 className="text-xs font-black uppercase tracking-[0.2em] text-text-light-muted mb-2 px-1">Common Questions</h3>
-                          {[
-                              { q: "Is my data stored securely?", a: "Yes. We use AES-256 encryption for all local data and secure SSL pipelines for cloud synchronization. Your financial data is never sold to third parties." },
-                              { q: "How do I export my data?", a: "Go to the Dashboard, click the 'Export' button in the top toolbar. You can download a CSV of your current view or your entire transaction history." },
-                              { q: "Can I share my budget?", a: "Currently, budget sharing is in beta. You can use the 'Split Bill' feature to manage shared expenses with friends." }
-                          ].map((item, idx) => (
-                              <div key={idx} className="bg-gray-50 dark:bg-surface-darker rounded-2xl border border-border-light dark:border-border-dark overflow-hidden transition-all">
-                                  <button 
-                                    onClick={() => setFaqOpen(faqOpen === idx ? null : idx)}
-                                    className="w-full flex items-center justify-between p-5 text-left hover:bg-gray-100 dark:hover:bg-border-dark/50 transition-colors"
-                                  >
-                                      <span className="text-sm font-bold text-text-light-main dark:text-text-dark-main">{item.q}</span>
-                                      <span className={`material-symbols-outlined text-text-light-muted transition-transform duration-300 ${faqOpen === idx ? 'rotate-180' : ''}`}>expand_more</span>
-                                  </button>
-                                  <div className={`px-5 text-xs text-text-light-muted leading-relaxed overflow-hidden transition-all duration-300 ${faqOpen === idx ? 'max-h-40 pb-5 opacity-100' : 'max-h-0 opacity-0'}`}>
-                                      {item.a}
-                                  </div>
+                      <section className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                          <div className="bg-gray-50 dark:bg-surface-darker p-10 rounded-[2.5rem] border border-border-light dark:border-border-dark flex flex-col gap-6 group hover:border-primary/30 transition-all">
+                              <div className="flex items-center gap-4">
+                                <div className="size-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary">
+                                    <span className="material-symbols-outlined text-2xl">support_agent</span>
+                                </div>
+                                <h4 className="text-xs font-black uppercase tracking-[0.2em] text-text-light-main dark:text-white">Help & Support</h4>
                               </div>
-                          ))}
-                      </div>
+                              <p className="text-xs text-text-light-muted leading-relaxed">Need assistance with your personal instance or found a bug?</p>
+                              <div className="flex flex-col gap-3 mt-2">
+                                  <a href="mailto:hello@expensetracker.pro" className="flex items-center justify-between p-5 bg-white dark:bg-surface-dark rounded-2xl border border-border-light dark:border-border-dark hover:border-primary/60 transition-all group/item shadow-sm">
+                                      <span className="text-xs font-black uppercase tracking-widest">Email Developer</span>
+                                      <span className="material-symbols-outlined text-sm group-hover/item:translate-x-1 transition-transform">arrow_forward</span>
+                                  </a>
+                              </div>
+                          </div>
 
-                      <div className="text-center opacity-40 mt-8">
-                          <p className="text-[10px] uppercase font-bold text-text-light-muted">© 2024 ExpenseTracker Pro. All rights reserved.</p>
+                          <div className="bg-gray-50 dark:bg-surface-darker p-10 rounded-[2.5rem] border border-border-light dark:border-border-dark flex flex-col gap-6 group hover:border-primary/30 transition-all">
+                              <div className="flex items-center gap-4">
+                                <div className="size-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary">
+                                    <span className="material-symbols-outlined text-2xl">terminal</span>
+                                </div>
+                                <h4 className="text-xs font-black uppercase tracking-[0.2em] text-text-light-main dark:text-white">System Tools</h4>
+                              </div>
+                              <p className="text-xs text-text-light-muted leading-relaxed">Administrative controls and debugging utilities for this app.</p>
+                              <div className="flex flex-col gap-3 mt-2">
+                                  <button onClick={() => window.location.reload()} className="flex items-center justify-between p-5 bg-white dark:bg-surface-dark rounded-2xl border border-border-light dark:border-border-dark hover:border-primary/60 transition-all group/item shadow-sm">
+                                      <span className="text-xs font-black uppercase tracking-widest">Hard Reload App</span>
+                                      <span className="material-symbols-outlined text-sm group-hover/item:rotate-180 transition-transform duration-700">sync</span>
+                                  </button>
+                              </div>
+                          </div>
+                      </section>
+
+                      <div className="text-center opacity-20 py-8">
+                          <p className="text-[10px] font-black uppercase tracking-[0.6em]">Design is Intelligence Made Visible</p>
                       </div>
                   </div>
               )}

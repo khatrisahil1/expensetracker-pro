@@ -10,7 +10,7 @@ export const getGeminiApiKey = (): string | null => {
 
   // Vite exposes env vars through define() in vite.config.ts.
   // The project defaults to reading GEMINI_API_KEY from .env.local.
-  const envKey = (process.env.GEMINI_API_KEY || process.env.API_KEY || (import.meta.env as any).VITE_GEMINI_API_KEY) as string | undefined;
+  const envKey = (process.env.GEMINI_API_KEY || process.env.API_KEY || (import.meta as any).env.VITE_GEMINI_API_KEY) as string | undefined;
   if (envKey) return envKey;
 
   return null;

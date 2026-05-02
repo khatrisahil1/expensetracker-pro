@@ -26,7 +26,7 @@ const CATEGORY_STYLES: Record<string, { icon: string, colorClass: string }> = {
 const formatDisplayDate = (dateStr: string) => {
     if (!dateStr) return '';
     const d = new Date(dateStr);
-    return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+    return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' });
 };
 
 export const ScannerScreen: React.FC<ScannerScreenProps> = ({ onNavigate }) => {
@@ -40,6 +40,7 @@ export const ScannerScreen: React.FC<ScannerScreenProps> = ({ onNavigate }) => {
   // Refs for Media Elements
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const fallbackInputRef = useRef<HTMLInputElement>(null);
   const [stream, setStream] = useState<MediaStream | null>(null);
 
   // Form State
@@ -50,7 +51,9 @@ export const ScannerScreen: React.FC<ScannerScreenProps> = ({ onNavigate }) => {
     category: 'Food',
     type: 'expense' as 'expense' | 'income',
     paymentMethod: 'UPI',
-    notes: ''
+    notes: '',
+    isSubscription: false,
+    subscriptionFrequency: 'monthly' as 'monthly' | 'yearly' | 'weekly'
   });
 
   const recentTransactions = transactions.slice(0, 10);
@@ -69,6 +72,11 @@ export const ScannerScreen: React.FC<ScannerScreenProps> = ({ onNavigate }) => {
   // --- CAMERA LOGIC ---
   const startCamera = async () => {
     try {
+      // First check if mediaDevices is supported (often missing in insecure contexts or WKWebView)
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+          throw new Error("getUserMedia not supported");
+      }
+      
       // Request access to rear camera
       const mediaStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
       setStream(mediaStream);
@@ -76,7 +84,13 @@ export const ScannerScreen: React.FC<ScannerScreenProps> = ({ onNavigate }) => {
       // Wait for video element to mount then assign stream
       setTimeout(() => { if (videoRef.current) videoRef.current.srcObject = mediaStream; }, 100);
     } catch (err) {
-      alert("Could not access camera.");
+      console.warn("Camera access failed, falling back to file picker:", err);
+      // Fallback to native OS camera/file picker
+      if (fallbackInputRef.current) {
+          fallbackInputRef.current.click();
+      } else {
+          alert("Could not access camera or file picker.");
+      }
     }
   };
 
@@ -142,10 +156,17 @@ export const ScannerScreen: React.FC<ScannerScreenProps> = ({ onNavigate }) => {
     const amt = parseFloat(formData.amount);
     if (isNaN(amt) || !formData.merchant) return;
     await addTransaction({
-      title: formData.merchant, amount: amt, date: formData.date, category: formData.category,
-      type: formData.type, note: formData.notes, paymentMethod: formData.paymentMethod
+      title: formData.merchant, 
+      amount: amt, 
+      date: formData.date, 
+      category: formData.category,
+      type: formData.type, 
+      note: formData.notes, 
+      paymentMethod: formData.paymentMethod,
+      isSubscription: formData.isSubscription,
+      subscriptionFrequency: formData.subscriptionFrequency
     });
-    setFormData(prev => ({ ...prev, amount: '', merchant: '', notes: '' }));
+    setFormData(prev => ({ ...prev, amount: '', merchant: '', notes: '', isSubscription: false }));
     setPreviewImage(null);
     alert("Saved!");
   };
@@ -237,9 +258,49 @@ export const ScannerScreen: React.FC<ScannerScreenProps> = ({ onNavigate }) => {
                 <textarea value={formData.notes} onChange={(e) => setFormData({...formData, notes: e.target.value})} className="w-full bg-gray-50 dark:bg-surface-darker border border-border-light dark:border-border-dark rounded-2xl p-4 text-sm font-bold focus:border-primary outline-none transition-all h-20 resize-none" placeholder="Add optional details..." />
               </div>
 
+              {/* Subscription Toggle */}
+              <div className="bg-gray-50 dark:bg-surface-darker border border-border-light dark:border-border-dark rounded-2xl p-6 flex flex-col gap-4">
+                  <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                          <div className={`size-10 rounded-xl flex items-center justify-center transition-all ${formData.isSubscription ? 'bg-primary/20 text-primary' : 'bg-gray-200 text-gray-400'}`}>
+                              <span className="material-symbols-outlined">{formData.isSubscription ? 'subscriptions' : 'sync'}</span>
+                          </div>
+                          <div>
+                              <p className="text-xs font-black uppercase tracking-tight">Recurring Subscription</p>
+                              <p className="text-[10px] text-text-light-muted">Mark this as a repeating payment</p>
+                          </div>
+                      </div>
+                      <button 
+                        type="button"
+                        onClick={() => setFormData({...formData, isSubscription: !formData.isSubscription})}
+                        className={`w-12 h-6 rounded-full relative transition-all ${formData.isSubscription ? 'bg-primary' : 'bg-gray-300 dark:bg-border-dark'}`}
+                      >
+                          <div className={`absolute top-1 size-4 bg-white rounded-full transition-all ${formData.isSubscription ? 'left-7' : 'left-1'}`} />
+                      </button>
+                  </div>
+
+                  {formData.isSubscription && (
+                      <div className="flex gap-2 animate-fade-in">
+                          {['weekly', 'monthly', 'yearly'].map(freq => (
+                              <button 
+                                key={freq}
+                                type="button"
+                                onClick={() => setFormData({...formData, subscriptionFrequency: freq as any})}
+                                className={`flex-1 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all ${formData.subscriptionFrequency === freq ? 'bg-primary/10 border-primary text-primary' : 'border-border-light dark:border-border-dark text-text-light-muted'}`}
+                              >
+                                  {freq}
+                              </button>
+                          ))}
+                      </div>
+                  )}
+              </div>
+
               <div className="grid grid-cols-2 gap-4">
                 <button type="button" onClick={startCamera} className="flex-1 bg-gray-100 dark:bg-surface-darker hover:bg-gray-200 dark:hover:bg-border-dark py-3.5 rounded-2xl text-xs font-black uppercase tracking-widest flex items-center justify-center gap-2 transition-all"><span className="material-symbols-outlined text-[18px]">photo_camera</span>Scan Receipt</button>
                 <label className="flex-1 bg-gray-100 dark:bg-surface-darker hover:bg-gray-200 dark:hover:bg-border-dark py-3.5 rounded-2xl text-xs font-black uppercase tracking-widest flex items-center justify-center gap-2 cursor-pointer transition-all"><span className="material-symbols-outlined text-[18px]">cloud_upload</span>Upload File<input type="file" className="hidden" accept="image/*" onChange={(e) => { const f = e.target.files?.[0]; if(f) { const r = new FileReader(); r.onloadend = () => analyzeReceipt(r.result as string); r.readAsDataURL(f); }}} /></label>
+                
+                {/* Hidden Fallback Input for Camera */}
+                <input ref={fallbackInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if(f) { const r = new FileReader(); r.onloadend = () => analyzeReceipt(r.result as string); r.readAsDataURL(f); }}} />
               </div>
 
               <button type="submit" disabled={!formData.amount || !formData.merchant || isProcessing} className="w-full bg-primary hover:bg-primary-hover text-[#131811] font-black py-5 rounded-[2rem] shadow-glow transition-all flex items-center justify-center gap-2 transform active:scale-[0.98] disabled:opacity-50 disabled:grayscale">
@@ -276,7 +337,15 @@ export const ScannerScreen: React.FC<ScannerScreenProps> = ({ onNavigate }) => {
                             <div className="flex items-center gap-4">
                                 <div className={`size-12 rounded-2xl flex items-center justify-center border ${style.colorClass}`}><span className="material-symbols-outlined text-xl">{style.icon}</span></div>
                                 <div className="flex flex-col">
-                                    <p className="text-text-light-main dark:text-text-dark-main font-bold text-base">{tx.title}</p>
+                                    <div className="flex items-center gap-2">
+                                        <p className="text-text-light-main dark:text-text-dark-main font-bold text-base">{tx.title}</p>
+                                        {tx.isSubscription && (
+                                            <span className="bg-primary/20 text-primary text-[8px] font-black uppercase px-2 py-0.5 rounded-full border border-primary/20 flex items-center gap-1">
+                                                <span className="material-symbols-outlined text-[10px]">sync</span>
+                                                Sub
+                                            </span>
+                                        )}
+                                    </div>
                                     <p className="text-[10px] text-text-light-muted dark:text-text-dark-muted uppercase font-black tracking-widest opacity-60">{formatDisplayDate(tx.date)}</p>
                                 </div>
                             </div>

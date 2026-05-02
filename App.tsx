@@ -27,10 +27,12 @@ import { ScannerScreen } from './components/ScannerScreen';
 import SettingsScreen from './components/SettingsScreen';
 import OnboardingScreen from './components/OnboardingScreen';
 import TransactionsCalendarScreen from './components/TransactionsCalendarScreen';
+import SubscriptionsScreen from './components/SubscriptionsScreen';
 import TransactionDetailsPanel from './components/TransactionDetailsPanel';
 import BudgetGoalsScreen from './components/BudgetGoalsScreen';
 import Sidebar from './components/Sidebar';
 import { PinLockScreen } from './components/PinLockScreen';
+import { LoadingScreen } from './components/LoadingScreen';
 // Global Store
 import { StoreProvider, useStore } from './context/Store';
 
@@ -144,6 +146,11 @@ const AppContent: React.FC = () => {
   const handleNavigate = (view: View) => {
     setCurrentView(view);
     setMobileMenuOpen(false); // Close mobile drawer on navigation
+    // Reset scroll position of the main content area
+    setTimeout(() => {
+        const mainContent = document.querySelector('main > div.overflow-y-auto');
+        if (mainContent) mainContent.scrollTo({ top: 0, behavior: 'instant' });
+    }, 0);
   };
 
   // Construct display user object safely
@@ -155,7 +162,7 @@ const AppContent: React.FC = () => {
   };
 
   // --- RENDERING CONDITIONS ---
-  if (loading) return <div className="h-screen w-full bg-background-dark flex items-center justify-center text-primary"><span className="material-symbols-outlined text-4xl animate-spin">sync</span></div>;
+  if (loading) return <LoadingScreen />;
   if (!user) return <LoginScreen />;
   if (isAppLocked) return <PinLockScreen />;
   if (currentView === View.ONBOARDING) return <OnboardingScreen />;
@@ -206,6 +213,7 @@ const AppContent: React.FC = () => {
             {currentView === View.SCANNER && <ScannerScreen onNavigate={handleNavigate} />}
             {currentView === View.SETTINGS && <SettingsScreen />}
             {currentView === View.GOALS && <BudgetGoalsScreen />}
+            {currentView === View.SUBSCRIPTIONS && <SubscriptionsScreen />}
           </div>
         </div>
       </main>

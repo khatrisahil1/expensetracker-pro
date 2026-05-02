@@ -54,7 +54,7 @@ const LoginScreen: React.FC = () => {
         await login(email, password);
       }
       // Sync theme after successful login/signup
-      localStorage.setItem('theme', isDark ? 'dark' : 'light');
+      localStorage.setItem('theme', theme);
     } catch (err: any) {
       console.error(err);
       if (err.code === 'auth/invalid-credential') setError("Invalid email or password.");

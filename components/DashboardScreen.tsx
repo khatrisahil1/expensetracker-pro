@@ -47,13 +47,9 @@ const INCOME_CATEGORIES = ["Salary", "Freelance", "Investments", "Gifts", "Refun
 // Helper: Short Date Format
 
 const formatDisplayDateShort = (dateStr: string) => {
-
     if (!dateStr) return '';
-
     const d = new Date(dateStr);
-
-    return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
-
+    return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' });
 };
 
 
@@ -283,7 +279,7 @@ const RealWaveGraph: React.FC<{ data: number[], color: string }> = ({ data, colo
 
 // --- MAIN DASHBOARD COMPONENT ---
 const DashboardScreen: React.FC<DashboardScreenProps> = ({ onNavigate }) => {
-  const { user, userSettings, transactions, addTransaction, deleteTransaction, loading, toggleTheme, widgets, toggleWidget, widgetOrder, updateWidgetOrder, setViewingTransaction, updateUserSettings, lockApp, showUndo, notifications, markNotificationRead, markAllNotificationsRead, clearNotifications, generateFinancialAudit } = useStore();
+  const { user, userSettings, transactions, addTransaction, deleteTransaction, loading, toggleTheme, widgets, toggleWidget, widgetOrder, updateWidgetOrder, setViewingTransaction, updateUserSettings, lockApp, showUndo, generateFinancialAudit, notifications, markNotificationsRead, clearNotifications } = useStore();
   const { isInstallable, install } = usePWAInstall();
   // Offline state
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
@@ -302,6 +298,7 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ onNavigate }) => {
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [dashboardViewMode, setDashboardViewMode] = useState<'week' | 'month' | 'year'>('month');
   const [dashboardDate, setDashboardDate] = useState(new Date());
+  const [showNotifications, setShowNotifications] = useState(false);
   
   // UI Toggles
   const [showExportModal, setShowExportModal] = useState(false);
@@ -310,7 +307,7 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ onNavigate }) => {
   const [showMobileHeaderMenu, setShowMobileHeaderMenu] = useState(false);
   const [editingTarget, setEditingTarget] = useState<'income' | 'expense' | null>(null);
   const [targetInput, setTargetInput] = useState('');
-  const [showNotifDropdown, setShowNotifDropdown] = useState(false);
+
 
   const [insightOpen, setInsightOpen] = useState(false);
   const [insightText, setInsightText] = useState<string | null>(null);
@@ -339,7 +336,7 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ onNavigate }) => {
     }
   }, [userSettings]);
 
-  const unreadCount = notifications.filter(n => !n.read).length;
+
   const currencySymbol = userSettings?.currency === 'USD' ? '$' : userSettings?.currency === 'EUR' ? '€' : '₹';
 
   // --- DATA AGGREGATION & MEMOIZATION ---
@@ -952,53 +949,14 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ onNavigate }) => {
           <button onClick={() => { setInsightOpen(true); setInsightText(null); setInsightJson(null); setInsightError(null); setInsightParseError(null); handleInsight(); }} className="flex items-center justify-center size-10 rounded-full bg-surface-light dark:bg-surface-dark border border-border-light dark:border-border-dark text-text-light-muted dark:text-text-dark-muted hover:text-primary hover:border-primary transition-all duration-200 ease-out shadow-sm relative overflow-hidden hover:scale-[1.05] active:scale-[0.95]" title="Gemini Neural Insight">
             <span className="material-symbols-outlined text-[22px]">magic_button</span>
           </button>
-
-          <div className="relative">
-            <button onClick={() => setShowNotifDropdown(!showNotifDropdown)} className="flex items-center justify-center size-10 rounded-full bg-surface-light dark:bg-surface-dark border border-border-light dark:border-border-dark text-text-light-muted dark:text-text-dark-muted hover:text-primary hover:border-primary transition-all duration-200 ease-out shadow-sm relative overflow-hidden hover:scale-[1.05] active:scale-[0.95]" title="Notifications">
-              <span className="material-symbols-outlined text-[22px] group-hover:animate-swing">notifications</span>
-              {unreadCount > 0 && <span className="absolute top-2 right-2 size-2 bg-red-500 rounded-full border border-surface-light dark:border-surface-dark animate-pulse"></span>}
-            </button>
-            {showNotifDropdown && (
-              <div className="fixed inset-x-0 top-16 z-50 flex justify-center md:absolute md:inset-auto md:top-12 md:right-0 md:flex-none">
-                <div className="w-[92vw] max-w-sm md:w-80 bg-surface-light dark:bg-surface-dark border border-border-light dark:border-border-dark rounded-2xl shadow-2xl p-4 animate-fade-in">
-                  <div className="flex justify-between items-center mb-3">
-                  <h3 className="font-bold text-text-light-main dark:text-text-dark-main">Notifications</h3>
-                  <div className="flex items-center gap-3">
-                    {unreadCount > 0 && (
-                      <button onClick={async () => { await markAllNotificationsRead(); setShowNotifDropdown(false); }} className="text-xs text-primary font-bold hover:underline">Mark all read</button>
-                    )}
-                    <button
-                      onClick={async (e) => {
-                        e.stopPropagation();
-                        await clearNotifications();
-                        setShowNotifDropdown(false);
-                      }}
-                      className="text-xs text-primary font-bold hover:underline"
-                    >
-                      Clear All
-                    </button>
-                  </div>
-                </div>
-                  <div className="flex flex-col gap-3 max-h-[300px] overflow-y-auto custom-scrollbar">
-                    {notifications.length > 0 ? notifications.map(n => (
-                      <div key={n.id} onClick={() => {
-                        if (!n.read) markNotificationRead(n.id);
-                    }} className={`flex gap-3 p-3 rounded-xl transition-colors cursor-pointer active:bg-white/10 dark:active:bg-white/10 ${n.read ? 'bg-transparent hover:bg-gray-50 dark:hover:bg-surface-darker' : 'bg-primary/5'}`}>
-                        <div className="size-8 rounded-full bg-surface-light dark:bg-surface-darker flex items-center justify-center text-text-light-main dark:text-text-dark-main border border-border-light dark:border-border-dark"><span className="material-symbols-outlined text-sm">{n.icon}</span></div>
-                        <div className="flex flex-col">
-                          <p className="text-sm font-bold text-text-light-main dark:text-text-dark-main leading-tight">{n.title}</p>
-                          <p className="text-xs text-text-light-muted dark:text-text-dark-muted leading-tight mt-0.5">{n.msg}</p>
-                          <p className="text-[10px] text-text-light-muted dark:text-text-dark-muted mt-1 opacity-60">{n.time}</p>
-                        </div>
-                      </div>
-                    )) : (
-                      <div className="py-8 text-center text-text-light-muted dark:text-text-dark-muted text-xs">No new notifications</div>
-                    )}
-                  </div>
-                </div>
-              </div>
+          <button onClick={() => { setShowNotifications(true); markNotificationsRead(); }} className="flex items-center justify-center size-10 rounded-full bg-surface-light dark:bg-surface-dark border border-border-light dark:border-border-dark text-text-light-muted dark:text-text-dark-muted hover:text-primary hover:border-primary transition-all duration-200 ease-out shadow-sm relative overflow-hidden hover:scale-[1.05] active:scale-[0.95]" title="Notifications">
+            <span className="material-symbols-outlined text-[22px]">notifications</span>
+            {notifications.some(n => !n.read) && (
+              <span className="absolute top-2 right-2 size-2 bg-rose-500 rounded-full border border-white dark:border-surface-dark"></span>
             )}
-          </div>
+          </button>
+
+
         
           <div className="hidden md:flex items-center gap-2 bg-surface-light dark:bg-surface-dark border border-border-light dark:border-border-dark rounded-full p-1.5 shadow-sm">
             <button onClick={() => toggleTheme()} className="flex items-center gap-2 px-3 py-2 rounded-full hover:bg-gray-100 dark:hover:bg-surface-darker transition-colors text-text-light-muted dark:text-text-dark-muted hover:text-primary"><span className="material-symbols-outlined text-[20px]">{userSettings?.theme === 'light' ? 'dark_mode' : 'light_mode'}</span><span className="hidden lg:inline text-sm font-bold">Theme</span></button>
@@ -1051,6 +1009,52 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ onNavigate }) => {
             </React.Fragment>
         ))}
       </div>
+
+      {/* Notifications Panel */}
+      {showNotifications && (
+        <div className="fixed inset-0 z-[200] flex justify-end animate-fade-in" onClick={() => setShowNotifications(false)}>
+            <div className="absolute inset-0 bg-black/40 backdrop-blur-sm"></div>
+            <div className="relative w-full max-w-sm bg-surface-light dark:bg-surface-dark h-full shadow-2xl animate-slide-left flex flex-col" onClick={e => e.stopPropagation()}>
+                <div className="p-6 border-b border-border-light dark:border-border-dark flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                        <span className="material-symbols-outlined text-primary">notifications</span>
+                        <h2 className="text-xl font-black uppercase tracking-tight">Notifications</h2>
+                    </div>
+                    <button onClick={() => setShowNotifications(false)} className="size-10 rounded-full hover:bg-gray-100 dark:hover:bg-surface-darker flex items-center justify-center transition-colors">
+                        <span className="material-symbols-outlined">close</span>
+                    </button>
+                </div>
+
+                <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-3">
+                    {notifications.length > 0 ? (
+                        notifications.map(notif => (
+                            <div key={notif.id} className="p-4 bg-gray-50 dark:bg-surface-darker rounded-2xl border border-border-light dark:border-border-dark group hover:border-primary/30 transition-all">
+                                <div className="flex justify-between items-start mb-1">
+                                    <h3 className="font-bold text-sm text-text-light-main dark:text-text-dark-main">{notif.title}</h3>
+                                    <span className="text-[10px] text-text-light-muted opacity-60">{new Date(notif.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                </div>
+                                <p className="text-xs text-text-light-muted dark:text-text-dark-muted leading-relaxed">{notif.body}</p>
+                            </div>
+                        ))
+                    ) : (
+                        <div className="flex-1 flex flex-col items-center justify-center text-center opacity-40">
+                            <span className="material-symbols-outlined text-6xl mb-4">notifications_off</span>
+                            <p className="text-sm font-bold uppercase tracking-widest">No notifications yet</p>
+                            <p className="text-xs">We'll let you know when things happen.</p>
+                        </div>
+                    )}
+                </div>
+
+                {notifications.length > 0 && (
+                    <div className="p-4 border-t border-border-light dark:border-border-dark">
+                        <button onClick={clearNotifications} className="w-full py-3 text-xs font-black uppercase tracking-[0.2em] text-danger hover:bg-danger/10 rounded-xl transition-all">
+                            Clear All
+                        </button>
+                    </div>
+                )}
+            </div>
+        </div>
+      )}
     </div>
   );
 };
