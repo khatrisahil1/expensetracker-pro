@@ -29,10 +29,9 @@ const Sidebar: React.FC<SidebarProps> = ({
 
   const navItemClass = (view: View) => `
     flex items-center gap-3 px-4 py-3 rounded-xl transition-all cursor-pointer select-none font-semibold
-    ${
-      currentView === view
-        ? 'bg-green-100 dark:bg-primary/10 text-green-800 dark:text-primary'
-        : 'text-text-light-muted dark:text-text-dark-muted hover:bg-gray-100 dark:hover:bg-surface-dark hover:text-text-light-main dark:hover:text-text-dark-main'
+    ${currentView === view
+      ? 'bg-green-100 dark:bg-primary/10 text-green-800 dark:text-primary'
+      : 'text-text-light-muted dark:text-text-dark-muted hover:bg-gray-100 dark:hover:bg-surface-dark hover:text-text-light-main dark:hover:text-text-dark-main'
     }
   `;
 
@@ -60,7 +59,7 @@ const Sidebar: React.FC<SidebarProps> = ({
         <div className="flex flex-col gap-8">
           {/* Brand */}
           <div className="flex items-center justify-between">
-            <div 
+            <div
               onClick={() => onNavigate(View.DASHBOARD)}
               className="flex items-center gap-3 cursor-pointer group"
             >
@@ -99,16 +98,16 @@ const Sidebar: React.FC<SidebarProps> = ({
               <span className="material-symbols-outlined">savings</span>
               Vault
             </div>
+            <div onClick={() => onNavigate(View.SUBSCRIPTIONS)} className={navItemClass(View.SUBSCRIPTIONS)}>
+              <span className="material-symbols-outlined">subscriptions</span>
+              Subscriptions
+            </div>
 
             <div onClick={() => onNavigate(View.GOALS)} className={navItemClass(View.GOALS)}>
               <span className="material-symbols-outlined">money_bag</span>
               Budget
             </div>
 
-            <div onClick={() => onNavigate(View.SUBSCRIPTIONS)} className={navItemClass(View.SUBSCRIPTIONS)}>
-              <span className="material-symbols-outlined">subscriptions</span>
-              Subscriptions
-            </div>
           </nav>
         </div>
 
@@ -133,24 +132,23 @@ const Sidebar: React.FC<SidebarProps> = ({
       {/* Bottom Navigation (MOBILE) */}
       {isMobile && (
         <nav className="fixed bottom-0 left-0 right-0 z-50 lg:hidden">
-              <div className="  bg-white dark:bg-surface-darker
+          <div className="  bg-white dark:bg-surface-darker
                   border border-border-light dark:border-border-dark shadow-l
                   grid grid-cols-5 items-center py-3">
             {[
-               { view: View.DASHBOARD, icon: 'home', label: 'Home' },
-               { view: View.SCANNER, icon: 'receipt_long', label: 'Trans' },
-               { view: View.SUBSCRIPTIONS, icon: 'subscriptions', label: 'Subs' },
-               { view: View.GOALS, icon: 'money_bag', label: 'Budget' },
-               { view: View.SETTINGS, icon: 'person', label: 'Profile' },
-             ].map(item => (
+              { view: View.DASHBOARD, icon: 'home', label: 'Home' },
+              { view: View.SCANNER, icon: 'receipt_long', label: 'Trans' },
+              { view: View.SUBSCRIPTIONS, icon: 'subscriptions', label: 'Subs' },
+              { view: View.GOALS, icon: 'money_bag', label: 'Budget' },
+              { view: View.SETTINGS, icon: 'person', label: 'Profile' },
+            ].map(item => (
               <button
                 key={item.label}
                 onClick={() => onNavigate(item.view)}
                 className={`flex flex-col items-center gap-1 text-xs transition
-                  ${
-                    currentView === item.view
-                      ? 'text-primary font-semibold'
-                      : 'text-gray-400'
+                  ${currentView === item.view
+                    ? 'text-primary font-semibold'
+                    : 'text-gray-400'
                   }`}
               >
                 <span className="material-symbols-outlined">{item.icon}</span>
