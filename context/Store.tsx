@@ -203,10 +203,12 @@ export const useStore = () => {
   return context;
 };
 
-const DEFAULT_EXPENSE_CATS = ["Food", "Rent", "Transportation", "Shopping", "Entertainment", "Health", "Utilities", "Other"];
-const DEFAULT_INCOME_CATS = ["Salary", "Freelance", "Investments", "Gifts", "Refunds", "Rental", "Other"];
+const DEFAULT_EXPENSE_CATS = ["Food", "Rent", "Transportation", "Shopping", "Entertainment", "Health", "Utilities", "Home", "Other"];
+const DEFAULT_INCOME_CATS = ["Salary", "Freelance", "Investments", "Gifts", "Refunds", "Rental", "Home", "Other"];
 const DEFAULT_PAYMENT_METHODS = ["Cash", "UPI", "Savings Account"];
 const DEFAULT_ORDER = ['balance', 'income', 'expense', 'streak','breakdown', 'recent', 'quickAdd'];
+
+const mergeCategories = (storedCategories: string[] | undefined, defaults: string[]) => Array.from(new Set([...(storedCategories || []), ...defaults]));
 
 export const StoreProvider = ({ children }: PropsWithChildren) => {
   // Global State
@@ -345,8 +347,8 @@ export const StoreProvider = ({ children }: PropsWithChildren) => {
           appPin: data.appPin || null,
           biometricEnabled: data.biometricEnabled ?? false,
           paymentMethods: data.paymentMethods || DEFAULT_PAYMENT_METHODS,
-          expenseCategories: data.expenseCategories || DEFAULT_EXPENSE_CATS,
-          incomeCategories: data.incomeCategories || DEFAULT_INCOME_CATS,
+          expenseCategories: mergeCategories(data.expenseCategories, DEFAULT_EXPENSE_CATS),
+          incomeCategories: mergeCategories(data.incomeCategories, DEFAULT_INCOME_CATS),
           categoryBudgets: data.categoryBudgets || {},
           savingsGoals: data.savingsGoals || [],
           realizedSavings: data.realizedSavings || 0,

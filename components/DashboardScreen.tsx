@@ -32,6 +32,7 @@ const CATEGORY_STYLES: Record<string, { icon: string, colorClass: string, hex: s
     "Subscription": { icon: "Subscriptions", colorClass: "text-red-500 bg-red-500/10 border-red-500/20", hex: "#ad1c43" },
     "Health": { icon: "medical_services", colorClass: "text-red-400 bg-red-400/10 border-red-400/20", hex: "#f87171" },
     "Utilities": { icon: "bolt", colorClass: "text-cyan-400 bg-cyan-400/10 border-cyan-400/20", hex: "#22d3ee" },
+    "Home": { icon: "home", colorClass: "text-indigo-500 bg-indigo-500/10 border-indigo-500/20", hex: "#6366f1" },
     "Salary": { icon: "payments", colorClass: "text-emerald-500 bg-emerald-500/10 border-emerald-500/20", hex: "#10b981" },
     "Freelance": { icon: "work", colorClass: "text-cyan-500 bg-cyan-500/10 border-cyan-500/20", hex: "#06b6d4" },
     "Investments": { icon: "trending_up", colorClass: "text-violet-500 bg-violet-500/10 border-violet-500/20", hex: "#8b5cf6" },

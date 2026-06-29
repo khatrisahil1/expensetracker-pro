@@ -15,13 +15,14 @@ const CATEGORY_STYLES: Record<string, { icon: string, colorClass: string }> = {
     "Entertainment": { icon: "movie", colorClass: "text-pink-500 bg-pink-500/10 border-pink-500/20" },
     "Health": { icon: "medical_services", colorClass: "text-red-400 bg-red-400/10 border-red-400/20" },
     "Utilities": { icon: "bolt", colorClass: "text-cyan-400 bg-cyan-400/10 border-cyan-400/20" },
+    "Home": { icon: "home", colorClass: "text-indigo-500 bg-indigo-500/10 border-indigo-500/20" },
     "Salary": { icon: "payments", colorClass: "text-primary bg-primary/10 border-primary/20" },
     "Freelance": { icon: "work", colorClass: "text-emerald-400 bg-emerald-400/10 border-emerald-400/20" },
     "Other": { icon: "receipt", colorClass: "text-gray-400 bg-gray-400/10 border-gray-400/20" }
 };
 
-const EXPENSE_CATEGORIES = ["Food", "Housing", "Rent", "Transportation", "Entertainment", "Shopping", "Health", "Utilities", "Other"];
-const INCOME_CATEGORIES = ["Salary", "Freelance", "Investments", "Gifts", "Refunds", "Rental", "Other"];
+const EXPENSE_CATEGORIES = ["Food", "Housing", "Rent", "Transportation", "Entertainment", "Shopping", "Health", "Utilities", "Home", "Other"];
+const INCOME_CATEGORIES = ["Salary", "Freelance", "Investments", "Gifts", "Refunds", "Rental", "Home", "Other"];
 const ALL_CATEGORIES = Array.from(new Set([...EXPENSE_CATEGORIES, ...INCOME_CATEGORIES]));
 
 const TransactionsCalendarScreen: React.FC<TransactionsCalendarScreenProps> = ({ onNavigate, isEmbedded = false }) => {
