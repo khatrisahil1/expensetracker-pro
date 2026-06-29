@@ -41,8 +41,8 @@ const CATEGORY_STYLES: Record<string, { icon: string, colorClass: string, hex: s
     "Other": { icon: "receipt", colorClass: "text-gray-400 bg-gray-400/10 border-gray-400/20", hex: "#9ca3af" }
 };
 
-const EXPENSE_CATEGORIES = ["Food", "Housing", "Rent", "Transportation", "Entertainment", "Shopping","Subscription", "Health", "Utilities", "Other"];
-const INCOME_CATEGORIES = ["Salary", "Freelance", "Investments", "Gifts", "Refunds", "Rental", "Other"];
+const EXPENSE_CATEGORIES = ["Food", "Housing", "Rent", "Transportation", "Entertainment", "Shopping","Subscription", "Health","Home", "Utilities", "Other"];
+const INCOME_CATEGORIES = ["Salary", "Freelance", "Investments", "Gifts","Home", "Refunds", "Rental", "Other"];
 
 // Helper: Short Date Format
 
