@@ -156,6 +156,7 @@ const SettingsScreen: React.FC = () => {
   };
 
   const handlePassUpdate = async () => {
+      if (passForm.new.length < 8) return alert("Password must be at least 8 characters");
       if (passForm.new !== passForm.confirm) return alert("Passwords don't match");
       try {
           setIsSaving(true);
@@ -309,7 +310,7 @@ const SettingsScreen: React.FC = () => {
       setShowPinSetup(true);
   };
 
-  const handlePinKey = (val: string) => {
+  const handlePinKey = async (val: string) => {
       const current = pinSetupStep === 1 ? firstPin : confirmPin;
       if (current.length >= 4) return;
       
@@ -321,7 +322,7 @@ const SettingsScreen: React.FC = () => {
           setConfirmPin(updated);
           if (updated.length === 4) {
               if (updated === firstPin) {
-                  setAppPin(updated);
+                  await setAppPin(updated);
                   setShowPinSetup(false);
                   showToast("PIN Lock Updated");
               } else {

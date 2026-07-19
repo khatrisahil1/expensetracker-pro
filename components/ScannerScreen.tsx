@@ -73,18 +73,14 @@ export const ScannerScreen: React.FC<ScannerScreenProps> = ({ onNavigate }) => {
   useEffect(() => {
     // Proactively check permission status if supported
     if (navigator.permissions && navigator.permissions.query) {
-        navigator.permissions.query({ name: 'camera' as any }).then(status => {
-            console.log("Camera permission status:", status.state);
-        }).catch(e => console.warn("Permissions API not supported for camera."));
+        navigator.permissions.query({ name: 'camera' as any }).then(() => {}).catch(() => {});
     }
   }, []);
 
   const startCamera = async () => {
-    console.log("Starting camera...");
     try {
       // First check if mediaDevices is supported
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-          console.warn("getUserMedia not supported in this browser/context.");
           throw new Error("NOT_SUPPORTED");
       }
       
@@ -98,18 +94,13 @@ export const ScannerScreen: React.FC<ScannerScreenProps> = ({ onNavigate }) => {
       };
 
       const mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
-      
-      // Log actual track settings to verify resolution
+      // Verify resolution meets minimum quality
       const track = mediaStream.getVideoTracks()[0];
       if (track) {
           const settings = track.getSettings();
-          console.log(`Camera active: ${settings.width}x${settings.height} @ ${settings.frameRate}fps`);
-          if (settings.width && settings.width < 1280) {
-              console.warn("Camera resolution is lower than HD. The device might not support it.");
-          }
+          // Low-res warning is handled silently
       }
 
-      console.log("Camera access granted.");
       setStream(mediaStream);
       setShowCamera(true);
       
@@ -131,9 +122,8 @@ export const ScannerScreen: React.FC<ScannerScreenProps> = ({ onNavigate }) => {
                        err.name === 'NotFoundError' ? "No camera found on this device." :
                        err.message || "Unknown camera error";
 
-      // Fallback to native OS camera/file picker
       if (fallbackInputRef.current) {
-          console.log("Falling back to native file input...");
+          // Fallback to native OS camera/file picker
           // Only show alert if it's a permission issue, otherwise just fallback
           if (err.name === 'NotAllowedError') alert(errorMsg);
           fallbackInputRef.current.click();

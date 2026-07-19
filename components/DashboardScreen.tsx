@@ -4,6 +4,7 @@ import { usePWAInstall } from "../usePWAInstall";
 import { DotLottieReact } from "@lottiefiles/dotlottie-react";
 import { useStore, Transaction } from '../context/Store';
 import { View } from '../types';
+import CSVImportModal from './CSVImportModal';
 
 interface DashboardScreenProps {
     onNavigate?: (view: View) => void;
@@ -303,6 +304,7 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ onNavigate }) => {
   
   // UI Toggles
   const [showExportModal, setShowExportModal] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
   const [showWidgetEditor, setShowWidgetEditor] = useState(false);
   const [editorOrder, setEditorOrder] = useState<string[]>([]);
   const [showMobileHeaderMenu, setShowMobileHeaderMenu] = useState(false);
@@ -765,6 +767,9 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ onNavigate }) => {
       )}
       {/* Widget Customization Modal */}
       {showWidgetEditor && ( <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm"> <div className="bg-surface-light dark:bg-surface-dark border border-border-light dark:border-border-dark rounded-3xl p-6 w-[calc(100vw-32px)] md:w-[80vw] lg:max-w-[400px] shadow-2xl animate-slide-up"><div className="flex justify-between items-center mb-4"> <h2 className="text-xl font-bold text-text-light-main dark:text-text-dark-main">Customize Bento</h2> <button onClick={() => setShowWidgetEditor(false)} className="text-text-light-muted dark:text-text-dark-muted hover:text-text-light-main dark:hover:text-text-dark-main"><span className="material-symbols-outlined">close</span></button> </div> <div className="flex flex-col gap-2 max-h-[50vh] overflow-y-auto custom-scrollbar mb-4"> {editorOrder.map((id, idx) => ( <div key={id} className={`flex items-center justify-between p-3 bg-background-light dark:bg-surface-darker rounded-xl border border-border-light dark:border-border-dark transition-opacity ${!widgets[id] ? 'opacity-60' : 'opacity-100'}`}> <div className="flex items-center gap-3"> <div className="flex flex-col gap-1"> <button onClick={() => handleEditorReorder(id, 'up')} disabled={idx === 0} className="size-7 flex items-center justify-center rounded-lg bg-gray-200 dark:bg-border-dark hover:bg-gray-300 dark:hover:bg-border-dark/80 disabled:opacity-20 transition-colors"><span className="material-symbols-outlined text-sm font-bold">keyboard_arrow_up</span></button> <button onClick={() => handleEditorReorder(id, 'down')} disabled={idx === editorOrder.length - 1} className="size-7 flex items-center justify-center rounded-lg bg-gray-200 dark:bg-border-dark hover:bg-gray-300 dark:hover:bg-border-dark/80 disabled:opacity-20 transition-colors"><span className="material-symbols-outlined text-sm font-bold">keyboard_arrow_down</span></button> </div> <span className="text-text-light-main dark:text-text-dark-main font-medium text-sm">{WIDGET_LABELS[id] || id}</span> </div> <div onClick={() => toggleWidget(id)} className={`w-12 h-6 rounded-full cursor-pointer relative transition-colors ${widgets[id] ? 'bg-primary' : 'bg-gray-300 dark:bg-border-dark'}`}><div className={`absolute top-1 size-4 bg-white rounded-full shadow-md transition-all ${widgets[id] ? 'left-7' : 'left-1'}`}></div></div> </div> ))} </div> <button onClick={handleSaveLayout} className="w-full py-3 bg-primary text-[#131811] font-bold rounded-xl shadow-glow hover:bg-primary-hover transition-colors">Save Layout</button> </div> </div> )}
+      {/* CSV Import Modal */}
+      {showImportModal && <CSVImportModal onClose={() => setShowImportModal(false)} />}
+
       {/* Export Modal */}
       {showExportModal && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-fade-in">
@@ -964,6 +969,8 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ onNavigate }) => {
             <div className="w-px h-5 bg-border-light dark:bg-border-dark"></div>
             <button onClick={() => setShowExportModal(true)} className="flex items-center gap-2 px-3 py-2 rounded-full hover:bg-gray-100 dark:hover:bg-surface-darker transition-colors text-text-light-muted dark:text-text-dark-muted hover:text-primary"><span className="material-symbols-outlined text-[20px]">download</span><span className="hidden lg:inline text-sm font-bold">Export</span></button>
             <div className="w-px h-5 bg-border-light dark:bg-border-dark"></div>
+            <button onClick={() => setShowImportModal(true)} className="flex items-center gap-2 px-3 py-2 rounded-full hover:bg-gray-100 dark:hover:bg-surface-darker transition-colors text-text-light-muted dark:text-text-dark-muted hover:text-primary" title="Import CSV"><span className="material-symbols-outlined text-[20px]">upload_file</span><span className="hidden lg:inline text-sm font-bold">Import</span></button>
+            <div className="w-px h-5 bg-border-light dark:bg-border-dark"></div>
             <button onClick={() => setShowWidgetEditor(true)} className="flex items-center gap-2 px-3 py-2 rounded-full hover:bg-gray-100 dark:hover:bg-surface-darker transition-colors text-text-light-muted dark:text-text-dark-muted hover:text-primary"><span className="material-symbols-outlined text-[20px]">edit</span><span className="hidden lg:inline text-sm font-bold">Customize</span></button>
           </div>
           <div className="md:hidden relative">
@@ -972,6 +979,7 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ onNavigate }) => {
               <div className="absolute right-0 top-10 bg-surface-light dark:bg-surface-dark border border-border-light dark:border-border-dark rounded-2xl shadow-xl p-2 flex flex-col gap-1 min-w-[160px] z-50 animate-fade-in">
                 <button onClick={() => { toggleTheme(); setShowMobileHeaderMenu(false); }} className="flex items-center gap-3 px-4 py-3 hover:bg-gray-100 dark:hover:bg-surface-darker rounded-xl text-sm font-bold text-text-light-main dark:text-text-dark-main"><span className="material-symbols-outlined text-[20px]">{userSettings?.theme === 'light' ? 'dark_mode' : 'light_mode'}</span> Theme</button>
                 <button onClick={() => { setShowExportModal(true); setShowMobileHeaderMenu(false); }} className="flex items-center gap-3 px-4 py-3 hover:bg-gray-100 dark:hover:bg-surface-darker rounded-xl text-sm font-bold text-text-light-main dark:text-text-dark-main"><span className="material-symbols-outlined text-[20px]">download</span> Export</button>
+                <button onClick={() => { setShowImportModal(true); setShowMobileHeaderMenu(false); }} className="flex items-center gap-3 px-4 py-3 hover:bg-gray-100 dark:hover:bg-surface-darker rounded-xl text-sm font-bold text-text-light-main dark:text-text-dark-main"><span className="material-symbols-outlined text-[20px]">upload_file</span> Import CSV</button>
                 <button onClick={lockApp} className="flex items-center gap-3 px-4 py-3 hover:bg-gray-100 dark:hover:bg-surface-darker rounded-xl text-sm font-bold text-text-light-main dark:text-text-dark-main"><span className="material-symbols-outlined text-[20px]">lock</span> App lock</button>
                 <button onClick={() => { setShowWidgetEditor(true); setShowMobileHeaderMenu(false); }} className="flex items-center gap-3 px-4 py-3 hover:bg-gray-100 dark:hover:bg-surface-darker rounded-xl text-sm font-bold text-text-light-main dark:text-text-dark-main"><span className="material-symbols-outlined text-[20px]">edit</span> Customize</button>
               </div>

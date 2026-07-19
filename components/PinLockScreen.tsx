@@ -9,6 +9,12 @@ export const PinLockScreen = () => {
     const [activeKey, setActiveKey] = useState<string | null>(null);
     const [isBioVerifying, setIsBioVerifying] = useState(false);
     
+    // Brute-force lockout
+    const [failedAttempts, setFailedAttempts] = useState(0);
+    const [lockoutUntil, setLockoutUntil] = useState<number | null>(null);
+    const [lockoutSeconds, setLockoutSeconds] = useState(0);
+    const MAX_ATTEMPTS = 5;
+    const LOCKOUT_DURATION = 30; // seconds
     const [showResetModal, setShowResetModal] = useState(false);
     const [showSetPinModal, setShowSetPinModal] = useState(false);
     const [newPin, setNewPin] = useState('');
@@ -54,13 +60,42 @@ export const PinLockScreen = () => {
         });
     }, []);
 
+    // Lockout countdown timer
+    useEffect(() => {
+        if (!lockoutUntil) { setLockoutSeconds(0); return; }
+        const tick = () => {
+            const remaining = Math.ceil((lockoutUntil - Date.now()) / 1000);
+            if (remaining <= 0) {
+                setLockoutUntil(null);
+                setLockoutSeconds(0);
+                setFailedAttempts(0);
+            } else {
+                setLockoutSeconds(remaining);
+            }
+        };
+        tick();
+        const interval = setInterval(tick, 1000);
+        return () => clearInterval(interval);
+    }, [lockoutUntil]);
+
     useEffect(() => {
         if (enteredPin.length === 4) {
-            const timer = setTimeout(() => {
-                const success = unlockApp(enteredPin);
+            // Block during lockout
+            if (lockoutUntil && Date.now() < lockoutUntil) {
+                setEnteredPin('');
+                return;
+            }
+            const timer = setTimeout(async () => {
+                const success = await unlockApp(enteredPin);
                 if (!success) {
+                    const newAttempts = failedAttempts + 1;
+                    setFailedAttempts(newAttempts);
                     setError(true);
                     if (navigator.vibrate) navigator.vibrate([50, 50, 50]);
+                    // Trigger lockout after MAX_ATTEMPTS
+                    if (newAttempts >= MAX_ATTEMPTS) {
+                        setLockoutUntil(Date.now() + LOCKOUT_DURATION * 1000);
+                    }
                     setTimeout(() => { 
                         setEnteredPin(''); 
                         setError(false); 
@@ -69,7 +104,7 @@ export const PinLockScreen = () => {
             }, 200);
             return () => clearTimeout(timer);
         }
-    }, [enteredPin, unlockApp]);
+    }, [enteredPin, unlockApp, failedAttempts, lockoutUntil]);
 
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
@@ -151,7 +186,7 @@ export const PinLockScreen = () => {
                      <div className="bg-surface-light dark:bg-surface-dark border border-border-light dark:border-border-dark rounded-3xl p-8 w-full max-w-sm shadow-2xl animate-slide-up flex flex-col gap-6 text-center">
                          <h3 className="text-xl font-bold text-text-light-main dark:text-text-dark-main">Set New PIN</h3>
                          <input type="password" maxLength={4} value={newPin} onChange={e => setNewPin(e.target.value.replace(/\D/g,''))} className="bg-gray-100 dark:bg-surface-darker text-center text-4xl tracking-widest p-4 rounded-2xl w-full border border-border-light dark:border-border-dark focus:border-primary outline-none" placeholder="••••" />
-                         <button onClick={() => { setAppPin(newPin); unlockApp(newPin); }} className="w-full py-3 rounded-xl font-bold bg-primary text-black shadow-glow">Save & Unlock</button>
+                         <button onClick={async () => { await setAppPin(newPin); await unlockApp(newPin); }} className="w-full py-3 rounded-xl font-bold bg-primary text-black shadow-glow">Save & Unlock</button>
                      </div>
                  </div>
              )}
@@ -162,7 +197,11 @@ export const PinLockScreen = () => {
                         <span className="material-symbols-outlined text-5xl">lock_person</span>
                      </div>
                      <h1 className="text-3xl font-black text-text-light-main dark:text-text-dark-main tracking-tight uppercase">App Locked</h1>
-                     <p className="text-text-light-muted dark:text-text-dark-muted text-sm font-bold mt-2 tracking-widest opacity-60">SECURITY AUTHENTICATION REQUIRED</p>
+                     <p className="text-text-light-muted dark:text-text-dark-muted text-sm font-bold mt-2 tracking-widest opacity-60">
+                       {lockoutSeconds > 0
+                         ? `TOO MANY ATTEMPTS · RETRY IN ${lockoutSeconds}s`
+                         : 'SECURITY AUTHENTICATION REQUIRED'}
+                     </p>
                  </div>
 
                  <div className={`flex gap-8 mb-4 h-12 items-center ${error ? 'animate-shake' : ''}`}>

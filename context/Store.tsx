@@ -21,6 +21,17 @@ import { checkBudgetThresholds, checkDailyReminder, checkMonthlySummary } from '
 // Gemini API helpers
 import { createGeminiClient } from "../utils/gemini";
 
+// --- SECURITY HELPERS ---
+/** SHA-256 hash a string using the Web Crypto API. Returns a lowercase hex digest. */
+const hashPin = async (pin: string): Promise<string> => {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(`expensetracker:pin:${pin}`);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  return Array.from(new Uint8Array(hashBuffer))
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('');
+};
+
 // --- FIREBASE CONFIGURATION ---
 const firebaseConfig = {
   apiKey: "AIzaSyBryZdhGRp05tY9e6gv79z4mA1hDyXlQ8U",
@@ -177,9 +188,9 @@ interface StoreContextType {
   isDemo: boolean;
   isPinSet: boolean;
   isAppLocked: boolean;
-  setAppPin: (pin: string) => void;
+  setAppPin: (pin: string) => Promise<void>;
   removeAppPin: () => Promise<void>;
-  unlockApp: (pin: string) => boolean;
+  unlockApp: (pin: string) => Promise<boolean>;
   lockApp: () => void;
   sendVerificationEmail: () => Promise<void>;
   undoState: UndoState;
@@ -565,9 +576,10 @@ export const StoreProvider = ({ children }: PropsWithChildren) => {
     }
   };
 
-  const setAppPin = (pin: string) => { 
-      setPinState(pin); 
-      updateUserSettings({ appPin: pin }); 
+  const setAppPin = async (pin: string) => { 
+      const hashed = await hashPin(pin);
+      setPinState(hashed); 
+      updateUserSettings({ appPin: hashed }); 
   };
   
   const removeAppPin = async () => { 
@@ -591,7 +603,11 @@ export const StoreProvider = ({ children }: PropsWithChildren) => {
       }
   };
 
-  const unlockApp = (pin: string) => { if (pin === appPin) { setIsAppLocked(false); return true; } return false; };
+  const unlockApp = async (pin: string): Promise<boolean> => { 
+    const hashed = await hashPin(pin);
+    if (hashed === appPin) { setIsAppLocked(false); return true; } 
+    return false; 
+  };
   const lockApp = () => { if (appPin) setIsAppLocked(true); };
 
   // --- CRUD ---
@@ -603,12 +619,16 @@ export const StoreProvider = ({ children }: PropsWithChildren) => {
 
   const deleteTransaction = async (id: string) => {
     if (isDemo) return;
+    if (!user) return;
+    // Ownership guard: only delete if this transaction belongs to the current user
+    const owned = transactions.find(t => t.id === id);
+    if (!owned) return;
     await deleteDoc(doc(db, 'transactions', id));
   };
 
   const addNotification = (title: string, body: string, type: AppNotification['type'] = 'info') => {
     const newNotif: AppNotification = {
-      id: Math.random().toString(36).substring(7),
+      id: crypto.randomUUID(),
       title,
       body,
       timestamp: Date.now(),
@@ -636,8 +656,20 @@ export const StoreProvider = ({ children }: PropsWithChildren) => {
       await Promise.all(promises);
   };
 
-  const updateTransaction = async (id: string, updates: Partial<Transaction>) => { if (user) await setDoc(doc(db, 'transactions', id), updates, { merge: true }); };
-  const restoreTransaction = async (tx: Transaction) => { if (user) { const { id, ...data } = tx; await setDoc(doc(db, 'transactions', id), data); } };
+  const updateTransaction = async (id: string, updates: Partial<Transaction>) => { 
+    if (!user) return;
+    // Ownership guard
+    const owned = transactions.find(t => t.id === id);
+    if (!owned) return;
+    await setDoc(doc(db, 'transactions', id), { ...updates, userId: user.uid }, { merge: true }); 
+  };
+  const restoreTransaction = async (tx: Transaction) => { 
+    if (!user) return; 
+    // Only restore a transaction that belongs to this user
+    if (tx.userId !== user.uid) return;
+    const { id, ...data } = tx; 
+    await setDoc(doc(db, 'transactions', id), data); 
+  };
 
   const showUndo = (tx: Transaction) => {
     if (undoTimerRef.current) clearTimeout(undoTimerRef.current);

@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { useStore, Transaction } from '../context/Store';
 import { View } from '../types';
+import CSVImportModal from './CSVImportModal';
 
 interface TransactionsCalendarScreenProps {
   onNavigate: (view: View) => void;
@@ -30,6 +31,7 @@ const TransactionsCalendarScreen: React.FC<TransactionsCalendarScreenProps> = ({
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
   const [viewMode, setViewMode] = useState<'week' | 'month' | 'year'>('month');
+  const [showImportModal, setShowImportModal] = useState(false);
   
   // Filters
   const [searchQuery, setSearchQuery] = useState('');
@@ -357,7 +359,14 @@ const TransactionsCalendarScreen: React.FC<TransactionsCalendarScreenProps> = ({
                     <h2 className="text-lg font-bold text-text-light-main dark:text-text-dark-main flex items-center gap-2">
                         <span className="material-symbols-outlined text-primary">history</span> Recent Activity
                     </h2>
-                    <div className="flex gap-2">
+                    <div className="flex items-center gap-3">
+                        <button
+                            onClick={() => setShowImportModal(true)}
+                            className="flex items-center gap-1.5 text-xs font-bold text-text-light-muted dark:text-text-dark-muted hover:text-primary transition-colors uppercase tracking-wider"
+                        >
+                            <span className="material-symbols-outlined text-sm">upload_file</span>
+                            Import
+                        </button>
                         <button onClick={handleExportCSV} className="text-primary text-xs font-bold hover:underline uppercase tracking-wider">Export</button>
                         <select 
                             value={filterCategory}
@@ -434,6 +443,7 @@ const TransactionsCalendarScreen: React.FC<TransactionsCalendarScreenProps> = ({
 
         </div>
 
+      {showImportModal && <CSVImportModal onClose={() => setShowImportModal(false)} />}
     </div>
   );
 };
