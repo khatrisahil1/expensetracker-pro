@@ -2,6 +2,8 @@ import React, { useState, useMemo } from 'react';
 import { useStore, Transaction } from '../context/Store';
 import { View } from '../types';
 import CSVImportModal from './CSVImportModal';
+import SearchFilterBar, { FilterState, initialFilterState } from './SearchFilterBar';
+import SpendingHeatmap from './SpendingHeatmap';
 
 interface TransactionsCalendarScreenProps {
   onNavigate: (view: View) => void;
@@ -30,13 +32,11 @@ const TransactionsCalendarScreen: React.FC<TransactionsCalendarScreenProps> = ({
   const { transactions, userSettings, setViewingTransaction } = useStore();
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
-  const [viewMode, setViewMode] = useState<'week' | 'month' | 'year'>('month');
+  const [viewMode, setViewMode] = useState<'week' | 'month' | 'year' | 'heatmap'>('month');
   const [showImportModal, setShowImportModal] = useState(false);
   
-  // Filters
-  const [searchQuery, setSearchQuery] = useState('');
-  const [filterType, setFilterType] = useState<'all' | 'income' | 'expense'>('all');
-  const [filterCategory, setFilterCategory] = useState<string>('All');
+  // Advanced Filters
+  const [filters, setFilters] = useState<FilterState>(initialFilterState);
 
   // Calendar Constants
   const year = currentDate.getFullYear();
@@ -77,22 +77,29 @@ const TransactionsCalendarScreen: React.FC<TransactionsCalendarScreenProps> = ({
       let matchesPeriod = false;
 
       // Special Case: specific day selection within the grid
-      if (selectedDay !== null && viewMode !== 'year') {
+      if (selectedDay !== null && (viewMode === 'week' || viewMode === 'month')) {
           matchesPeriod = txDate.getFullYear() === year && txDate.getMonth() === month && txDate.getDate() === selectedDay;
       } else {
           matchesPeriod = txDate >= periodStart && txDate <= periodEnd;
       }
 
-      const matchesType = filterType === 'all' || tx.type === filterType;
-      const matchesCategory = filterCategory === 'All' || tx.category === filterCategory;
-      
-      const searchLower = searchQuery.toLowerCase();
-      const matchesSearch = tx.title.toLowerCase().includes(searchLower) || 
-                            (tx.note && tx.note.toLowerCase().includes(searchLower));
+      const matchesType = filters.type === 'all' || tx.type === filters.type;
+      const matchesCategory = filters.category === 'all' || tx.category === filters.category;
+      const matchesMethod = filters.paymentMethod === 'all' || tx.paymentMethod === filters.paymentMethod;
 
-      return matchesPeriod && matchesType && matchesCategory && matchesSearch;
+      const searchLower = filters.searchQuery.toLowerCase();
+      const matchesSearch = !searchLower || tx.title.toLowerCase().includes(searchLower) || 
+                            (tx.note && tx.note.toLowerCase().includes(searchLower)) ||
+                            tx.category.toLowerCase().includes(searchLower);
+
+      const matchesStart = !filters.startDate || tx.date >= filters.startDate;
+      const matchesEnd = !filters.endDate || tx.date <= filters.endDate;
+      const matchesMin = !filters.minAmount || tx.amount >= parseFloat(filters.minAmount);
+      const matchesMax = !filters.maxAmount || tx.amount <= parseFloat(filters.maxAmount);
+
+      return matchesPeriod && matchesType && matchesCategory && matchesMethod && matchesSearch && matchesStart && matchesEnd && matchesMin && matchesMax;
     }).sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  }, [transactions, periodStart, periodEnd, selectedDay, viewMode, filterType, filterCategory, year, month, searchQuery]);
+  }, [transactions, periodStart, periodEnd, selectedDay, viewMode, filters, year, month]);
 
   // Derived Data: Stats for the VISUALIZATION (Grid/Bars)
   const visualizationData = useMemo(() => {
@@ -225,11 +232,11 @@ const TransactionsCalendarScreen: React.FC<TransactionsCalendarScreenProps> = ({
                 {/* View Mode Tabs */}
                 <div className="flex justify-center">
                     <div className="flex bg-gray-100 dark:bg-surface-darker p-1 rounded-full border border-gray-200 dark:border-border-dark shadow-sm">
-                        {(['Week', 'Month', 'Year'] as const).map(m => (
+                        {(['Week', 'Month', 'Year', 'Heatmap'] as const).map(m => (
                             <button
                                 key={m}
                                 onClick={() => handleModeChange(m.toLowerCase() as any)}
-                                className={`px-6 py-2 rounded-full text-sm font-bold transition-all ${viewMode === m.toLowerCase() ? 'bg-primary text-[#142210] shadow-md' : 'text-text-light-muted dark:text-text-dark-muted hover:text-text-light-main dark:hover:text-text-dark-main'}`}
+                                className={`px-5 py-2 rounded-full text-xs md:text-sm font-bold transition-all ${viewMode === m.toLowerCase() ? 'bg-primary text-[#142210] shadow-md' : 'text-text-light-muted dark:text-text-dark-muted hover:text-text-light-main dark:hover:text-text-dark-main'}`}
                             >
                                 {m}
                             </button>
@@ -237,7 +244,10 @@ const TransactionsCalendarScreen: React.FC<TransactionsCalendarScreenProps> = ({
                     </div>
                 </div>
 
-                {/* Main Calendar Card */}
+                {/* Main Calendar Card or Heatmap */}
+                {viewMode === 'heatmap' ? (
+                  <SpendingHeatmap onSelectDate={(d) => { setFilters(prev => ({ ...prev, startDate: d, endDate: d })); }} />
+                ) : (
                 <div className="bg-surface-light dark:bg-surface-dark border border-border-light dark:border-border-dark rounded-[2.5rem] p-6 md:p-10 shadow-card-light dark:shadow-card">
                     
                     {/* Income / Expense Header */}
@@ -349,6 +359,7 @@ const TransactionsCalendarScreen: React.FC<TransactionsCalendarScreenProps> = ({
                         )}
                     </div>
                 </div>
+                )}
             </div>
 
             {/* RIGHT COLUMN: Transactions List */}
@@ -368,39 +379,15 @@ const TransactionsCalendarScreen: React.FC<TransactionsCalendarScreenProps> = ({
                             Import
                         </button>
                         <button onClick={handleExportCSV} className="text-primary text-xs font-bold hover:underline uppercase tracking-wider">Export</button>
-                        <select 
-                            value={filterCategory}
-                            onChange={(e) => setFilterCategory(e.target.value)}
-                            className="bg-transparent text-xs font-bold text-text-light-muted dark:text-text-dark-muted border-none outline-none focus:ring-0 cursor-pointer hover:text-primary transition-colors pr-8 text-right"
-                        >
-                            <option value="All">All Categories</option>
-                            {ALL_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-                        </select>
                     </div>
                 </div>
 
-                {/* Search & Type Filter Row */}
-                <div className="flex gap-3">
-                    <div className="relative flex-1">
-                        <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-lg">search</span>
-                        <input 
-                            type="text" 
-                            placeholder="Search..." 
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            className="w-full bg-surface-light dark:bg-surface-dark border border-border-light dark:border-border-dark rounded-xl py-2.5 pl-10 pr-3 text-sm text-text-light-main dark:text-text-dark-main focus:border-primary outline-none focus:ring-1 focus:ring-primary"
-                        />
-                    </div>
-                    <select 
-                        value={filterType}
-                        onChange={(e) => setFilterType(e.target.value as any)}
-                        className="bg-surface-light dark:bg-surface-dark border border-border-light dark:border-border-dark rounded-xl px-3 py-2.5 text-sm font-bold text-text-light-main dark:text-text-dark-main focus:border-primary outline-none focus:ring-1 focus:ring-primary cursor-pointer"
-                    >
-                        <option value="all">All</option>
-                        <option value="income">Income</option>
-                        <option value="expense">Expense</option>
-                    </select>
-                </div>
+                {/* Smart Search & Filters */}
+                <SearchFilterBar
+                    filters={filters}
+                    onFilterChange={setFilters}
+                    onReset={() => setFilters(initialFilterState)}
+                />
 
                 {/* List Items */}
                 <div className="flex flex-col gap-3">

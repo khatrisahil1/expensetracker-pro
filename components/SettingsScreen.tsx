@@ -2,6 +2,8 @@
 import React, { useState, useEffect } from 'react';
 import { useStore, Transaction } from '../context/Store';
 import { DotLottieReact } from "@lottiefiles/dotlottie-react";
+import BackupRestoreModal from './BackupRestoreModal';
+import { requestNotificationPermission } from '../utils/notifications';
 
 
 const SettingsScreen: React.FC = () => {
@@ -10,6 +12,7 @@ const SettingsScreen: React.FC = () => {
   const [showMobileContent, setShowMobileContent] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState('');
+  const [showBackupModal, setShowBackupModal] = useState(false);
 
   const stats = React.useMemo(() => {
     const expenses = transactions.filter(t => t.type === 'expense');
@@ -815,11 +818,15 @@ const SettingsScreen: React.FC = () => {
                                           </div>
                                       </div>
                                       <button 
-                                        onClick={() => {
-                                            const updated = { ...notifPrefs, [pref.id]: !notifPrefs[pref.id as keyof typeof notifPrefs] };
+                                        onClick={async () => {
+                                            const val = !notifPrefs[pref.id as keyof typeof notifPrefs];
+                                            if (val) {
+                                                await requestNotificationPermission();
+                                            }
+                                            const updated = { ...notifPrefs, [pref.id]: val };
                                             setNotifPrefs(updated);
                                             updateUserSettings({ notificationPrefs: updated });
-                                            showToast(`${pref.label} ${updated[pref.id as keyof typeof notifPrefs] ? 'Enabled' : 'Disabled'}`);
+                                            showToast(`${pref.label} ${val ? 'Enabled' : 'Disabled'}`);
                                         }}
                                         className={`w-14 h-8 rounded-full relative transition-all duration-300 p-1 ${notifPrefs[pref.id as keyof typeof notifPrefs] ? 'bg-primary' : 'bg-gray-300 dark:bg-border-dark'}`}
                                       >
@@ -969,6 +976,14 @@ const SettingsScreen: React.FC = () => {
                                   <span className="text-xs text-text-light-muted text-center max-w-[200px]">Upload a CSV file to restore history or add bulk data.</span>
                                   <input type="file" accept=".csv" onChange={handleImportCSV} className="hidden" />
                               </label>
+
+                              <div onClick={() => setShowBackupModal(true)} className="flex flex-col items-center justify-center gap-2 p-6 rounded-2xl bg-white dark:bg-surface-dark border-2 border-dashed border-border-light dark:border-border-dark hover:border-primary/50 transition-all group cursor-pointer h-full">
+                                  <div className="size-14 rounded-full bg-primary/10 text-primary flex items-center justify-center mb-2 shadow-sm group-hover:scale-110 transition-transform">
+                                      <span className="material-symbols-outlined text-3xl">cloud_sync</span>
+                                  </div>
+                                  <span className="text-sm font-bold text-text-light-main dark:text-text-dark-main">Full JSON Backup & Restore</span>
+                                  <span className="text-xs text-text-light-muted text-center max-w-[200px]">Export or import complete JSON database snapshots.</span>
+                              </div>
                           </div>
                       </section>
 
@@ -1058,6 +1073,7 @@ const SettingsScreen: React.FC = () => {
           </div>
         </div>
       </div>
+      {showBackupModal && <BackupRestoreModal onClose={() => setShowBackupModal(false)} />}
     </div>
   );
 };

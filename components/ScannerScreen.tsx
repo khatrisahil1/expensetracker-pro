@@ -203,7 +203,8 @@ export const ScannerScreen: React.FC<ScannerScreenProps> = ({ onNavigate }) => {
       note: formData.notes, 
       paymentMethod: formData.paymentMethod,
       isSubscription: formData.isSubscription,
-      subscriptionFrequency: formData.subscriptionFrequency
+      subscriptionFrequency: formData.subscriptionFrequency,
+      attachment: previewImage || undefined,
     });
     setFormData(prev => ({ ...prev, amount: '', merchant: '', notes: '', isSubscription: false }));
     setPreviewImage(null);

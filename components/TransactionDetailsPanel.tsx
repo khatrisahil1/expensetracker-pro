@@ -7,6 +7,7 @@ const TransactionDetailsPanel: React.FC = () => {
     const [isEditing, setIsEditing] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
     const [showScanner, setShowScanner] = useState(false);
+    const [lightboxOpen, setLightboxOpen] = useState(false);
     const [formData, setFormData] = useState<Partial<Transaction>>({});
 
     useEffect(() => {
@@ -78,6 +79,12 @@ const TransactionDetailsPanel: React.FC = () => {
                                     {formData.type === 'income' ? '+' : '-'}{currencySymbol}{(formData.amount ?? 0).toLocaleString()}
                                 </span>
                                 <div className={`mt-4 px-5 py-1.5 rounded-full text-xs font-black uppercase tracking-[0.2em] ${formData.type === 'income' ? 'bg-primary/10 text-primary' : 'bg-red-500/10 text-danger'}`}>{formData.type}</div>
+                                {formData.isRecurring && (
+                                    <div className="flex items-center gap-1.5 mt-2 px-3 py-1 rounded-full bg-info/10 text-info text-xs font-bold border border-info/20 w-fit">
+                                        <span className="material-symbols-outlined text-[14px]">repeat</span>
+                                        Recurring · {formData.recurrenceRule?.frequency || 'monthly'}
+                                    </div>
+                                )}
                             </div>
                         )}
                     </div>
@@ -127,6 +134,111 @@ const TransactionDetailsPanel: React.FC = () => {
                                 <textarea value={formData.note || ""} onChange={(e) => setFormData({...formData, note: e.target.value})} className="w-full bg-gray-50 dark:bg-surface-darker border border-border-light dark:border-border-dark rounded-2xl p-4 text-sm font-bold text-text-light-main dark:text-text-dark-main outline-none focus:border-primary h-32 resize-none" placeholder="Add notes..." />
                             ) : (
                                 <p className="text-sm font-medium text-text-light-muted dark:text-text-dark-muted leading-relaxed bg-gray-50 dark:bg-surface-darker p-5 rounded-[2rem] border border-border-light dark:border-border-dark/30 min-h-[100px]">{formData.note || "No extra context provided."}</p>
+                            )}
+                        </div>
+                        {/* Recurring settings */}
+                        <div className="flex flex-col gap-2">
+                            <label className="text-[10px] font-black uppercase tracking-widest text-text-light-muted opacity-60">Recurring</label>
+                            {isEditing ? (
+                                <div className="flex flex-col gap-3">
+                                    <div
+                                        onClick={() => setFormData({...formData, isRecurring: !formData.isRecurring})}
+                                        className="flex items-center justify-between p-3 rounded-xl bg-gray-50 dark:bg-surface-darker border border-border-light dark:border-border-dark cursor-pointer"
+                                    >
+                                        <span className="text-sm font-bold text-text-light-main dark:text-text-dark-main">Repeat automatically</span>
+                                        <div className={`w-10 h-5 rounded-full relative transition-colors ${formData.isRecurring ? 'bg-primary' : 'bg-gray-300 dark:bg-border-dark'}`}>
+                                            <div className={`absolute top-0.5 size-4 bg-white rounded-full shadow transition-all ${formData.isRecurring ? 'left-5' : 'left-0.5'}`} />
+                                        </div>
+                                    </div>
+                                    {formData.isRecurring && (
+                                        <div className="flex gap-2 flex-wrap">
+                                            {(['daily', 'weekly', 'monthly', 'yearly'] as const).map(f => (
+                                                <button
+                                                    key={f}
+                                                    type="button"
+                                                    onClick={() => setFormData({...formData, recurrenceRule: { frequency: f, interval: 1 }})}
+                                                    className={`px-3 py-1.5 rounded-full text-xs font-bold capitalize transition-all ${
+                                                        formData.recurrenceRule?.frequency === f
+                                                            ? 'bg-primary text-[#131811]'
+                                                            : 'bg-gray-100 dark:bg-surface-darker text-text-light-muted'
+                                                    }`}
+                                                >
+                                                    {f}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            ) : (
+                                formData.isRecurring
+                                    ? <div className="flex items-center gap-2 text-info font-bold text-sm"><span className="material-symbols-outlined text-[18px]">repeat</span>Every {formData.recurrenceRule?.frequency || 'month'}</div>
+                                    : <span className="text-text-light-muted dark:text-text-dark-muted text-sm">One-time transaction</span>
+                            )}
+                        </div>
+                        {/* Receipt Attachment */}
+                        <div className="flex flex-col gap-2">
+                            <label className="text-[10px] font-black uppercase tracking-widest text-text-light-muted opacity-60">Receipt</label>
+                            {isEditing ? (
+                                <div className="flex flex-col gap-3">
+                                    {formData.attachment ? (
+                                        <div className="relative rounded-2xl overflow-hidden border border-border-light dark:border-border-dark">
+                                            <img
+                                                src={formData.attachment}
+                                                alt="Receipt"
+                                                className="w-full max-h-48 object-cover cursor-pointer"
+                                                onClick={() => setLightboxOpen(true)}
+                                            />
+                                            <button
+                                                type="button"
+                                                onClick={() => setFormData({...formData, attachment: undefined})}
+                                                className="absolute top-2 right-2 size-7 rounded-full bg-danger text-white flex items-center justify-center shadow-md hover:scale-110 transition-transform"
+                                            >
+                                                <span className="material-symbols-outlined text-sm">close</span>
+                                            </button>
+                                        </div>
+                                    ) : (
+                                        <label className="flex items-center gap-3 p-4 rounded-2xl border border-dashed border-border-light dark:border-border-dark cursor-pointer hover:border-primary/50 transition-colors">
+                                            <span className="material-symbols-outlined text-text-light-muted">photo_camera</span>
+                                            <span className="text-sm font-bold text-text-light-muted dark:text-text-dark-muted">Attach receipt photo</span>
+                                            <input
+                                                type="file" accept="image/*" className="hidden"
+                                                onChange={async (e) => {
+                                                    const file = e.target.files?.[0];
+                                                    if (!file) return;
+                                                    const reader = new FileReader();
+                                                    reader.onload = (ev) => {
+                                                        const img = new Image();
+                                                        img.onload = () => {
+                                                            const canvas = document.createElement('canvas');
+                                                            const MAX = 800;
+                                                            const scale = Math.min(1, MAX / Math.max(img.width, img.height));
+                                                            canvas.width = img.width * scale;
+                                                            canvas.height = img.height * scale;
+                                                            canvas.getContext('2d')!.drawImage(img, 0, 0, canvas.width, canvas.height);
+                                                            setFormData(prev => ({...prev, attachment: canvas.toDataURL('image/jpeg', 0.7)}));
+                                                        };
+                                                        img.src = ev.target?.result as string;
+                                                    };
+                                                    reader.readAsDataURL(file);
+                                                }}
+                                            />
+                                        </label>
+                                    )}
+                                </div>
+                            ) : (
+                                formData.attachment ? (
+                                    <div
+                                        className="relative rounded-2xl overflow-hidden border border-border-light dark:border-border-dark cursor-pointer group"
+                                        onClick={() => setLightboxOpen(true)}
+                                    >
+                                        <img src={formData.attachment} alt="Receipt" className="w-full max-h-40 object-cover" />
+                                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center">
+                                            <span className="material-symbols-outlined text-white opacity-0 group-hover:opacity-100 text-3xl transition-opacity">zoom_in</span>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <p className="text-sm text-text-light-muted dark:text-text-dark-muted opacity-60 italic">No receipt attached</p>
+                                )
                             )}
                         </div>
                     </div>
@@ -186,6 +298,21 @@ const TransactionDetailsPanel: React.FC = () => {
                         </button>
                       </div>
                     </div>
+                  </div>
+                )}
+                {/* Lightbox Modal */}
+                {lightboxOpen && formData.attachment && (
+                  <div
+                    className="fixed inset-0 z-[200] bg-black/90 flex items-center justify-center p-4 animate-fade-in"
+                    onClick={() => setLightboxOpen(false)}
+                  >
+                    <img src={formData.attachment} alt="Receipt" className="max-w-full max-h-full object-contain rounded-2xl shadow-2xl" />
+                    <button
+                      className="absolute top-4 right-4 size-10 rounded-full bg-white/10 flex items-center justify-center text-white hover:bg-white/20"
+                      onClick={() => setLightboxOpen(false)}
+                    >
+                      <span className="material-symbols-outlined">close</span>
+                    </button>
                   </div>
                 )}
             </div>

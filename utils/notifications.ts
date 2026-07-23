@@ -8,17 +8,32 @@ export const requestNotificationPermission = async () => {
 };
 
 export const sendNotification = (title: string, options?: NotificationOptions, onNotify?: (title: string, body: string, type: any) => void) => {
+    const tag = options?.tag;
+    if (tag) {
+        const today = new Date().toDateString();
+        const lastSent = localStorage.getItem(`notif_sent_${tag}`);
+        if (lastSent === today) {
+            return false;
+        }
+        localStorage.setItem(`notif_sent_${tag}`, today);
+    }
+
     if (onNotify) {
-        onNotify(title, options?.body || '', options?.tag?.includes('warning') ? 'warning' : 'info');
+        const isWarning = options?.tag?.includes('warning') || options?.tag?.includes('warn') || options?.tag?.includes('over') || options?.tag?.includes('exceeded');
+        onNotify(title, options?.body || '', isWarning ? 'warning' : 'info');
     }
 
     if (Notification.permission === "granted") {
-        new Notification(title, {
-            icon: '/logo192.png',
-            badge: '/logo192.png',
-            ...options
-        });
-        return true;
+        try {
+            new Notification(title, {
+                icon: '/logo192.png',
+                badge: '/logo192.png',
+                ...options
+            });
+            return true;
+        } catch (e) {
+            console.warn("Browser Notification failed:", e);
+        }
     }
     return false;
 };
@@ -64,12 +79,49 @@ export const checkBudgetThresholds = (transactions: any[], limit: number, prefs:
 
     const percentage = (monthlyExpenses / limit) * 100;
 
-    if (percentage >= 80 && percentage < 85) {
+    if (percentage >= 100) {
+        sendNotification("Monthly Budget Exceeded! 🚨", {
+            body: `You've spent ${Math.round(percentage)}% of your monthly budget limit.`,
+            tag: 'budget-exceeded'
+        }, onNotify);
+    } else if (percentage >= 80) {
         sendNotification("Budget Warning! ⚠️", {
             body: `You've reached ${Math.round(percentage)}% of your monthly budget limit.`,
             tag: 'budget-warning'
         }, onNotify);
     }
+};
+
+export const checkCategoryBudgets = (transactions: any[], categoryBudgets: Record<string, number>, prefs: any, onNotify?: (t: string, b: string, ty: any) => void) => {
+    if (!prefs?.budgetThresholds || !categoryBudgets) return;
+    
+    const currentMonth = new Date().getMonth();
+    const currentYear = new Date().getFullYear();
+    
+    const catSpend: Record<string, number> = {};
+    transactions.forEach(tx => {
+        const d = new Date(tx.date);
+        if (tx.type === 'expense' && d.getMonth() === currentMonth && d.getFullYear() === currentYear) {
+            catSpend[tx.category] = (catSpend[tx.category] || 0) + tx.amount;
+        }
+    });
+
+    Object.entries(categoryBudgets).forEach(([cat, limit]) => {
+        if (!limit || limit <= 0) return;
+        const spent = catSpend[cat] || 0;
+        const pct = (spent / limit) * 100;
+        if (pct >= 100) {
+            sendNotification(`Category Over Budget! 🚨`, {
+                body: `You've exceeded your budget for ${cat} (${Math.round(pct)}% used).`,
+                tag: `cat-budget-over-${cat}`
+            }, onNotify);
+        } else if (pct >= 80) {
+            sendNotification(`Category Warning! ⚠️`, {
+                body: `You've reached ${Math.round(pct)}% of your ${cat} budget limit.`,
+                tag: `cat-budget-warn-${cat}`
+            }, onNotify);
+        }
+    });
 };
 
 export const checkDailyReminder = (prefs: any, onNotify?: (t: string, b: string, ty: any) => void) => {

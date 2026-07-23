@@ -17,7 +17,7 @@ import {
   sendEmailVerification as fbSendEmailVerification
 } from 'firebase/auth';
 import { getFirestore, enableIndexedDbPersistence, collection, addDoc, query, where, onSnapshot, orderBy, doc, deleteDoc, Timestamp, setDoc, getDoc, updateDoc, deleteField, writeBatch } from 'firebase/firestore';
-import { checkBudgetThresholds, checkDailyReminder, checkMonthlySummary } from '../utils/notifications';
+import { checkBudgetThresholds, checkCategoryBudgets, checkDailyReminder, checkMonthlySummary } from '../utils/notifications';
 // Gemini API helpers
 import { createGeminiClient } from "../utils/gemini";
 
@@ -62,6 +62,12 @@ enableIndexedDbPersistence(db).catch((err) => {
 });
 
 // --- TYPE DEFINITIONS ---
+export interface RecurrenceRule {
+  frequency: 'daily' | 'weekly' | 'monthly' | 'yearly';
+  interval: number; // e.g. 2 = every 2 weeks
+  endDate?: string; // YYYY-MM-DD, optional
+}
+
 export interface Transaction {
   id: string;
   title: string;
@@ -77,6 +83,12 @@ export interface Transaction {
   subscriptionFrequency?: 'monthly' | 'yearly' | 'weekly';
   subscriptionStatus?: 'active' | 'paused';
   nextRenewalDate?: string;
+  // Recurring transactions
+  isRecurring?: boolean;
+  recurrenceRule?: RecurrenceRule;
+  nextOccurrence?: string; // YYYY-MM-DD
+  // Receipt attachment (compressed base64 data URL)
+  attachment?: string;
   createdAt?: { seconds: number, nanoseconds: number };
 }
 
@@ -109,6 +121,16 @@ export interface AppNotification {
   type: 'info' | 'warning' | 'success' | 'alert';
 }
 
+export interface QuickShortcut {
+  id: string;
+  emoji: string;
+  label: string;
+  amount: number;
+  type: 'income' | 'expense';
+  category: string;
+  paymentMethod: string;
+}
+
 export interface UserSettings {
   currency: string;
   displayName: string;
@@ -117,7 +139,6 @@ export interface UserSettings {
   monthlyIncomeGoal?: number;
   monthlyExpenseLimit?: number;
   theme?: 'light' | 'dark';
-
   dateFormat?: 'DD/MM/YYYY' | 'MM/DD/YYYY' | 'YYYY-MM-DD';
   language?: string;
   shakeToLock?: boolean;
@@ -142,6 +163,7 @@ export interface UserSettings {
     tipsAndTricks: boolean;
   };
   notificationTune: string;
+  quickShortcuts?: QuickShortcut[];
 }
 
 interface UndoState {
@@ -203,8 +225,11 @@ interface StoreContextType {
   // AI Features
   generateFinancialAudit: () => Promise<string>;
   verifyBiometric: () => Promise<boolean>;
-
+  // Backup & Restore
+  exportAllData: () => object;
+  importAllData: (data: any) => Promise<void>;
 }
+
 
 const StoreContext = createContext<StoreContextType | undefined>(undefined);
 
@@ -217,7 +242,7 @@ export const useStore = () => {
 const DEFAULT_EXPENSE_CATS = ["Food", "Rent", "Transportation", "Shopping", "Entertainment", "Health", "Utilities", "Home", "Other"];
 const DEFAULT_INCOME_CATS = ["Salary", "Freelance", "Investments", "Gifts", "Refunds", "Rental", "Home", "Other"];
 const DEFAULT_PAYMENT_METHODS = ["Cash", "UPI", "Savings Account"];
-const DEFAULT_ORDER = ['balance', 'income', 'expense', 'streak','breakdown', 'recent', 'quickAdd'];
+const DEFAULT_ORDER = ['balance', 'income', 'expense', 'streak', 'shortcuts', 'breakdown', 'recent', 'quickAdd'];
 
 const mergeCategories = (storedCategories: string[] | undefined, defaults: string[]) => Array.from(new Set([...(storedCategories || []), ...defaults]));
 
@@ -317,12 +342,24 @@ export const StoreProvider = ({ children }: PropsWithChildren) => {
     return () => { unsubTx(); unsubImpulse(); };
   }, [user, isDemo]);
 
+  // 2b. Process recurring transactions once on first load
+  const recurringProcessedRef = useRef(false);
+  useEffect(() => {
+    if (!user || isDemo || transactions.length === 0 || recurringProcessedRef.current) return;
+    recurringProcessedRef.current = true;
+    // Defer to avoid running before functions are defined
+    setTimeout(() => processRecurringTransactions(), 1000);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, isDemo, transactions.length]);
+
+
   // 3. Notification Observer
   useEffect(() => {
     if (!userSettings?.notificationPrefs) return;
 
     // Check budget thresholds when transactions or limit changes
     checkBudgetThresholds(transactions, userSettings.monthlyExpenseLimit || 0, userSettings.notificationPrefs, addNotification);
+    checkCategoryBudgets(transactions, userSettings.categoryBudgets || {}, userSettings.notificationPrefs, addNotification);
     
     // Check monthly summary
     checkMonthlySummary(transactions, userSettings.notificationPrefs, addNotification);
@@ -333,7 +370,7 @@ export const StoreProvider = ({ children }: PropsWithChildren) => {
     }, 60000); // Check every minute
 
     return () => clearInterval(timer);
-  }, [transactions.length, userSettings?.monthlyExpenseLimit, userSettings?.notificationPrefs]);
+  }, [transactions, userSettings?.monthlyExpenseLimit, userSettings?.categoryBudgets, userSettings?.notificationPrefs]);
 
   // 4. User Settings Listener
   useEffect(() => {
@@ -627,15 +664,20 @@ export const StoreProvider = ({ children }: PropsWithChildren) => {
   };
 
   const addNotification = (title: string, body: string, type: AppNotification['type'] = 'info') => {
-    const newNotif: AppNotification = {
-      id: crypto.randomUUID(),
-      title,
-      body,
-      timestamp: Date.now(),
-      read: false,
-      type
-    };
-    setNotifications(prev => [newNotif, ...prev].slice(0, 50)); // Keep last 50
+    setNotifications(prev => {
+      const exists = prev.some(n => n.title === title && n.body === body && !n.read);
+      if (exists) return prev;
+      
+      const newNotif: AppNotification = {
+        id: crypto.randomUUID(),
+        title,
+        body,
+        timestamp: Date.now(),
+        read: false,
+        type
+      };
+      return [newNotif, ...prev].slice(0, 50); // Keep last 50
+    });
   };
 
   const markNotificationsRead = () => {
@@ -778,6 +820,67 @@ Respond with JSON only.`;
       }
   };
 
+  // --- RECURRING TRANSACTIONS ---
+  const processRecurringTransactions = async () => {
+    if (!user || isDemo) return;
+    const today = new Date().toISOString().split('T')[0];
+    const due = transactions.filter(
+      t => t.isRecurring && t.nextOccurrence && t.nextOccurrence <= today
+    );
+    for (const template of due) {
+      // Skip if recurrence has ended
+      if (template.recurrenceRule?.endDate && template.recurrenceRule.endDate < today) continue;
+      // Create the new transaction for today
+      const { id, nextOccurrence, createdAt, ...txData } = template;
+      await addDoc(collection(db, 'transactions'), {
+        ...txData,
+        date: today,
+        userId: user.uid,
+        createdAt: Timestamp.now(),
+      });
+      // Advance nextOccurrence
+      const next = new Date(nextOccurrence!);
+      const rule = template.recurrenceRule!;
+      if (rule.frequency === 'daily') next.setDate(next.getDate() + rule.interval);
+      else if (rule.frequency === 'weekly') next.setDate(next.getDate() + 7 * rule.interval);
+      else if (rule.frequency === 'monthly') next.setMonth(next.getMonth() + rule.interval);
+      else if (rule.frequency === 'yearly') next.setFullYear(next.getFullYear() + rule.interval);
+      await updateDoc(doc(db, 'transactions', template.id), {
+        nextOccurrence: next.toISOString().split('T')[0],
+      });
+    }
+  };
+
+  // --- BACKUP & RESTORE ---
+  const exportAllData = () => ({
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    transactions,
+    userSettings,
+    impulseItems,
+  });
+
+  const importAllData = async (data: any) => {
+    if (!user || isDemo) return;
+    if (data.version !== 1) throw new Error('Unsupported backup version');
+    const batch = writeBatch(db);
+    // Write transactions
+    (data.transactions || []).forEach((tx: Transaction) => {
+      const { id, ...rest } = tx;
+      batch.set(doc(collection(db, 'transactions')), { ...rest, userId: user.uid });
+    });
+    // Write impulse items
+    (data.impulseItems || []).forEach((item: any) => {
+      const { id, ...rest } = item;
+      batch.set(doc(collection(db, 'impulse_items')), { ...rest, userId: user.uid });
+    });
+    // Write settings
+    if (data.userSettings) {
+      batch.set(doc(db, 'users', user.uid), { ...data.userSettings }, { merge: true });
+    }
+    await batch.commit();
+  };
+
   return (
     <StoreContext.Provider value={{
       user, userSettings, loading, transactions, impulseItems, login, signup, googleLogin, logout, 
@@ -812,7 +915,8 @@ Respond with JSON only.`;
       isPinSet: !!appPin, isAppLocked, setAppPin, removeAppPin, unlockApp, lockApp,
       undoState, showUndo, clearUndo,
       notifications, addNotification, markNotificationsRead, clearNotifications,
-      generateFinancialAudit, verifyBiometric, sendVerificationEmail
+      generateFinancialAudit, verifyBiometric, sendVerificationEmail,
+      exportAllData, importAllData,
     }}>
       {children}
     </StoreContext.Provider>
