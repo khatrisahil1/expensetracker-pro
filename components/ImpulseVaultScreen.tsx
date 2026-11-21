@@ -1,13 +1,18 @@
-
+// Impulse Vault page (/vault): park a tempting purchase behind a countdown.
+// Resisting it adds its price to realised savings; buying it records an expense.
 import React, { useState, useEffect, useRef } from 'react';
 import { useStore, ImpulseItem } from '../context/Store';
-import { createGeminiClient } from '../utils/gemini';
+import { useDialog } from './ui/DialogProvider';
+import { createGeminiClient, GEMINI_MODEL } from '../utils/gemini';
+import { extractJsonObject } from '../utils/json';
+import { getCurrencySymbol } from '../utils/currency';
+import { toLocalISODate } from '../utils/date';
 
 const ImpulseVaultScreen: React.FC = () => {
   const { userSettings, addTransaction, impulseItems, addImpulseItem, deleteImpulseItem } = useStore();
+  const dialog = useDialog();
   const [currentTime, setCurrentTime] = useState(Date.now());
   const [showAddModal, setShowAddModal] = useState(false);
-  const [savingsSession, setSavingsSession] = useState(0); 
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analyzingSource, setAnalyzingSource] = useState<'image' | 'link' | null>(null);
   
@@ -43,7 +48,7 @@ const ImpulseVaultScreen: React.FC = () => {
               createdAt: Date.now(), durationHours: parseInt(newItem.duration)
           });
           closeModal();
-      } catch (e) { alert("Failed to save item."); }
+      } catch (e) { dialog.toast('Could not save the item', 'error'); }
   };
 
   const startCamera = async () => {
@@ -51,7 +56,7 @@ const ImpulseVaultScreen: React.FC = () => {
       const mediaStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
       setStream(mediaStream); setShowCamera(true);
       setTimeout(() => { if (videoRef.current) videoRef.current.srcObject = mediaStream; }, 100);
-    } catch (err) { alert("Could not access camera."); }
+    } catch (err) { dialog.toast('Could not open the camera', 'error'); }
   };
 
   const stopCamera = () => { if (stream) stream.getTracks().forEach(t => t.stop()); setStream(null); setShowCamera(false); };
@@ -130,7 +135,7 @@ const ImpulseVaultScreen: React.FC = () => {
           });
           const data = JSON.parse(response.text);
           setNewItem(prev => ({ ...prev, name: data.name || prev.name, price: data.price?.toString() || prev.price }));
-      } catch (err: any) { alert(err?.message || "Manual entry required."); } finally { setIsAnalyzing(false); setAnalyzingSource(null); }
+      } catch (err: any) { dialog.toast(err?.message || 'Couldn’t read that. Enter the details yourself.', 'error'); } finally { setIsAnalyzing(false); setAnalyzingSource(null); }
   };
 
   const analyzeLink = async () => {
@@ -139,25 +144,24 @@ const ImpulseVaultScreen: React.FC = () => {
     try {
         const ai = createGeminiClient();
         const response = await ai.models.generateContent({
-            model: 'gemini-3-flash-preview',
+            model: GEMINI_MODEL,
             contents: `Search product link: ${newItem.link}. Extract name and price in JSON.`,
             config: { tools: [{ googleSearch: {} }] }
         });
-        const jsonStr = response.text.replace(/```json/g, '').replace(/```/g, '').trim();
-        const data = JSON.parse(jsonStr.substring(jsonStr.indexOf('{'), jsonStr.lastIndexOf('}') + 1));
+        const data = extractJsonObject<{ name?: string; price?: number | string }>(response.text);
+        if (!data) throw new Error('Could not read product details from that link.');
         setNewItem(prev => ({ ...prev, name: data.name || prev.name, price: data.price?.toString() || prev.price }));
-    } catch (e: any) { alert(e?.message || "Could not fetch link details."); } finally { setIsAnalyzing(false); setAnalyzingSource(null); }
+    } catch (e: any) { dialog.toast(e?.message || 'Couldn’t read that link', 'error'); } finally { setIsAnalyzing(false); setAnalyzingSource(null); }
   };
 
   const handleDelete = async (id: string, price: number) => {
       await deleteImpulseItem(id, true); // true = resisted impulse
-      setSavingsSession(prev => prev + price);
   };
 
   const handleBuy = async (item: ImpulseItem) => {
-      await addTransaction({ title: item.name, amount: item.price, type: 'expense', category: 'Shopping', date: new Date().toISOString().split('T')[0], note: 'Impulse buy from Vault' });
+      await addTransaction({ title: item.name, amount: item.price, type: 'expense', category: 'Shopping', date: toLocalISODate(), note: 'Impulse buy from Vault' });
       await deleteImpulseItem(item.id, false); // false = bought, not resisted
-      alert(`Bought ${item.name}!`);
+      dialog.toast(`Bought ${item.name}`);
   };
 
   const getTimeRemaining = (item: ImpulseItem) => {
@@ -170,7 +174,7 @@ const ImpulseVaultScreen: React.FC = () => {
       return days > 0 ? `${days}d ${hours}h` : `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
   };
 
-  const currencySymbol = userSettings?.currency === 'USD' ? '$' : userSettings?.currency === 'EUR' ? '€' : '₹';
+  const currencySymbol = getCurrencySymbol(userSettings?.currency);
   const totalPotentialSavings = impulseItems.reduce((acc, item) => acc + item.price, 0);
 
   return (
@@ -236,7 +240,7 @@ const ImpulseVaultScreen: React.FC = () => {
           <button onClick={() => setShowAddModal(true)} className="flex items-center justify-center rounded-full h-12 px-6 bg-primary hover:bg-primary-hover text-[#131811] gap-2 font-black uppercase tracking-widest shadow-glow active:scale-95 transition-transform"><span className="material-symbols-outlined">add</span>New Impulse</button>
         </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 animate-slide-up delay-200">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 stagger">
           {impulseItems.map(item => {
               const unlockTime = item.createdAt + (item.durationHours * 60 * 60 * 1000);
               const isLocked = Date.now() < unlockTime;

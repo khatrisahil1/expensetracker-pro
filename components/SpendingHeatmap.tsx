@@ -1,5 +1,8 @@
+// GitHub-style grid of daily spending over the last year (History page, Heatmap tab).
 import React, { useMemo } from 'react';
 import { useStore, Transaction } from '../context/Store';
+import { getCurrencySymbol } from '../utils/currency';
+import { toLocalISODate } from '../utils/date';
 
 interface SpendingHeatmapProps {
   onSelectDate?: (dateStr: string) => void;
@@ -7,7 +10,7 @@ interface SpendingHeatmapProps {
 
 const SpendingHeatmap: React.FC<SpendingHeatmapProps> = ({ onSelectDate }) => {
   const { transactions, userSettings } = useStore();
-  const currencySymbol = userSettings?.currency === 'USD' ? '$' : userSettings?.currency === 'EUR' ? '€' : '₹';
+  const currencySymbol = getCurrencySymbol(userSettings?.currency);
 
   // Generate 52 weeks (364 days) up to today
   const { weeks, dayStatsMap, maxExpense, statsSummary } = useMemo(() => {
@@ -149,7 +152,7 @@ const SpendingHeatmap: React.FC<SpendingHeatmapProps> = ({ onSelectDate }) => {
           {weeks.map((week, wIdx) => (
             <div key={wIdx} className="flex flex-col gap-1.5 flex-1">
               {week.map((dateObj) => {
-                const dateStr = dateObj.toISOString().split('T')[0];
+                const dateStr = toLocalISODate(dateObj);
                 const stat = dayStatsMap[dateStr];
                 const exp = stat?.expense || 0;
                 return (

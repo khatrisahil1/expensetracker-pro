@@ -2,16 +2,23 @@ import path from 'path';
 import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
+import basicSsl from '@vitejs/plugin-basic-ssl';
 
 export default defineConfig(({ mode }) => {
     const env = loadEnv(mode, '.', '');
+    // `npm run dev:phone`: serve on the Wi-Fi network over HTTPS so a phone can
+    // open it. HTTPS matters: on a plain http://192.168.x.x address browsers
+    // disable crypto.randomUUID, crypto.subtle (PIN hashing), the camera and
+    // service workers, all of which the app uses. The certificate is
+    // self-signed, so the phone shows a warning once.
+    const phone = mode === 'phone';
     return {
-      server: {
-        port: 3000,
-        host: 'localhost',
-      },
+      server: phone
+        ? { port: 5174, host: true, strictPort: true }
+        : { port: 3000, host: 'localhost' },
       plugins: [
         react(),
+        ...(phone ? [basicSsl()] : []),
 
         VitePWA({
             registerType: 'autoUpdate',
@@ -29,7 +36,10 @@ export default defineConfig(({ mode }) => {
             ],
 
             workbox: {
-              navigateFallback: '/offline.html',
+              // The app uses client-side routes (/budget, /settings, ...). Offline, any
+              // page URL must load the app shell so the router can render it. Serving
+              // offline.html here broke every deep link and refresh while offline.
+              navigateFallback: '/index.html',
 
               runtimeCaching: [
                 // Page navigation (offline fallback)

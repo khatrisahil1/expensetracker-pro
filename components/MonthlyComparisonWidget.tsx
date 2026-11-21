@@ -1,9 +1,13 @@
+// Dashboard widget: this month's income and expenses compared with last month.
 import React, { useMemo } from 'react';
 import { useStore } from '../context/Store';
+import { getCurrencySymbol } from '../utils/currency';
+import { parseLocalDate } from '../utils/date';
+import { formatPercentChange, percentChange } from '../utils/transactionStats';
 
 const MonthlyComparisonWidget: React.FC = () => {
   const { transactions, userSettings } = useStore();
-  const currencySymbol = userSettings?.currency === 'USD' ? '$' : userSettings?.currency === 'EUR' ? '€' : '₹';
+  const currencySymbol = getCurrencySymbol(userSettings?.currency);
 
   const comparisonData = useMemo(() => {
     const now = new Date();
@@ -26,7 +30,7 @@ const MonthlyComparisonWidget: React.FC = () => {
     const prevCatMap: Record<string, number> = {};
 
     transactions.forEach((tx) => {
-      const d = new Date(tx.date);
+      const d = parseLocalDate(tx.date);
       const y = d.getFullYear();
       const m = d.getMonth();
 
@@ -47,8 +51,9 @@ const MonthlyComparisonWidget: React.FC = () => {
       }
     });
 
-    const expChangePct = prevExpense > 0 ? ((currExpense - prevExpense) / prevExpense) * 100 : 0;
-    const incChangePct = prevIncome > 0 ? ((currIncome - prevIncome) / prevIncome) * 100 : 0;
+    // null when last month had nothing to compare against (shown as "New" / "—").
+    const expChangePct = percentChange(currExpense, prevExpense);
+    const incChangePct = percentChange(currIncome, prevIncome);
 
     // Build category delta list
     const allCats = Array.from(new Set([...Object.keys(currCatMap), ...Object.keys(prevCatMap)]));
@@ -107,9 +112,10 @@ const MonthlyComparisonWidget: React.FC = () => {
               <span className="text-xs text-text-light-muted ml-2">in {currMonthName}</span>
             </div>
             <span className={`px-2.5 py-1 rounded-full text-xs font-black ${
-              expChangePct <= 0 ? 'bg-emerald-500/10 text-emerald-500' : 'bg-rose-500/10 text-rose-500'
+              expChangePct === null ? 'bg-gray-500/10 text-text-light-muted'
+                : expChangePct <= 0 ? 'bg-emerald-500/10 text-emerald-500' : 'bg-rose-500/10 text-rose-500'
             }`}>
-              {expChangePct >= 0 ? '+' : ''}{expChangePct.toFixed(1)}%
+              {formatPercentChange(currExpense, prevExpense)}
             </span>
           </div>
           <p className="text-xs text-text-light-muted">
@@ -126,9 +132,10 @@ const MonthlyComparisonWidget: React.FC = () => {
               <span className="text-xs text-text-light-muted ml-2">in {currMonthName}</span>
             </div>
             <span className={`px-2.5 py-1 rounded-full text-xs font-black ${
-              incChangePct >= 0 ? 'bg-emerald-500/10 text-emerald-500' : 'bg-rose-500/10 text-rose-500'
+              incChangePct === null ? 'bg-gray-500/10 text-text-light-muted'
+                : incChangePct >= 0 ? 'bg-emerald-500/10 text-emerald-500' : 'bg-rose-500/10 text-rose-500'
             }`}>
-              {incChangePct >= 0 ? '+' : ''}{incChangePct.toFixed(1)}%
+              {formatPercentChange(currIncome, prevIncome)}
             </span>
           </div>
           <p className="text-xs text-text-light-muted">

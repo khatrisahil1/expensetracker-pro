@@ -1,39 +1,34 @@
+// Transaction History page (/transactions/history): week / month / year calendar
+// views, a spending heatmap, filters, and CSV import/export.
 import React, { useState, useMemo } from 'react';
-import { useStore, Transaction } from '../context/Store';
-import { View } from '../types';
+import { useStore } from '../context/Store';
+import { useNavigate } from 'react-router';
+import { ROUTES } from '../routes';
+import { CATEGORY_STYLES } from '../constants/categories';
+import { downloadTransactionsCsv } from '../utils/csv';
+import { getPeriodRange, shiftPeriod } from '../utils/period';
+import { formatDisplayDate, parseLocalDate, toLocalISODate } from '../utils/date';
+import { formatMoney } from '../utils/format';
 import CSVImportModal from './CSVImportModal';
+import TidyUpModal from './TidyUpModal';
 import SearchFilterBar, { FilterState, initialFilterState } from './SearchFilterBar';
+import { matchesSearch, searchTokens } from '../utils/search';
 import SpendingHeatmap from './SpendingHeatmap';
+import { getCurrencySymbol } from '../utils/currency';
 
 interface TransactionsCalendarScreenProps {
-  onNavigate: (view: View) => void;
   isEmbedded?: boolean;
 }
 
-const CATEGORY_STYLES: Record<string, { icon: string, colorClass: string }> = {
-    "Food": { icon: "restaurant", colorClass: "text-orange-500 bg-orange-500/10 border-orange-500/20" },
-    "Housing": { icon: "home", colorClass: "text-blue-500 bg-blue-500/10 border-blue-500/20" },
-    "Transportation": { icon: "directions_car", colorClass: "text-purple-500 bg-purple-500/10 border-purple-500/20" },
-    "Shopping": { icon: "shopping_bag", colorClass: "text-yellow-500 bg-yellow-500/10 border-yellow-500/20" },
-    "Entertainment": { icon: "movie", colorClass: "text-pink-500 bg-pink-500/10 border-pink-500/20" },
-    "Health": { icon: "medical_services", colorClass: "text-red-400 bg-red-400/10 border-red-400/20" },
-    "Utilities": { icon: "bolt", colorClass: "text-cyan-400 bg-cyan-400/10 border-cyan-400/20" },
-    "Home": { icon: "home", colorClass: "text-indigo-500 bg-indigo-500/10 border-indigo-500/20" },
-    "Salary": { icon: "payments", colorClass: "text-primary bg-primary/10 border-primary/20" },
-    "Freelance": { icon: "work", colorClass: "text-emerald-400 bg-emerald-400/10 border-emerald-400/20" },
-    "Other": { icon: "receipt", colorClass: "text-gray-400 bg-gray-400/10 border-gray-400/20" }
-};
 
-const EXPENSE_CATEGORIES = ["Food", "Housing", "Rent", "Transportation", "Entertainment", "Shopping", "Health", "Utilities", "Home", "Other"];
-const INCOME_CATEGORIES = ["Salary", "Freelance", "Investments", "Gifts", "Refunds", "Rental", "Home", "Other"];
-const ALL_CATEGORIES = Array.from(new Set([...EXPENSE_CATEGORIES, ...INCOME_CATEGORIES]));
-
-const TransactionsCalendarScreen: React.FC<TransactionsCalendarScreenProps> = ({ onNavigate, isEmbedded = false }) => {
+const TransactionsCalendarScreen: React.FC<TransactionsCalendarScreenProps> = ({ isEmbedded = false }) => {
+  const navigate = useNavigate();
   const { transactions, userSettings, setViewingTransaction } = useStore();
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
   const [viewMode, setViewMode] = useState<'week' | 'month' | 'year' | 'heatmap'>('month');
   const [showImportModal, setShowImportModal] = useState(false);
+  const [showTidyUp, setShowTidyUp] = useState(false);
   
   // Advanced Filters
   const [filters, setFilters] = useState<FilterState>(initialFilterState);
@@ -44,40 +39,24 @@ const TransactionsCalendarScreen: React.FC<TransactionsCalendarScreenProps> = ({
   const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
   // Helper: Get Start/End of current period
-  const { periodStart, periodEnd } = useMemo(() => {
-      const start = new Date(currentDate);
-      const end = new Date(currentDate);
+  // The calendar grid starts weeks on Sunday, so the week range does too.
+  const { start: periodStart, end: periodEnd } = useMemo(() => getPeriodRange(currentDate, viewMode === 'heatmap' ? 'year' : viewMode, 0), [currentDate, viewMode]);
 
-      if (viewMode === 'week') {
-          const day = start.getDay();
-          const diff = start.getDate() - day + (day === 0 ? -6 : 1); // Adjust when day is Sunday
-          start.setDate(start.getDate() - start.getDay()); // Start on Sunday
-          start.setHours(0,0,0,0);
-          end.setDate(start.getDate() + 6);
-          end.setHours(23,59,59,999);
-      } else if (viewMode === 'month') {
-          start.setDate(1);
-          start.setHours(0,0,0,0);
-          end.setMonth(start.getMonth() + 1);
-          end.setDate(0);
-          end.setHours(23,59,59,999);
-      } else { // Year
-          start.setMonth(0, 1);
-          start.setHours(0,0,0,0);
-          end.setMonth(11, 31);
-          end.setHours(23,59,59,999);
-      }
-      return { periodStart: start, periodEnd: end };
-  }, [currentDate, viewMode]);
+  // Searching (or picking a date range) looks across every date. It used to
+  // stay inside the period on screen, so most matches were never shown.
+  const searchWords = useMemo(() => searchTokens(filters.searchQuery), [filters.searchQuery]);
+  const searchAllDates = searchWords.length > 0 || !!filters.startDate || !!filters.endDate;
 
   // Derived Data: Filtered List
   const filteredTransactions = useMemo(() => {
     return transactions.filter(tx => {
-      const txDate = new Date(tx.date);
+      const txDate = parseLocalDate(tx.date);
       let matchesPeriod = false;
 
-      // Special Case: specific day selection within the grid
-      if (selectedDay !== null && (viewMode === 'week' || viewMode === 'month')) {
+      if (searchAllDates) {
+          matchesPeriod = true;
+      } else if (selectedDay !== null && (viewMode === 'week' || viewMode === 'month')) {
+          // A day picked in the calendar grid
           matchesPeriod = txDate.getFullYear() === year && txDate.getMonth() === month && txDate.getDate() === selectedDay;
       } else {
           matchesPeriod = txDate >= periodStart && txDate <= periodEnd;
@@ -87,19 +66,16 @@ const TransactionsCalendarScreen: React.FC<TransactionsCalendarScreenProps> = ({
       const matchesCategory = filters.category === 'all' || tx.category === filters.category;
       const matchesMethod = filters.paymentMethod === 'all' || tx.paymentMethod === filters.paymentMethod;
 
-      const searchLower = filters.searchQuery.toLowerCase();
-      const matchesSearch = !searchLower || tx.title.toLowerCase().includes(searchLower) || 
-                            (tx.note && tx.note.toLowerCase().includes(searchLower)) ||
-                            tx.category.toLowerCase().includes(searchLower);
+      const matchesText = matchesSearch(tx, searchWords);
 
       const matchesStart = !filters.startDate || tx.date >= filters.startDate;
       const matchesEnd = !filters.endDate || tx.date <= filters.endDate;
       const matchesMin = !filters.minAmount || tx.amount >= parseFloat(filters.minAmount);
       const matchesMax = !filters.maxAmount || tx.amount <= parseFloat(filters.maxAmount);
 
-      return matchesPeriod && matchesType && matchesCategory && matchesMethod && matchesSearch && matchesStart && matchesEnd && matchesMin && matchesMax;
-    }).sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  }, [transactions, periodStart, periodEnd, selectedDay, viewMode, filters, year, month]);
+      return matchesPeriod && matchesType && matchesCategory && matchesMethod && matchesText && matchesStart && matchesEnd && matchesMin && matchesMax;
+    }).sort((a, b) => b.date.localeCompare(a.date));
+  }, [transactions, periodStart, periodEnd, selectedDay, viewMode, filters, year, month, searchWords, searchAllDates]);
 
   // Derived Data: Stats for the VISUALIZATION (Grid/Bars)
   const visualizationData = useMemo(() => {
@@ -107,7 +83,7 @@ const TransactionsCalendarScreen: React.FC<TransactionsCalendarScreenProps> = ({
       if (viewMode === 'year') {
           const stats = Array(12).fill(0).map(() => ({ income: 0, expense: 0 }));
           transactions.forEach(tx => {
-              const d = new Date(tx.date);
+              const d = parseLocalDate(tx.date);
               if (d.getFullYear() === year) {
                   if (tx.type === 'income') stats[d.getMonth()].income += tx.amount;
                   else stats[d.getMonth()].expense += tx.amount;
@@ -119,7 +95,7 @@ const TransactionsCalendarScreen: React.FC<TransactionsCalendarScreenProps> = ({
       // Month & Week View: Daily stats
       const daysMap: Record<number, {income: number, expense: number}> = {};
       transactions.forEach(tx => {
-          const d = new Date(tx.date);
+          const d = parseLocalDate(tx.date);
           // Only include if within the broader period view
           if (d >= periodStart && d <= periodEnd) {
               const dateKey = d.getDate();
@@ -137,7 +113,7 @@ const TransactionsCalendarScreen: React.FC<TransactionsCalendarScreenProps> = ({
      let expense = 0;
      // We re-calculate based on the period, ignoring 'selectedDay' for the top totals to show context
      transactions.forEach(tx => {
-         const d = new Date(tx.date);
+         const d = parseLocalDate(tx.date);
          if (d >= periodStart && d <= periodEnd) {
              if (tx.type === 'income') income += tx.amount;
              else expense += tx.amount;
@@ -148,52 +124,20 @@ const TransactionsCalendarScreen: React.FC<TransactionsCalendarScreenProps> = ({
 
   // Actions
   const handleNavigate = (direction: 'prev' | 'next') => {
-      const val = direction === 'next' ? 1 : -1;
-      const newDate = new Date(currentDate);
-      
-      if (viewMode === 'year') {
-          newDate.setFullYear(newDate.getFullYear() + val);
-      } else if (viewMode === 'month') {
-          newDate.setMonth(newDate.getMonth() + val);
-      } else {
-          newDate.setDate(newDate.getDate() + (val * 7));
-      }
-      
-      setCurrentDate(newDate);
-      setSelectedDay(null); // Clear specific selection when moving periods
+      setCurrentDate(shiftPeriod(currentDate, viewMode === 'heatmap' ? 'year' : viewMode, direction === 'next' ? 1 : -1));
+      setSelectedDay(null); // a selected day belongs to the old period
   };
+
 
   const handleModeChange = (mode: 'week' | 'month' | 'year') => {
       setViewMode(mode);
       setSelectedDay(null);
   };
 
-  const currencySymbol = userSettings?.currency === 'USD' ? '$' : userSettings?.currency === 'EUR' ? '€' : '₹';
+  const currencySymbol = getCurrencySymbol(userSettings?.currency);
 
-  const handleExportCSV = () => {
-    const headers = ['Date', 'Title', 'Amount', 'Type', 'Category', 'Note'];
-    const csvContent = [
-        headers.join(','),
-        ...filteredTransactions.map(tx => {
-            const escape = (str: string | undefined) => `"${(str || '').replace(/"/g, '""')}"`;
-            return [
-            tx.date, 
-            escape(tx.title), 
-            tx.amount, 
-            tx.type, 
-            tx.category, 
-            escape(tx.note)
-            ].join(',');
-        })
-    ].join('\n');
+  const handleExportCSV = () => downloadTransactionsCsv(filteredTransactions, `transactions_${toLocalISODate()}`);
 
-    const blob = new Blob([csvContent], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `transactions_export.csv`;
-    a.click();
-  };
 
   // Rendering Helper: Header Text
   const getPeriodLabel = () => {
@@ -211,7 +155,7 @@ const TransactionsCalendarScreen: React.FC<TransactionsCalendarScreenProps> = ({
         {!isEmbedded && (
              <div className="flex flex-col gap-3 shrink-0">
                 <button 
-                    onClick={() => onNavigate(View.SCANNER)} 
+                    onClick={() => navigate(ROUTES.TRANSACTIONS)} 
                     className="flex items-center gap-2 text-sm font-bold text-primary hover:bg-primary/10 px-4 py-2 rounded-full border border-primary/20 w-fit transition-all active:scale-95"
                 >
                     <span className="material-symbols-outlined text-lg">arrow_back</span>
@@ -378,6 +322,13 @@ const TransactionsCalendarScreen: React.FC<TransactionsCalendarScreenProps> = ({
                             <span className="material-symbols-outlined text-sm">upload_file</span>
                             Import
                         </button>
+                        <button
+                            onClick={() => setShowTidyUp(true)}
+                            className="flex items-center gap-1.5 text-xs font-bold text-text-light-muted dark:text-text-dark-muted hover:text-primary transition-colors uppercase tracking-wider"
+                        >
+                            <span className="material-symbols-outlined text-sm" aria-hidden="true">auto_fix_high</span>
+                            Tidy up
+                        </button>
                         <button onClick={handleExportCSV} className="text-primary text-xs font-bold hover:underline uppercase tracking-wider">Export</button>
                     </div>
                 </div>
@@ -389,8 +340,14 @@ const TransactionsCalendarScreen: React.FC<TransactionsCalendarScreenProps> = ({
                     onReset={() => setFilters(initialFilterState)}
                 />
 
+                {searchAllDates && (
+                    <p role="status" className="text-xs font-semibold text-text-light-muted dark:text-text-dark-muted">
+                        {filteredTransactions.length} {filteredTransactions.length === 1 ? 'result' : 'results'} across all dates
+                    </p>
+                )}
+
                 {/* List Items */}
-                <div className="flex flex-col gap-3">
+                <div className="flex flex-col gap-3 stagger">
                     {filteredTransactions.length > 0 ? filteredTransactions.map(tx => {
                         const style = CATEGORY_STYLES[tx.category] || CATEGORY_STYLES['Other'];
                         return (
@@ -406,14 +363,14 @@ const TransactionsCalendarScreen: React.FC<TransactionsCalendarScreenProps> = ({
                                     <div className="flex flex-col">
                                         <p className="font-bold text-text-light-main dark:text-text-dark-main text-base">{tx.title}</p>
                                         <div className="flex gap-2 text-xs text-text-light-muted dark:text-text-dark-muted">
-                                            <span>{tx.date}</span>
+                                            <span>{formatDisplayDate(tx.date)}</span>
                                             {tx.note && <span className="opacity-70 truncate max-w-[100px] hidden sm:inline">• {tx.note}</span>}
                                         </div>
                                     </div>
                                 </div>
                                 <div className="flex flex-col items-end">
                                     <p className={`text-base font-bold ${tx.type === 'income' ? 'text-primary' : 'text-danger dark:text-red-400'}`}>
-                                        {tx.type === 'income' ? '+' : '-'}{currencySymbol}{tx.amount.toFixed(2)}
+                                        {formatMoney(tx.type === 'income' ? tx.amount : -tx.amount, currencySymbol, { signed: true })}
                                     </p>
                                 </div>
                             </div>
@@ -421,7 +378,8 @@ const TransactionsCalendarScreen: React.FC<TransactionsCalendarScreenProps> = ({
                     }) : (
                         <div className="flex flex-col items-center justify-center py-12 text-text-light-muted dark:text-text-dark-muted border border-dashed border-border-light dark:border-border-dark rounded-2xl">
                             <span className="material-symbols-outlined text-3xl mb-2 opacity-30">search_off</span>
-                            <p className="text-sm">No transactions found.</p>
+                            <p className="text-sm">{searchWords.length ? `Nothing matches "${filters.searchQuery.trim()}".` : 'No transactions in this period.'}</p>
+                            {searchWords.length > 0 && <p className="text-xs mt-1 opacity-70">Try fewer words, part of a name, an amount, or a month like "oct".</p>}
                         </div>
                     )}
                 </div>
@@ -431,6 +389,7 @@ const TransactionsCalendarScreen: React.FC<TransactionsCalendarScreenProps> = ({
         </div>
 
       {showImportModal && <CSVImportModal onClose={() => setShowImportModal(false)} />}
+      {showTidyUp && <TidyUpModal onClose={() => setShowTidyUp(false)} />}
     </div>
   );
 };

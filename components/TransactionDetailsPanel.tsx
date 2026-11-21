@@ -1,6 +1,10 @@
+// Slide-over panel for one transaction (Store.viewingTransaction): view, edit,
+// attach a receipt photo, or delete with Undo.
 import React, { useState, useEffect } from 'react';
 import { useStore, Transaction } from '../context/Store';
 import ReceiptScannerModal, { ReceiptScanResult } from './ReceiptScannerModal';
+import { getCurrencySymbol } from '../utils/currency';
+import { compressImageFile, RECEIPT_MAX_SIDE } from '../utils/image';
 
 const TransactionDetailsPanel: React.FC = () => {
     const { viewingTransaction, setViewingTransaction, updateTransaction, deleteTransaction, userSettings, showUndo } = useStore();
@@ -9,12 +13,14 @@ const TransactionDetailsPanel: React.FC = () => {
     const [showScanner, setShowScanner] = useState(false);
     const [lightboxOpen, setLightboxOpen] = useState(false);
     const [formData, setFormData] = useState<Partial<Transaction>>({});
+    const [saveError, setSaveError] = useState<string | null>(null);
 
     useEffect(() => {
         if (viewingTransaction) {
             setFormData({ ...viewingTransaction });
             setIsEditing(false);
             setIsDeleting(false);
+            setSaveError(null);
         }
     }, [viewingTransaction]);
 
@@ -23,12 +29,17 @@ const TransactionDetailsPanel: React.FC = () => {
     const handleClose = () => { setViewingTransaction(null); setIsEditing(false); setIsDeleting(false); };
 
     const handleSave = async () => {
-        if (viewingTransaction && formData) {
-            const finalAmount = isNaN(formData.amount as number) ? 0 : formData.amount;
-            const finalData = { ...formData, amount: finalAmount };
+        if (!viewingTransaction || !formData) return;
+        const amount = Number(formData.amount);
+        if (!Number.isFinite(amount) || amount <= 0) { setSaveError('Enter an amount greater than 0.'); return; }
+        const finalData = { ...formData, amount };
+        setSaveError(null);
+        try {
             await updateTransaction(viewingTransaction.id, finalData);
             setViewingTransaction({ ...viewingTransaction, ...finalData } as Transaction);
             setIsEditing(false);
+        } catch (err: any) {
+            setSaveError(err?.message || 'Could not save changes.');
         }
     };
 
@@ -42,7 +53,7 @@ const TransactionDetailsPanel: React.FC = () => {
         }));
     };
 
-    const currencySymbol = userSettings?.currency === 'USD' ? '$' : userSettings?.currency === 'EUR' ? '€' : '₹';
+    const currencySymbol = getCurrencySymbol(userSettings?.currency);
     const categories = formData.type === 'income' ? userSettings?.incomeCategories : userSettings?.expenseCategories;
 
     return (
@@ -205,21 +216,12 @@ const TransactionDetailsPanel: React.FC = () => {
                                                 onChange={async (e) => {
                                                     const file = e.target.files?.[0];
                                                     if (!file) return;
-                                                    const reader = new FileReader();
-                                                    reader.onload = (ev) => {
-                                                        const img = new Image();
-                                                        img.onload = () => {
-                                                            const canvas = document.createElement('canvas');
-                                                            const MAX = 800;
-                                                            const scale = Math.min(1, MAX / Math.max(img.width, img.height));
-                                                            canvas.width = img.width * scale;
-                                                            canvas.height = img.height * scale;
-                                                            canvas.getContext('2d')!.drawImage(img, 0, 0, canvas.width, canvas.height);
-                                                            setFormData(prev => ({...prev, attachment: canvas.toDataURL('image/jpeg', 0.7)}));
-                                                        };
-                                                        img.src = ev.target?.result as string;
-                                                    };
-                                                    reader.readAsDataURL(file);
+                                                    try {
+                                                        const attachment = await compressImageFile(file, RECEIPT_MAX_SIDE);
+                                                        setFormData(prev => ({ ...prev, attachment }));
+                                                    } catch (err: any) {
+                                                        setSaveError(err?.message || 'Could not read that image.');
+                                                    }
                                                 }}
                                             />
                                         </label>
@@ -246,9 +248,12 @@ const TransactionDetailsPanel: React.FC = () => {
 
                 <div className="p-8 border-t border-border-light dark:border-border-dark bg-surface-light dark:bg-surface-dark mt-auto pb-12 md:pb-8">
                     {isEditing ? (
+                        <div className="flex flex-col gap-3">
+                        {saveError && <p role="alert" className="text-danger text-sm font-bold text-center">{saveError}</p>}
                         <div className="flex gap-4">
                             <button onClick={() => setIsEditing(false)} className="flex-1 py-4 rounded-2xl font-black text-xs uppercase tracking-widest text-text-light-muted hover:bg-gray-100 transition-colors">Cancel</button>
                             <button onClick={handleSave} className="flex-1 py-4 rounded-2xl font-black text-xs uppercase tracking-widest bg-primary text-[#131811] hover:bg-primary-hover shadow-glow transition-all">Apply Changes</button>
+                        </div>
                         </div>
                     ) : (
                         <button onClick={() => setIsDeleting(true)} className="w-full py-4 rounded-2xl font-black text-xs uppercase tracking-widest text-danger border border-danger/30 hover:bg-danger hover:text-white transition-all flex items-center justify-center gap-2"><span className="material-symbols-outlined text-[20px]">delete</span>Delete </button>

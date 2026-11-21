@@ -1,5 +1,8 @@
+// Dashboard widget: one-tap buttons that add a preset transaction (e.g. ☕ Coffee ₹50).
 import React, { useState } from 'react';
 import { useStore, QuickShortcut } from '../context/Store';
+import { getCurrencySymbol } from '../utils/currency';
+import { toLocalISODate } from '../utils/date';
 
 const EXPENSE_CATS = ["Food", "Rent", "Transportation", "Shopping", "Entertainment", "Health", "Utilities", "Home", "Other"];
 const INCOME_CATS = ["Salary", "Freelance", "Investments", "Gifts", "Refunds", "Rental", "Other"];
@@ -7,7 +10,7 @@ const INCOME_CATS = ["Salary", "Freelance", "Investments", "Gifts", "Refunds", "
 const QuickShortcutsWidget: React.FC = () => {
   const { userSettings, updateUserSettings, addTransaction, isDemo } = useStore();
   const shortcuts = userSettings?.quickShortcuts || [];
-  const currencySymbol = userSettings?.currency === 'USD' ? '$' : userSettings?.currency === 'EUR' ? '€' : '₹';
+  const currencySymbol = getCurrencySymbol(userSettings?.currency);
 
   const [showModal, setShowModal] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -20,7 +23,7 @@ const QuickShortcutsWidget: React.FC = () => {
 
   const handleTap = async (s: QuickShortcut) => {
     if (isDemo) return;
-    const today = new Date().toISOString().split('T')[0];
+    const today = toLocalISODate();
     await addTransaction({
       title: s.label, amount: s.amount, date: today,
       type: s.type, category: s.category, paymentMethod: s.paymentMethod,
@@ -53,7 +56,7 @@ const QuickShortcutsWidget: React.FC = () => {
     setEditingId(null);
   };
 
-  const cats = form.type === 'expense' ? EXPENSE_CATS : INCOME_CATS;
+  const cats = form.type === 'expense' ? (userSettings?.expenseCategories || EXPENSE_CATS) : (userSettings?.incomeCategories || INCOME_CATS);
 
   return (
     <div className="col-span-2 md:col-span-2 lg:col-span-12 bg-surface-light dark:bg-surface-dark border border-border-light dark:border-border-dark rounded-[2rem] p-5 shadow-card-light dark:shadow-card">

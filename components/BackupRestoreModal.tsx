@@ -1,5 +1,8 @@
+// Backup & Restore dialog (Settings → Data & Privacy). Downloads a full JSON backup,
+// or adds the contents of one to the account via Store.importAllData.
 import React, { useState, useRef } from 'react';
 import { useStore } from '../context/Store';
+import { toLocalISODate } from '../utils/date';
 
 interface BackupRestoreModalProps {
   onClose: () => void;
@@ -19,7 +22,7 @@ const BackupRestoreModal: React.FC<BackupRestoreModalProps> = ({ onClose }) => {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `expensetracker_backup_${new Date().toISOString().split('T')[0]}.json`;
+    a.download = `expensetracker_backup_${toLocalISODate()}.json`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -56,7 +59,7 @@ const BackupRestoreModal: React.FC<BackupRestoreModalProps> = ({ onClose }) => {
     }
   };
 
-  const today = new Date().toISOString().split('T')[0];
+  const today = toLocalISODate();
 
   return (
     <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">

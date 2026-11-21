@@ -1,6 +1,8 @@
-
+// First-run questionnaire (/onboarding). Saves the answers with Store.completeOnboarding;
+// the router then moves the user on to the Dashboard.
 import React, { useState } from 'react';
-import { useStore } from '../context/Store';
+import { useStore, OnboardingData } from '../context/Store';
+import { getCurrencySymbol } from '../utils/currency';
 
 const DotLottiePlayer = 'dotlottie-player' as any;
 
@@ -17,7 +19,7 @@ const OnboardingScreen: React.FC = () => {
       initialBalance: '',
       monthlyIncome: '',
       monthlyBudget: '',
-      financialGoal: 'tracking' // tracking, saving, debt
+      financialGoal: 'tracking' as OnboardingData['goal'],
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -43,7 +45,7 @@ const OnboardingScreen: React.FC = () => {
       });
   };
 
-  const currencySymbol = formData.currency === 'USD' ? '$' : formData.currency === 'EUR' ? '€' : formData.currency === 'GBP' ? '£' : '₹';
+  const currencySymbol = getCurrencySymbol(formData.currency);
 
   return (
     <div className="h-screen w-full bg-[#050505] text-white flex items-center justify-center relative overflow-hidden font-display">

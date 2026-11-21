@@ -1,17 +1,30 @@
-
+// Dashboard page (/): balance, income/expense, streak, breakdown and other
+// widgets in a user-arranged grid, plus Quick Add and the AI insight panel.
+// Calculations live in utils/period.ts and utils/transactionStats.ts.
 import React, { useState, useMemo, useEffect } from 'react';
 import { usePWAInstall } from "../usePWAInstall";
 import { DotLottieReact } from "@lottiefiles/dotlottie-react";
-import { useStore, Transaction } from '../context/Store';
-import { View } from '../types';
+import { useStore } from '../context/Store';
+import { useDialog } from './ui/DialogProvider';
+import { useNavigate } from 'react-router';
+import { ROUTES } from '../routes';
+import { CATEGORY_STYLES, getCategoryStyle, DEFAULT_EXPENSE_CATEGORIES, DEFAULT_INCOME_CATEGORIES } from '../constants/categories';
+import { downloadTransactionsCsv } from '../utils/csv';
+import { addInterval, formatDisplayDate, parseLocalDate, toLocalISODate } from '../utils/date';
+import { getPeriodRange, shiftPeriod, isInRange, PeriodMode } from '../utils/period';
+import { formatMoney } from '../utils/format';
+import { useCountUp } from '../hooks/useCountUp';
+import PaymentModeBreakdown from './PaymentModeBreakdown';
+import NotificationsPanel from './NotificationsPanel';
+import { sumTotals, signedAmount, calculateStreak, topCategories, percentChange } from '../utils/transactionStats';
+import { useFinancialInsight } from '../hooks/useFinancialInsight';
+import { STORAGE_KEYS } from '../constants/app';
 import CSVImportModal from './CSVImportModal';
 import QuickShortcutsWidget from './QuickShortcutsWidget';
 import MonthlyComparisonWidget from './MonthlyComparisonWidget';
 import CategoryBudgetWidget from './CategoryBudgetWidget';
+import { getCurrencySymbol } from '../utils/currency';
 
-interface DashboardScreenProps {
-    onNavigate?: (view: View) => void;
-}
 
 
 // Widget Configuration Maps
@@ -28,37 +41,17 @@ const WIDGET_LABELS: Record<string, string> = {
     quickAdd: "Quick Add"
 };
 
-// Styling map for categories
-const CATEGORY_STYLES: Record<string, { icon: string, colorClass: string, hex: string }> = {
-    "Food": { icon: "restaurant", colorClass: "text-orange-500 bg-orange-500/10 border-orange-500/20", hex: "#f97316" },
-    "Housing": { icon: "home", colorClass: "text-blue-500 bg-blue-500/10 border-blue-500/20", hex: "#3b82f6" },
-    "Rent": { icon: "real_estate_agent", colorClass: "text-indigo-400 bg-indigo-400/10 border-indigo-400/20", hex: "#818cf8" },
-    "Transportation": { icon: "directions_car", colorClass: "text-purple-500 bg-purple-500/10 border-purple-500/20", hex: "#a855f7" },
-    "Entertainment": { icon: "movie", colorClass: "text-pink-500 bg-pink-500/10 border-pink-500/20", hex: "#ec4899" },
-    "Shopping": { icon: "shopping_bag", colorClass: "text-yellow-500 bg-yellow-500/10 border-yellow-500/20", hex: "#eab308" },
-    "Subscription": { icon: "Subscriptions", colorClass: "text-red-500 bg-red-500/10 border-red-500/20", hex: "#ad1c43" },
-    "Health": { icon: "medical_services", colorClass: "text-red-400 bg-red-400/10 border-red-400/20", hex: "#f87171" },
-    "Utilities": { icon: "bolt", colorClass: "text-cyan-400 bg-cyan-400/10 border-cyan-400/20", hex: "#22d3ee" },
-    "Home": { icon: "home", colorClass: "text-indigo-500 bg-indigo-500/10 border-indigo-500/20", hex: "#6366f1" },
-    "Salary": { icon: "payments", colorClass: "text-emerald-500 bg-emerald-500/10 border-emerald-500/20", hex: "#10b981" },
-    "Freelance": { icon: "work", colorClass: "text-cyan-500 bg-cyan-500/10 border-cyan-500/20", hex: "#06b6d4" },
-    "Investments": { icon: "trending_up", colorClass: "text-violet-500 bg-violet-500/10 border-violet-500/20", hex: "#8b5cf6" },
-    "Gifts": { icon: "card_giftcard", colorClass: "text-pink-400 bg-pink-400/10 border-pink-400/20", hex: "#f472b6" },
-    "Refunds": { icon: "currency_exchange", colorClass: "text-amber-500 bg-amber-500/10 border-amber-500/20", hex: "#f59e0b" },
-    "Rental": { icon: "house", colorClass: "text-blue-400 bg-blue-400/10 border-blue-400/20", hex: "#60a5fa" },
-    "Other": { icon: "receipt", colorClass: "text-gray-400 bg-gray-400/10 border-gray-400/20", hex: "#9ca3af" }
-};
+/**
+ * Scales monthly income/expense goals to the selected period. A week is
+ * 7 / 30.44 of an average month (was a flat 0.25).
+ */
+const PERIOD_GOAL_MULTIPLIER: Record<PeriodMode, number> = { week: 7 / 30.44, month: 1, year: 12 };
 
-const EXPENSE_CATEGORIES = ["Food", "Housing", "Rent", "Transportation", "Entertainment", "Shopping","Subscription", "Health","Home", "Utilities", "Other"];
-const INCOME_CATEGORIES = ["Salary", "Freelance", "Investments", "Gifts","Home", "Refunds", "Rental", "Other"];
+
 
 // Helper: Short Date Format
 
-const formatDisplayDateShort = (dateStr: string) => {
-    if (!dateStr) return '';
-    const d = new Date(dateStr);
-    return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' });
-};
+const formatDisplayDateShort = (dateStr: string) => (dateStr ? formatDisplayDate(dateStr) : '');
 
 
 
@@ -116,7 +109,6 @@ const STREAK_LOTTIE_MAP: Record<StreakTier, string> = {
 
 
 
-const STREAK_STORAGE_KEY = "streak:lastCelebrated";
 
 
 
@@ -137,7 +129,7 @@ export const StreakVisual: React.FC<{ count: number }> = ({ count }) => {
 
 
 
-    const last = Number(localStorage.getItem(STREAK_STORAGE_KEY));
+    const last = Number(localStorage.getItem(STORAGE_KEYS.STREAK_CELEBRATED));
 
     if (last === count) return;
 
@@ -146,7 +138,7 @@ export const StreakVisual: React.FC<{ count: number }> = ({ count }) => {
 
     setShowCelebration(true);
 
-    localStorage.setItem(STREAK_STORAGE_KEY, String(count));
+    localStorage.setItem(STORAGE_KEYS.STREAK_CELEBRATED, String(count));
 
 
 
@@ -213,7 +205,7 @@ export const StreakVisual: React.FC<{ count: number }> = ({ count }) => {
 
 // Component: SVG Donut Chart
 // Renders SVG arcs based on data percentage
-const DonutChart: React.FC<{ data: Record<string, number>, total: number, currencySymbol: string, change?: number, label: string, className?: string, isExpense?: boolean }> = ({ data, total, currencySymbol, change = 0, label, className = "size-80", isExpense = true }) => {
+const DonutChart: React.FC<{ data: Record<string, number>, total: number, currencySymbol: string, change?: number, changeLabel?: string, label: string, className?: string, isExpense?: boolean }> = ({ data, total, currencySymbol, change, changeLabel, label, className = "size-80", isExpense = true }) => {
     const [hovered, setHovered] = useState<{category: string, value: number, color: string} | null>(null);
     let accumulatedAngle = 0; 
     const radius = 40; 
@@ -255,13 +247,16 @@ const DonutChart: React.FC<{ data: Record<string, number>, total: number, curren
             <div className="absolute inset-0 flex items-center justify-center flex-col pointer-events-none text-center p-6">
                 <span className="text-[10px] text-text-light-muted dark:text-text-dark-muted font-bold uppercase tracking-widest mb-1 truncate max-w-full">{hovered ? hovered.category : `Total ${label}`}</span>
                 <span className="text-2xl md:text-3xl font-black text-text-light-main dark:text-text-dark-main tracking-tight">{hovered ? `${((hovered.value / total) * 100).toFixed(1)}%` : `${currencySymbol}${total.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`}</span>
-                {!hovered && change !== undefined && total > 0 && (<span className={`text-xs font-bold mt-1 flex items-center gap-1 ${isBad ? 'text-danger' : 'text-primary'}`}><span className="material-symbols-outlined text-xs font-bold">{(change ?? 0) >= 0 ? 'arrow_upward' : 'arrow_downward'}</span>{Math.abs(change).toFixed(0)}%</span>)}
+                {!hovered && change !== undefined && total > 0 && (<span className={`text-xs font-bold mt-1 flex items-center gap-1 ${isBad ? 'text-danger' : 'text-primary'}`}><span className="material-symbols-outlined text-xs font-bold">{(change ?? 0) >= 0 ? 'arrow_upward' : 'arrow_downward'}</span>{Math.abs(change).toFixed(0)}%{changeLabel && <span className="font-medium text-text-light-muted dark:text-text-dark-muted">{changeLabel}</span>}</span>)}
             </div>
         </div>
     );
 };
 
 // Component: Simple Wave Graph for Balance Widget
+const PERIODS = ['week', 'month', 'year'] as const;
+const NEXT_PERIOD: Record<(typeof PERIODS)[number], (typeof PERIODS)[number]> = { week: 'month', month: 'year', year: 'week' };
+
 const RealWaveGraph: React.FC<{ data: number[], color: string }> = ({ data, color }) => {
     if (!data || data.length === 0) return null;
     const max = Math.max(...data, 1);
@@ -274,7 +269,7 @@ const RealWaveGraph: React.FC<{ data: number[], color: string }> = ({ data, colo
     }).join(' ');
 
     return (
-        <svg viewBox="0 0 100 100" className="w-full h-full opacity-30" preserveAspectRatio="none">
+        <svg viewBox="0 0 100 100" className="w-full h-full opacity-70" preserveAspectRatio="none">
             <polyline points={points} fill="none" stroke={color} strokeWidth="2" vectorEffect="non-scaling-stroke" />
             <linearGradient id="grad" x1="0%" y1="0%" x2="0%" y2="100%">
                 <stop offset="0%" stopColor={color} stopOpacity="0.5" />
@@ -286,25 +281,17 @@ const RealWaveGraph: React.FC<{ data: number[], color: string }> = ({ data, colo
 };
 
 // --- MAIN DASHBOARD COMPONENT ---
-const DashboardScreen: React.FC<DashboardScreenProps> = ({ onNavigate }) => {
-  const { user, userSettings, transactions, addTransaction, deleteTransaction, loading, toggleTheme, widgets, toggleWidget, widgetOrder, updateWidgetOrder, setViewingTransaction, updateUserSettings, lockApp, showUndo, generateFinancialAudit, notifications, markNotificationsRead, clearNotifications } = useStore();
+const DashboardScreen: React.FC = () => {
+  const navigate = useNavigate();
+  const { userSettings, transactions, addTransaction, deleteTransaction, loading, toggleTheme, widgets, toggleWidget, widgetOrder, updateWidgetOrder, setViewingTransaction, updateUserSettings, lockApp, showUndo, notifications } = useStore();
+  const unreadNotifications = notifications.filter(n => !n.read).length;
+  const dialog = useDialog();
   const { isInstallable, install } = usePWAInstall();
-  // Offline state
-  const [isOffline, setIsOffline] = useState(!navigator.onLine);
-
-  useEffect(() => {
-    const goOffline = () => setIsOffline(true);
-    const goOnline = () => setIsOffline(false);
-    window.addEventListener("offline", goOffline);
-    window.addEventListener("online", goOnline);
-    return () => {
-      window.removeEventListener("offline", goOffline);
-      window.removeEventListener("online", goOnline);
-    };
-  }, []);
   // Local State
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [dashboardViewMode, setDashboardViewMode] = useState<'week' | 'month' | 'year'>('month');
+  /** The balance card's period chip cycles through these on each tap. */
+  const cyclePeriod = () => setDashboardViewMode(m => NEXT_PERIOD[m]);
   const [dashboardDate, setDashboardDate] = useState(new Date());
   const [showNotifications, setShowNotifications] = useState(false);
   
@@ -319,21 +306,22 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ onNavigate }) => {
 
 
   const [insightOpen, setInsightOpen] = useState(false);
-  const [insightText, setInsightText] = useState<string | null>(null);
-  const [insightJson, setInsightJson] = useState<any | null>(null);
-  const [insightLoading, setInsightLoading] = useState(false);
-  const [insightError, setInsightError] = useState<string | null>(null);
-  const [insightParseError, setInsightParseError] = useState<string | null>(null);
+  const {
+    raw: insightText, json: insightJson, loading: insightLoading, notice: insightParseError,
+    run: handleInsight, reset: resetInsight, copyJson: copyInsightJson, exportJson: exportInsightJson,
+  } = useFinancialInsight();
   
   // Quick Add Form State
   const [breakdownType, setBreakdownType] = useState<'income' | 'expense'>('expense');
   const [formData, setFormData] = useState({
-    title: '', amount: '', date: new Date().toISOString().split('T')[0],
+    title: '', amount: '', date: toLocalISODate(),
     category: 'Food', type: 'expense' as 'income' | 'expense', paymentMethod: 'UPI', note: '', tags: ''
   });
   const [isAdding, setIsAdding] = useState(false);
   const [isRecurring, setIsRecurring] = useState(false);
   const [recurrenceFreq, setRecurrenceFreq] = useState<'daily' | 'weekly' | 'monthly' | 'yearly'>('monthly');
+  const [showBalanceBreakdown, setShowBalanceBreakdown] = useState(false);
+  const [enableCarryForward, setEnableCarryForward] = useState(true);
 
   // Sync widget editor order with store when opened
   useEffect(() => {
@@ -348,126 +336,110 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ onNavigate }) => {
   }, [userSettings]);
 
 
-  const currencySymbol = userSettings?.currency === 'USD' ? '$' : userSettings?.currency === 'EUR' ? '€' : '₹';
+  const currencySymbol = getCurrencySymbol(userSettings?.currency);
 
-  // --- DATA AGGREGATION & MEMOIZATION ---
-  // Calculates start/end dates for current view mode (Week/Month/Year)
-  const { periodStart, periodEnd } = useMemo(() => {
-      const d = new Date(dashboardDate); const start = new Date(d); const end = new Date(d);
-      if (dashboardViewMode === 'week') {
-          const day = d.getDay(); const diff = d.getDate() - day + (day === 0 ? -6 : 1); 
-          start.setDate(diff); start.setHours(0,0,0,0); end.setDate(start.getDate() + 6); end.setHours(23,59,59,999);
-      } else if (dashboardViewMode === 'month') {
-          start.setDate(1); start.setHours(0,0,0,0); end.setMonth(start.getMonth() + 1); end.setDate(0); end.setHours(23,59,59,999);
-      } else {
-          start.setMonth(0, 1); start.setHours(0,0,0,0); end.setFullYear(start.getFullYear() + 1); end.setMonth(0, 0); end.setHours(23,59,59,999);
-      }
-      return { periodStart: start, periodEnd: end };
-  }, [dashboardDate, dashboardViewMode]);
+  // --- DATA AGGREGATION ---
+  // The Dashboard shows one week/month/year at a time (weeks start on Monday).
+  const period = useMemo(() => getPeriodRange(dashboardDate, dashboardViewMode, 1), [dashboardDate, dashboardViewMode]);
+  const periodStart = period.start;
 
-  // Filter transactions based on calculated period
-  const filteredTransactions = useMemo(() => {
-      return transactions.filter(t => {
-          const d = new Date(t.date); return d >= periodStart && d <= periodEnd;
-      }).sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  }, [transactions, periodStart, periodEnd]);
+  /** Transactions in the selected period, newest first. */
+  const filteredTransactions = useMemo(
+    () => transactions.filter(t => isInRange(t.date, period)).sort((a, b) => b.date.localeCompare(a.date)),
+    [transactions, period]
+  );
 
-  // Compute Income/Expense Totals
-  const periodStats = useMemo(() => {
-      let income = 0; let expense = 0;
-      filteredTransactions.forEach(t => {
-          if (t.type === 'income') income += t.amount; else expense += t.amount;
-      });
-      return { income, expense, balance: income - expense };
-  }, [filteredTransactions]);
+  const periodStats = useMemo(() => sumTotals(filteredTransactions), [filteredTransactions]);
 
-  // Compute Previous Period for comparison percentages
+  /** Balance from everything before the period, added on when "carry forward" is on. */
+  const carriedForwardStats = useMemo(() => {
+    const periodStartIso = toLocalISODate(periodStart);
+    const { income, expense, balance } = sumTotals(transactions.filter(t => t.date < periodStartIso));
+    return { priorIncome: income, priorExpense: expense, balance };
+  }, [transactions, periodStart]);
+
+  const effectiveBalance = enableCarryForward ? (carriedForwardStats.balance + periodStats.balance) : periodStats.balance;
+  /** The headline balance rolls to its new value when the period or data changes. */
+  const animatedBalance = useCountUp(effectiveBalance);
+
+  /** Totals for the period before this one, for the "% vs last period" badges. */
   const previousPeriodStats = useMemo(() => {
-      const d = new Date(dashboardDate); let start = new Date(d); let end = new Date(d);
-      if (dashboardViewMode === 'week') {
-          const day = d.getDay(); const diff = d.getDate() - day + (day === 0 ? -6 : 1); 
-          start.setDate(diff - 7); start.setHours(0,0,0,0); end.setDate(start.getDate() + 6); end.setHours(23,59,59,999);
-      } else if (dashboardViewMode === 'month') {
-          start.setDate(1); start.setMonth(start.getMonth() - 1); start.setHours(0,0,0,0);
-          end = new Date(start); end.setMonth(start.getMonth() + 1); end.setDate(0); end.setHours(23,59,59,999);
-      } else {
-          start.setFullYear(start.getFullYear() - 1); start.setMonth(0, 1); start.setHours(0,0,0,0);
-          end.setFullYear(start.getFullYear()); end.setMonth(11, 31); end.setHours(23,59,59,999);
-      }
-      const prevTx = transactions.filter(t => {
-          const tDate = new Date(t.date); return tDate >= start && tDate <= end;
-      });
-      let income = 0; let expense = 0;
-      prevTx.forEach(t => {
-          if (t.type === 'income') income += t.amount; else expense += t.amount;
-      });
-      return { income, expense, balance: income - expense };
+    const previous = getPeriodRange(shiftPeriod(dashboardDate, dashboardViewMode, -1), dashboardViewMode, 1);
+    return sumTotals(transactions.filter(t => isInRange(t.date, previous)));
   }, [transactions, dashboardViewMode, dashboardDate]);
 
-  // Compute Points for Wave Graph
+  /** Running balance for the wave graph: one point per day (week/month) or per month (year). */
   const graphData = useMemo(() => {
       const points: number[] = [];
+      let running = 0;
       if (dashboardViewMode === 'year') {
-          const yearStart = periodStart.getFullYear();
-          for (let i = 0; i < 12; i++) {
-              const monthlyNet = transactions.filter(t => { const d = new Date(t.date); return d.getFullYear() === yearStart && d.getMonth() === i; }).reduce((acc, t) => acc + (t.type === 'income' ? t.amount : -t.amount), 0);
-              const prev = points.length > 0 ? points[points.length - 1] : 0; points.push(prev + monthlyNet);
-          }
+          const year = periodStart.getFullYear();
+          const netByMonth = Array(12).fill(0);
+          transactions.forEach(t => {
+              const d = parseLocalDate(t.date);
+              if (d.getFullYear() === year) netByMonth[d.getMonth()] += signedAmount(t);
+          });
+          netByMonth.forEach(net => { running += net; points.push(running); });
       } else {
-          const map = new Map<string, number>(); filteredTransactions.forEach(t => { const d = t.date; const val = t.type === 'income' ? t.amount : -t.amount; map.set(d, (map.get(d) || 0) + val); });
-          let runningBalance = 0; 
-          if (dashboardViewMode === 'week') {
-              for (let i=0; i<7; i++) {
-                  const d = new Date(periodStart); d.setDate(periodStart.getDate() + i); const dateStr = d.toISOString().split('T')[0]; const net = map.get(dateStr) || 0; runningBalance += net; points.push(runningBalance);
-              }
-          } else {
-              const daysInMonth = new Date(periodStart.getFullYear(), periodStart.getMonth() + 1, 0).getDate();
-              for (let d = 1; d <= daysInMonth; d++) {
-                   const dateObj = new Date(periodStart.getFullYear(), periodStart.getMonth(), d); if (dateObj > new Date()) break;
-                   const dateStr = dateObj.toISOString().split('T')[0]; const net = map.get(dateStr) || 0; runningBalance += net; points.push(runningBalance);
-              }
+          const netByDay = new Map<string, number>();
+          filteredTransactions.forEach(t => netByDay.set(t.date, (netByDay.get(t.date) || 0) + signedAmount(t)));
+          const dayCount = dashboardViewMode === 'week'
+              ? 7
+              : new Date(periodStart.getFullYear(), periodStart.getMonth() + 1, 0).getDate();
+          const now = new Date();
+          for (let i = 0; i < dayCount; i++) {
+              const day = new Date(periodStart.getFullYear(), periodStart.getMonth(), periodStart.getDate() + i);
+              if (dashboardViewMode === 'month' && day > now) break; // don't draw the future
+              // Local date key: toISOString() shifted every point by a day in UTC+ zones.
+              running += netByDay.get(toLocalISODate(day)) || 0;
+              points.push(running);
           }
       }
-      if (points.length === 1) points.push(points[0]); if (points.length === 0) return [0, 0, 0]; return points;
+      if (points.length === 0) return [0, 0, 0];
+      if (points.length === 1) points.push(points[0]); // a line needs two points
+      return points;
   }, [filteredTransactions, dashboardViewMode, transactions, periodStart]);
 
-  // Targets for progress bars
+  /**
+   * One-line summary under the greeting, always about the current calendar
+   * month. It used to say "Your finances are looking good" whatever the numbers.
+   */
+  const monthSummary = useMemo(() => {
+    const month = getPeriodRange(new Date(), 'month', 1);
+    const { income, expense } = sumTotals(transactions.filter(t => isInRange(t.date, month)));
+    const limit = userSettings?.monthlyExpenseLimit || 0;
+    if (limit > 0 && expense > limit) return `You're over this month's spending limit by ${formatMoney(expense - limit, currencySymbol)}.`;
+    if (limit > 0 && expense >= limit * 0.85) return `You've used ${Math.round((expense / limit) * 100)}% of this month's spending limit.`;
+    if (expense > income && income > 0) return `You've spent ${formatMoney(expense - income, currencySymbol)} more than you earned this month.`;
+    if (expense === 0 && income === 0) return 'Nothing recorded this month yet.';
+    return "You're on track this month.";
+  }, [transactions, userSettings?.monthlyExpenseLimit, currencySymbol]);
+
+  /** Monthly goals scaled to the selected period; 0 means no goal has been set. */
   const targets = useMemo(() => {
-      const baseIncome = userSettings?.monthlyIncomeGoal || 1; const baseExpense = userSettings?.monthlyExpenseLimit || 1;
-      let multiplier = 1; if (dashboardViewMode === 'week') multiplier = 0.25; if (dashboardViewMode === 'year') multiplier = 12;
-      return { income: baseIncome * multiplier, expense: baseExpense * multiplier };
+      const multiplier = PERIOD_GOAL_MULTIPLIER[dashboardViewMode];
+      return {
+          income: (userSettings?.monthlyIncomeGoal || 0) * multiplier,
+          expense: (userSettings?.monthlyExpenseLimit || 0) * multiplier,
+      };
   }, [userSettings, dashboardViewMode]);
 
-  // Breakdown Chart Data
+  /** Progress towards a goal, 0–100. With no goal it was shown as "1" and 100%. */
+  const goalPercent = (value: number, goal: number) => (goal > 0 ? Math.min((value / goal) * 100, 100) : 0);
+
+  /** Donut chart data: top five categories plus "Other". */
   const breakdownStats = useMemo(() => {
-      const stats: Record<string, number> = {}; let total = 0;
-      filteredTransactions.forEach(t => { if (t.type === breakdownType) { stats[t.category] = (stats[t.category] || 0) + t.amount; total += t.amount; } });
-      const sorted = Object.entries(stats).sort(([,a], [,b]) => b - a);
-      const top5 = sorted.slice(0, 5); const otherVal = sorted.slice(5).reduce((sum, [,v]) => sum + v, 0);
-      const displayData: Record<string, number> = {}; top5.forEach(([k,v]) => displayData[k] = v); if (otherVal > 0) displayData['Other'] = otherVal;
-      const legends = Object.entries(displayData).map(([cat, val]) => ({ name: cat, value: val, percent: total > 0 ? (val / total * 100).toFixed(1) : '0', color: CATEGORY_STYLES[cat]?.hex || '#9ca3af' })).sort((a,b) => b.value - a.value);
-      return { data: displayData, total, legends };
+      const { data, total } = topCategories(filteredTransactions, breakdownType);
+      const legends = Object.entries(data)
+          .map(([cat, val]) => ({ name: cat, value: val, percent: total > 0 ? (val / total * 100).toFixed(1) : '0', color: getCategoryStyle(cat).hex }))
+          .sort((a, b) => b.value - a.value);
+      return { data, total, legends };
   }, [filteredTransactions, breakdownType]);
 
-  // Streak Calculation (Consecutive days with activity)
-  const streakCount = useMemo(() => {
-      if (transactions.length === 0) return 0;
-      const uniqueDates = Array.from(new Set(transactions.map(t => t.date))).sort((a: any, b: any) => new Date(b).getTime() - new Date(a).getTime());
-      const today = new Date().toISOString().split('T')[0]; const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
-      if (!uniqueDates.includes(today) && !uniqueDates.includes(yesterday)) return 0;
-      let count = 0; let checkDate = new Date(); if (!uniqueDates.includes(today)) checkDate.setDate(checkDate.getDate() - 1);
-      while (true) { const dateStr = checkDate.toISOString().split('T')[0]; if (uniqueDates.includes(dateStr)) { count++; checkDate.setDate(checkDate.getDate() - 1); } else break; }
-      return count;
-  }, [transactions]);
+  const streakCount = useMemo(() => calculateStreak(transactions.map(t => t.date)), [transactions]);
 
-  // Navigation Logic
-  const handleDateNavigate = (direction: 'prev' | 'next') => {
-      const newDate = new Date(dashboardDate);
-      if (dashboardViewMode === 'week') newDate.setDate(newDate.getDate() + (direction === 'next' ? 7 : -7));
-      if (dashboardViewMode === 'month') newDate.setMonth(newDate.getMonth() + (direction === 'next' ? 1 : -1));
-      if (dashboardViewMode === 'year') newDate.setFullYear(newDate.getFullYear() + (direction === 'next' ? 1 : -1));
-      setDashboardDate(newDate);
-  };
+  const handleDateNavigate = (direction: 'prev' | 'next') =>
+      setDashboardDate(shiftPeriod(dashboardDate, dashboardViewMode, direction === 'next' ? 1 : -1));
 
   // Bento Box Layout Logic
   const handleEditorReorder = (key: string, direction: 'up' | 'down') => {
@@ -479,21 +451,17 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ onNavigate }) => {
 
   const handleSaveLayout = () => { updateWidgetOrder(editorOrder); setShowWidgetEditor(false); };
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => { const { name, value } = e.target; setFormData(prev => ({ ...prev, [name]: value })); };
-  const handleTypeChange = (type: 'income' | 'expense') => { setFormData(prev => ({ ...prev, type, category: type === 'income' ? INCOME_CATEGORIES[0] : EXPENSE_CATEGORIES[0] })); };
-
-  const getNextOccurrenceDate = (fromDate: string, freq: string): string => {
-    const d = new Date(fromDate);
-    if (freq === 'daily') d.setDate(d.getDate() + 1);
-    else if (freq === 'weekly') d.setDate(d.getDate() + 7);
-    else if (freq === 'monthly') d.setMonth(d.getMonth() + 1);
-    else if (freq === 'yearly') d.setFullYear(d.getFullYear() + 1);
-    return d.toISOString().split('T')[0];
+  const handleTypeChange = (type: 'income' | 'expense') => { 
+    const cats = type === 'income' ? (userSettings?.incomeCategories || DEFAULT_INCOME_CATEGORIES) : (userSettings?.expenseCategories || DEFAULT_EXPENSE_CATEGORIES);
+    setFormData(prev => ({ ...prev, type, category: cats[0] || 'Other' })); 
   };
 
+
+
   const handleAddTransaction = async () => {
-    if (!formData.title.trim() || !formData.amount) { alert("Please fill description and amount."); return; }
+    if (!formData.title.trim() || !formData.amount) { dialog.toast('Add a description and an amount', 'error'); return; }
     const amount = parseFloat(formData.amount);
-    if (isNaN(amount) || amount <= 0) { alert("Please enter valid amount."); return; }
+    if (isNaN(amount) || amount <= 0) { dialog.toast('Enter an amount greater than 0', 'error'); return; }
     setIsAdding(true);
     try {
         let tags: string[] = formData.tags ? formData.tags.split(',').map(t => t.trim()).filter(t => t.length > 0) : [];
@@ -502,10 +470,11 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ onNavigate }) => {
           ...(isRecurring ? {
             isRecurring: true,
             recurrenceRule: { frequency: recurrenceFreq, interval: 1 },
-            nextOccurrence: getNextOccurrenceDate(formData.date, recurrenceFreq)
+            nextOccurrence: addInterval(formData.date, recurrenceFreq)
           } : {})
         });
-        setFormData({ title: '', amount: '', date: new Date().toISOString().split('T')[0], category: formData.type === 'income' ? INCOME_CATEGORIES[0] : EXPENSE_CATEGORIES[0], type: formData.type, paymentMethod: userSettings?.paymentMethods[0] || 'UPI', note: '', tags: '' });
+        const defaultCats = formData.type === 'income' ? (userSettings?.incomeCategories || DEFAULT_INCOME_CATEGORIES) : (userSettings?.expenseCategories || DEFAULT_EXPENSE_CATEGORIES);
+        setFormData({ title: '', amount: '', date: toLocalISODate(), category: defaultCats[0] || 'Other', type: formData.type, paymentMethod: userSettings?.paymentMethods[0] || 'UPI', note: '', tags: '' });
         setIsRecurring(false);
     } catch (e: any) { console.error(e); } finally { setIsAdding(false); }
   };
@@ -527,103 +496,19 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ onNavigate }) => {
       setEditingTarget(null);
   };
 
-  // Export Logic: Generates CSV blob from current data
+  /** Download the current period's transactions, or all of them, as CSV. */
   const handleExport = (allTime: boolean = false) => {
-      const dataToExport = allTime ? transactions : filteredTransactions;
-      const headers = ['Date', 'Title', 'Amount', 'Type', 'Category', 'Method', 'Note'];
-      const csvContent = [
-          headers.join(','),
-          ...dataToExport.map(tx => {
-              const escape = (str: string | undefined) => `"${(str || '').replace(/"/g, '""')}"`;
-              return [
-                  tx.date, 
-                  escape(tx.title), 
-                  tx.amount, 
-                  tx.type, 
-                  tx.category, 
-                  escape(tx.paymentMethod),
-                  escape(tx.note)
-              ].join(',');
-          })
-      ].join('\n');
-
-      const blob = new Blob([csvContent], { type: 'text/csv' });
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `transactions_${allTime ? 'full' : 'view'}_export.csv`;
-      a.click();
+      downloadTransactionsCsv(allTime ? transactions : filteredTransactions, `transactions_${allTime ? 'full' : 'view'}_${toLocalISODate()}`);
       setShowExportModal(false);
   };
 
+
   const formatCompact = (val: number) => { if(val >= 1000000) return `${(val/1000000).toFixed(1)}M`; if(val >= 1000) return `${(val/1000).toFixed(1)}k`; return val.toLocaleString('en-IN', { maximumFractionDigits: 0 }); };
 
-  const tryParseJson = (raw: string) => {
-    if (!raw) return null;
-    const trimmed = raw.trim();
-    try {
-      return JSON.parse(trimmed);
-    } catch {
-      const first = trimmed.indexOf('{');
-      const last = trimmed.lastIndexOf('}');
-      if (first >= 0 && last > first) {
-        const candidate = trimmed.slice(first, last + 1);
-        try {
-          return JSON.parse(candidate);
-        } catch {
-          return null;
-        }
-      }
-      return null;
-    }
-  };
 
-  const handleInsight = async () => {
-    setInsightLoading(true);
-    setInsightError(null);
-    setInsightParseError(null);
-    try {
-      const res = await generateFinancialAudit();
-      setInsightText(res);
-      const parsed = res ? tryParseJson(res) : null;
-      if (parsed) {
-        setInsightJson(parsed);
-      } else {
-        setInsightJson(null);
-        if (res) setInsightParseError('Could not parse JSON output; showing raw response.');
-      }
-    } catch (e) {
-      setInsightError('Unable to reach Gemini AI.');
-      setInsightJson(null);
-    } finally {
-      setInsightLoading(false);
-    }
-  };
 
-  const copyInsightJson = async () => {
-    if (!insightJson) return;
-    try {
-      await navigator.clipboard.writeText(JSON.stringify(insightJson, null, ));
-      setInsightParseError('Copied insight JSON to clipboard.');
-      setTimeout(() => setInsightParseError(null), 2500);
-    } catch {
-      setInsightParseError('Clipboard copy failed.');
-      setTimeout(() => setInsightParseError(null), 2500);
-    }
-  };
-
-  const exportInsightJson = () => {
-    if (!insightJson) return;
-    const blob = new Blob([JSON.stringify(insightJson, null, 2)], { type: 'application/json' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'insight.json';
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
-  const filteredList = transactions.sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 5);
+  // Five most recent. Sorts a copy: sorting `transactions` in place reordered the shared store array during render.
+  const recentTransactions = [...transactions].sort((a,b) => b.date.localeCompare(a.date)).slice(0, 5);
 
   // Widget Renderer: Dynamically renders components based on key
   const renderWidget = (key: string) => {
@@ -689,19 +574,121 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ onNavigate }) => {
   );
 
 
-          case 'balance': 
-            const balanceChange = previousPeriodStats.balance !== 0 ? ((periodStats.balance - previousPeriodStats.balance) / Math.abs(previousPeriodStats.balance)) * 100 : 0;
-            return ( <div className="col-span-2 md:col-span-2 lg:col-span-12 bg-surface-light dark:bg-surface-dark border border-border-light dark:border-border-dark rounded-[2.5rem] p-8 relative overflow-hidden flex flex-col justify-between min-h-[300px] shadow-card-light dark:shadow-glow transition-all hover:scale-[1.005]"> {loading ? <Skeleton className="h-full w-full"/> : ( <> <div className="flex flex-row justify-between items-start gap-4 relative z-10"> <div className="flex flex-col gap-4"> <div className="flex items-center gap-2"> <span className="material-symbols-outlined text-[#3b82f6] text-xl">account_balance</span> <span className="text-[#3b82f6] font-bold text-base tracking-wide">Total Balance</span> </div> <h2 className="text-5xl lg:text-7xl font-black text-text-light-main dark:text-text-dark-main tracking-tight leading-none"> {currencySymbol}{periodStats.balance.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} </h2> <div className="flex items-center gap-2 mt-1"> <span className={`px-2 py-1 rounded-md text-xs font-bold ${balanceChange >= 0 ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'}`}> {balanceChange >= 0 ? '↗' : '↘'} {Math.abs(balanceChange).toFixed(1)}% </span> <span className="text-text-light-muted dark:text-text-dark-muted text-sm font-medium">vs last {dashboardViewMode}</span> </div> </div> <div className="hidden sm:flex p-1 bg-gray-100 dark:bg-surface-darker rounded-full border border-border-light dark:border-border-dark self-start"> {['week', 'month', 'year'].map(m => ( <button key={m} onClick={() => setDashboardViewMode(m as any)} className={`px-4 py-1.5 rounded-full text-xs font-bold capitalize transition-all ${dashboardViewMode === m ? 'bg-white dark:bg-surface-dark text-text-light-main dark:text-text-dark-main shadow-sm' : 'text-text-light-muted dark:text-text-dark-muted hover:text-primary'}`} > {m} </button> ))} </div> <button onClick={() => setDashboardViewMode(dashboardViewMode === 'week' ? 'month' : dashboardViewMode === 'month' ? 'year' : 'week')} className="sm:hidden px-4 py-2 bg-gray-100 dark:bg-surface-darker border border-border-light dark:border-border-dark rounded-full text-xs font-bold capitalize text-text-light-main dark:text-text-dark-main shadow-sm self-start" > {dashboardViewMode} </button> </div> <div className="absolute bottom-0 left-0 w-full h-32 pointer-events-none"> <RealWaveGraph data={graphData} color="#2ECC71" /> </div> </> )} </div> );
-          case 'income': return ( <div onClick={() => handleEditTarget('income')} className="col-span-1 lg:col-span-3 bg-surface-light dark:bg-surface-dark rounded-[2rem] lg:rounded-[2.5rem] p-5 lg:p-8 border border-border-light dark:border-border-dark flex flex-col justify-between shadow-card-light dark:shadow-card relative group min-h-[180px] lg:min-h-[240px] cursor-pointer" > {loading ? <Skeleton className="h-full w-full"/> : ( <> <div className="flex justify-between items-start"> <div className="size-10 lg:size-12 rounded-full border border-gray-200 dark:border-border-dark hidden md:flex items-center justify-center text-text-light-main dark:text-text-dark-main mb-2 lg:mb-4 group-hover:scale-110 transition-transform"> <span className="material-symbols-outlined text-lg lg:text-2xl text-primary">south_west</span> </div> <span className="hidden lg:block text-xs font-bold text-text-light-muted dark:text-text-dark-muted uppercase bg-gray-100 dark:bg-surface-darker px-2 py-1 rounded-md">{dashboardViewMode}ly</span> </div> <div> <span className="text-text-light-muted dark:text-text-dark-muted text-[10px] lg:text-xs font-bold uppercase tracking-wider">Total Income</span> <span className="block text-xl lg:text-4xl font-black text-primary tracking-tight mt-1 lg:mt-1">+{formatCompact(periodStats.income)}</span> </div> <div className="mt-4 lg:mt-6"> <div className="flex justify-between text-[10px] font-bold text-text-light-muted dark:text-text-dark-muted mb-1 uppercase tracking-wider"> <span className="flex items-center gap-1 truncate max-w-[80px] lg:max-w-none">Target: {formatCompact(targets.income)}</span> <span>{Math.min((periodStats.income / targets.income) * 100, 100).toFixed(0)}%</span> </div> <div className="h-1.5 lg:h-2 w-full bg-gray-100 dark:bg-black/20 rounded-full overflow-hidden"> <div className="h-full bg-primary rounded-full transition-all duration-1000 ease-out" style={{width: `${Math.min((periodStats.income / targets.income) * 100, 100)}%`}}></div> </div> </div> </> )} </div> );
-          case 'expense': return ( <div onClick={() => handleEditTarget('expense')} className="col-span-1 lg:col-span-3 bg-surface-light dark:bg-surface-dark rounded-[2rem] lg:rounded-[2.5rem] p-5 lg:p-8 border border-border-light dark:border-border-dark flex flex-col justify-between shadow-card-light dark:shadow-card relative group min-h-[180px] lg:min-h-[240px] cursor-pointer" > {loading ? <Skeleton className="h-full w-full"/> : ( <> <div className="flex justify-between items-start"> <div className="size-10 lg:size-12 rounded-full border border-gray-200 dark:border-border-dark hidden md:flex items-center justify-center text-text-light-main dark:text-text-dark-main mb-2 lg:mb-4 group-hover:scale-110 transition-transform"> <span className="material-symbols-outlined text-lg lg:text-2xl text-danger">north_east</span> </div> <span className="hidden lg:block text-xs font-bold text-text-light-muted dark:text-text-dark-muted uppercase bg-gray-100 dark:bg-surface-darker px-2 py-1 rounded-md">{dashboardViewMode}ly</span> </div> <div> <span className="text-text-light-muted dark:text-text-dark-muted text-[10px] lg:text-xs font-bold uppercase tracking-wider">Total Expenses</span> <span className="block text-xl lg:text-4xl font-black text-danger tracking-tight mt-1 lg:mt-1">-{formatCompact(periodStats.expense)}</span> </div> <div className="mt-4 lg:mt-6"> <div className="flex justify-between text-[10px] font-bold text-text-light-muted dark:text-text-dark-muted mb-1 uppercase tracking-wider"> <span className="flex items-center gap-1 truncate max-w-[80px] lg:max-w-none">Limit: {formatCompact(targets.expense)}</span> <span>{Math.min((periodStats.expense / targets.expense) * 100, 100).toFixed(0)}%</span> </div> <div className="h-1.5 lg:h-2 w-full bg-gray-100 dark:bg-black/20 rounded-full overflow-hidden"> <div className="h-full bg-danger rounded-full transition-all duration-1000 ease-out" style={{width: `${Math.min((periodStats.expense / targets.expense) * 100, 100)}%`}}></div> </div> </div> </> )} </div> );
+          case 'balance': {
+            // null when the previous period's balance was 0: nothing to compare against.
+            const balanceChange = percentChange(periodStats.balance, previousPeriodStats.balance);
+            const periodWord = dashboardViewMode; // week / month / year
+            const periodStartLabel = periodStart.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+            // Layout, top to bottom: label + period switch, the balance, its change,
+            // a small trend line, two figures that make up the balance, then the
+            // two options. It used to squeeze four controls into one row.
+            return (
+              <div className="col-span-2 md:col-span-2 lg:col-span-12 bg-surface-light dark:bg-surface-dark border border-border-light dark:border-border-dark rounded-[2.5rem] p-5 sm:p-6 lg:p-8 relative overflow-hidden shadow-card-light dark:shadow-glow">
+                <div className="pointer-events-none absolute -top-24 -right-16 size-72 rounded-full bg-primary/10 blur-[100px]" aria-hidden="true" />
+                {loading ? <Skeleton className="h-64 w-full"/> : (
+                  <div className="relative flex flex-col gap-5">
+                    {/* Label + period chip. One tap moves Week → Month → Year → Week. */}
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-2.5">
+                        <span className="size-9 rounded-xl bg-sky-500/15 text-sky-400 flex items-center justify-center">
+                          <span className="material-symbols-outlined text-[20px]" aria-hidden="true">account_balance</span>
+                        </span>
+                        <span className="text-[11px] font-black uppercase tracking-[0.2em] text-text-light-muted dark:text-text-dark-muted">Total balance</span>
+                      </div>
+                      <button type="button" onClick={cyclePeriod}
+                        aria-label={`Period: ${periodWord}. Tap for ${NEXT_PERIOD[dashboardViewMode]}.`}
+                        className="group flex items-center gap-2 pl-3.5 pr-2 py-1.5 rounded-full bg-gray-100 dark:bg-black/30 border border-border-light dark:border-border-dark hover:border-primary/40 transition-colors">
+                        <span key={dashboardViewMode} className="text-xs font-black capitalize text-text-light-main dark:text-text-dark-main min-w-[2.75rem] text-left animate-sheet-in">{periodWord}</span>
+                        {/* Three dots show where you are in the cycle */}
+                        <span className="flex gap-1" aria-hidden="true">
+                          {PERIODS.map(m => (
+                            <span key={m} className={`h-1.5 rounded-full transition-all duration-300 ${dashboardViewMode === m ? 'w-4 bg-primary' : 'w-1.5 bg-gray-300 dark:bg-white/20'}`} />
+                          ))}
+                        </span>
+                      </button>
+                    </div>
+
+                    {/* The balance and how it changed */}
+                    <div className="flex flex-col gap-2">
+                      <h2 className="text-[2.6rem] leading-none sm:text-6xl lg:text-7xl font-black tracking-tight tabular-nums text-text-light-main dark:text-text-dark-main">
+                        {currencySymbol}{animatedBalance.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </h2>
+                      <div className="flex flex-wrap items-center gap-2 text-xs font-bold">
+                        {balanceChange === null ? (
+                          <span className="px-2.5 py-1 rounded-full bg-gray-100 dark:bg-white/5 text-text-light-muted dark:text-text-dark-muted">No data for last {periodWord}</span>
+                        ) : (
+                          <span className={`px-2.5 py-1 rounded-full flex items-center gap-1 ${balanceChange >= 0 ? 'bg-primary/15 text-primary' : 'bg-danger/15 text-danger'}`}>
+                            <span className="material-symbols-outlined text-[14px]" aria-hidden="true">{balanceChange >= 0 ? 'trending_up' : 'trending_down'}</span>
+                            {Math.abs(balanceChange).toFixed(1)}% vs last {periodWord}
+                          </span>
+                        )}
+                        {/* Scope: everything to date, or just this period */}
+                        <div role="radiogroup" aria-label="Balance covers" className="relative grid grid-cols-2 p-0.5 rounded-full bg-gray-100 dark:bg-black/30 border border-border-light dark:border-border-dark">
+                          <span className={`absolute top-0.5 bottom-0.5 left-0.5 w-[calc(50%-2px)] rounded-full bg-white dark:bg-surface-dark shadow-sm transition-transform duration-300 [transition-timing-function:cubic-bezier(0.34,1.56,0.64,1)] ${enableCarryForward ? '' : 'translate-x-full'}`} aria-hidden="true" />
+                          {[{ on: true, label: 'All time' }, { on: false, label: `This ${periodWord}` }].map(o => (
+                            <button key={o.label} type="button" role="radio" aria-checked={enableCarryForward === o.on} onClick={() => setEnableCarryForward(o.on)}
+                              className={`relative z-10 px-3 py-1 text-[11px] font-bold whitespace-nowrap transition-colors ${enableCarryForward === o.on ? 'text-text-light-main dark:text-text-dark-main' : 'text-text-light-muted dark:text-text-dark-muted'}`}>
+                              {o.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Trend line, in its own row so it never sits behind text */}
+                    <div className="h-14 -mx-2" aria-hidden="true">
+                      <RealWaveGraph data={graphData} color="#2ECC71" />
+                    </div>
+
+                    {/* What the balance is made of. "All time": earlier + this period.
+                        "This period": money in and out, so it doesn't just repeat the headline. */}
+                    <div className="grid grid-cols-2 rounded-2xl bg-gray-50 dark:bg-black/20 border border-border-light dark:border-border-dark divide-x divide-border-light dark:divide-border-dark overflow-hidden">
+                      {(enableCarryForward
+                        ? [
+                            { label: `Before ${periodStartLabel}`, value: carriedForwardStats.balance, tone: carriedForwardStats.balance >= 0 ? 'text-text-light-main dark:text-text-dark-main' : 'text-danger' },
+                            { label: `Net this ${periodWord}`, value: periodStats.balance, tone: periodStats.balance >= 0 ? 'text-primary' : 'text-danger' },
+                          ]
+                        : [
+                            { label: `In this ${periodWord}`, value: periodStats.income, tone: 'text-primary' },
+                            { label: `Out this ${periodWord}`, value: -periodStats.expense, tone: 'text-danger' },
+                          ]
+                      ).map(cell => (
+                        <div key={cell.label} className="p-3.5 sm:p-4 flex flex-col gap-1 min-w-0 animate-fade-in">
+                          <span className="text-[10px] font-black uppercase tracking-widest text-text-light-muted dark:text-text-dark-muted truncate">{cell.label}</span>
+                          <span className={`text-base sm:text-xl font-black tabular-nums truncate ${cell.tone}`}>
+                            {formatMoney(Math.round(cell.value), currencySymbol, { signed: true })}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="flex">
+                      <button type="button" onClick={() => setShowBalanceBreakdown(v => !v)} aria-expanded={showBalanceBreakdown}
+                        className={`w-full sm:w-auto justify-center flex items-center gap-1.5 px-3.5 py-2.5 rounded-full text-xs font-bold border transition-colors ${showBalanceBreakdown ? 'bg-primary/15 text-primary border-primary/30' : 'bg-gray-100 dark:bg-white/5 text-text-light-main dark:text-text-dark-main border-border-light dark:border-border-dark hover:border-primary/40'}`}>
+                        <span className="material-symbols-outlined text-[16px]" aria-hidden="true">account_balance_wallet</span>
+                        By payment method
+                        <span className={`material-symbols-outlined text-[18px] transition-transform duration-300 ${showBalanceBreakdown ? 'rotate-180' : ''}`} aria-hidden="true">expand_more</span>
+                      </button>
+                    </div>
+
+                    {showBalanceBreakdown && (
+                      <PaymentModeBreakdown transactions={transactions} paymentMethods={userSettings?.paymentMethods || []} currencySymbol={currencySymbol} />
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          }
+          case 'income': return ( <div onClick={() => handleEditTarget('income')} className="lift col-span-1 lg:col-span-3 bg-surface-light dark:bg-surface-dark rounded-[2rem] lg:rounded-[2.5rem] p-5 lg:p-8 border border-border-light dark:border-border-dark flex flex-col justify-between shadow-card-light dark:shadow-card relative group min-h-[180px] lg:min-h-[240px] cursor-pointer" > {loading ? <Skeleton className="h-full w-full"/> : ( <> <div className="flex justify-between items-start"> <div className="size-10 lg:size-12 rounded-full border border-gray-200 dark:border-border-dark hidden md:flex items-center justify-center text-text-light-main dark:text-text-dark-main mb-2 lg:mb-4 group-hover:scale-110 transition-transform"> <span className="material-symbols-outlined text-lg lg:text-2xl text-primary">south_west</span> </div> <span className="hidden lg:block text-xs font-bold text-text-light-muted dark:text-text-dark-muted uppercase bg-gray-100 dark:bg-surface-darker px-2 py-1 rounded-md">{dashboardViewMode}ly</span> </div> <div> <span className="text-text-light-muted dark:text-text-dark-muted text-[10px] lg:text-xs font-bold uppercase tracking-wider">Total Income</span> <span className="block text-xl lg:text-4xl font-black text-primary tracking-tight mt-1 lg:mt-1">{formatMoney(periodStats.income, currencySymbol, { compact: true, signed: true })}</span> </div> <div className="mt-4 lg:mt-6"> <div className="flex justify-between text-[10px] font-bold text-text-light-muted dark:text-text-dark-muted mb-1 uppercase tracking-wider"> <span className="flex items-center gap-1 truncate max-w-[80px] lg:max-w-none">{targets.income > 0 ? `Target: ${formatMoney(targets.income, currencySymbol, { compact: true })}` : 'Set target'}</span> <span>{targets.income > 0 ? `${((periodStats.income / targets.income) * 100).toFixed(0)}%` : ''}</span> </div> <div className="h-1.5 lg:h-2 w-full bg-gray-100 dark:bg-black/20 rounded-full overflow-hidden"> <div className="h-full bg-primary rounded-full transition-all duration-1000 ease-out" style={{width: `${goalPercent(periodStats.income, targets.income)}%`}}></div> </div> </div> </> )} </div> );
+          case 'expense': return ( <div onClick={() => handleEditTarget('expense')} className="lift col-span-1 lg:col-span-3 bg-surface-light dark:bg-surface-dark rounded-[2rem] lg:rounded-[2.5rem] p-5 lg:p-8 border border-border-light dark:border-border-dark flex flex-col justify-between shadow-card-light dark:shadow-card relative group min-h-[180px] lg:min-h-[240px] cursor-pointer" > {loading ? <Skeleton className="h-full w-full"/> : ( <> <div className="flex justify-between items-start"> <div className="size-10 lg:size-12 rounded-full border border-gray-200 dark:border-border-dark hidden md:flex items-center justify-center text-text-light-main dark:text-text-dark-main mb-2 lg:mb-4 group-hover:scale-110 transition-transform"> <span className="material-symbols-outlined text-lg lg:text-2xl text-danger">north_east</span> </div> <span className="hidden lg:block text-xs font-bold text-text-light-muted dark:text-text-dark-muted uppercase bg-gray-100 dark:bg-surface-darker px-2 py-1 rounded-md">{dashboardViewMode}ly</span> </div> <div> <span className="text-text-light-muted dark:text-text-dark-muted text-[10px] lg:text-xs font-bold uppercase tracking-wider">Total Expenses</span> <span className="block text-xl lg:text-4xl font-black text-danger tracking-tight mt-1 lg:mt-1">{formatMoney(-periodStats.expense, currencySymbol, { compact: true })}</span> </div> <div className="mt-4 lg:mt-6"> <div className="flex justify-between text-[10px] font-bold text-text-light-muted dark:text-text-dark-muted mb-1 uppercase tracking-wider"> <span className={`flex items-center gap-1 truncate max-w-[110px] lg:max-w-none ${targets.expense > 0 && periodStats.expense > targets.expense ? 'text-danger' : ''}`}>{targets.expense <= 0 ? 'Set limit' : periodStats.expense > targets.expense ? `Over by ${formatMoney(periodStats.expense - targets.expense, currencySymbol, { compact: true })}` : `Limit: ${formatMoney(targets.expense, currencySymbol, { compact: true })}`}</span> <span className={targets.expense > 0 && periodStats.expense > targets.expense ? 'text-danger' : ''}>{targets.expense > 0 ? `${((periodStats.expense / targets.expense) * 100).toFixed(0)}%` : ''}</span> </div> <div className="h-1.5 lg:h-2 w-full bg-gray-100 dark:bg-black/20 rounded-full overflow-hidden"> <div className="h-full bg-danger rounded-full transition-all duration-1000 ease-out" style={{width: `${goalPercent(periodStats.expense, targets.expense)}%`}}></div> </div> </div> </> )} </div> );
           case 'shortcuts': return <QuickShortcutsWidget />;
           case 'comparison': return <MonthlyComparisonWidget />;
           case 'categoryBudgets': return <CategoryBudgetWidget />;
-          case 'quickAdd': return ( <div className="col-span-2 md:col-span-2 lg:col-span-4 bg-surface-light dark:bg-surface-dark border border-border-light dark:border-border-dark rounded-[2rem] p-6 shadow-card-light dark:shadow-card hover:shadow-lg transition-shadow"> <div className="flex items-center gap-2 mb-6"> <div className="size-8 rounded-full bg-primary flex items-center justify-center text-[#142210] shadow-glow"><span className="material-symbols-outlined text-lg">add</span></div> <h3 className="text-xl font-bold text-text-light-main dark:text-text-dark-main">New Transaction</h3> </div> <div className="flex flex-col gap-5"> <div className="flex bg-gray-100 dark:bg-surface-darker p-1.5 rounded-xl border border-gray-200 dark:border-border-dark"> <button onClick={() => handleTypeChange('expense')} className={`flex-1 py-2.5 text-sm font-bold rounded-lg transition-all ${formData.type === 'expense' ? 'bg-white dark:bg-surface-dark text-danger dark:text-red-400 shadow-sm border border-danger/30' : 'text-text-light-muted dark:text-text-dark-muted hover:text-text-light-main dark:hover:text-text-dark-main'}`}>Expense</button> <button onClick={() => handleTypeChange('income')} className={`flex-1 py-2.5 text-sm font-bold rounded-lg transition-all ${formData.type === 'income' ? 'bg-white dark:bg-surface-dark text-primary shadow-sm border border-primary/30' : 'text-text-light-muted dark:text-text-dark-muted hover:text-text-light-main dark:hover:text-text-dark-main'}`}>Income</button> </div> <div className="space-y-4"> <div className="flex flex-col gap-1.5"> <label className="text-xs font-bold text-text-light-muted dark:text-text-dark-muted ml-1 uppercase">Description</label> <div className="relative"> <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 text-lg">edit_note</span> <input name="title" value={formData.title} onChange={handleInputChange} type="text" placeholder="e.g. Groceries" className="w-full bg-background-light dark:bg-surface-darker text-text-light-main dark:text-text-dark-main rounded-xl py-3 pl-10 pr-4 border border-border-light dark:border-border-dark focus:border-primary focus:ring-1 focus:ring-primary outline-none text-sm transition-all" /> </div> </div> <div className="grid grid-cols-2 gap-3"> <div className="flex flex-col gap-1.5"> <label className="text-xs font-bold text-text-light-muted dark:text-text-dark-muted ml-1 uppercase">Amount</label> <div className="relative"> <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 font-bold text-lg">{currencySymbol}</span> <input name="amount" value={formData.amount} onChange={handleInputChange} type="number" placeholder="0.00" className="w-full bg-background-light dark:bg-surface-darker text-text-light-main dark:text-text-dark-main rounded-xl py-3 pl-9 pr-4 border border-border-light dark:border-border-dark focus:border-primary outline-none text-sm font-bold tracking-wide" /> </div> </div> <div className="flex flex-col gap-1.5"> <label className="text-xs font-bold text-text-light-muted dark:text-text-dark-muted ml-1 uppercase">Method</label> <select name="paymentMethod" value={formData.paymentMethod} onChange={handleInputChange} className="w-full bg-background-light dark:bg-surface-darker text-text-light-main dark:text-text-dark-main rounded-xl py-3 px-3 border border-border-light dark:border-border-dark focus:border-primary outline-none text-sm appearance-none cursor-pointer"> {userSettings?.paymentMethods.map(m => <option key={m} value={m}>{m}</option>)} </select> </div> </div> <div className="grid grid-cols-2 gap-3"> <div className="flex flex-col gap-1.5"> <label className="text-xs font-bold text-text-light-muted dark:text-text-dark-muted ml-1 uppercase">Category</label> <select name="category" value={formData.category} onChange={handleInputChange} className="w-full bg-background-light dark:bg-surface-darker text-text-light-main dark:text-text-dark-main rounded-xl py-3 px-3 border border-border-light dark:border-border-dark focus:border-primary outline-none text-sm appearance-none cursor-pointer"> {(formData.type === 'income' ? INCOME_CATEGORIES : EXPENSE_CATEGORIES).map(cat => <option key={cat} value={cat}>{cat}</option>)} </select> </div> <div className="flex flex-col gap-1.5"> <label className="text-xs font-bold text-text-light-muted dark:text-text-dark-muted ml-1 uppercase">Date</label> <input name="date" type="date" value={formData.date} onChange={handleInputChange} className="w-full bg-background-light dark:bg-surface-darker text-text-light-main dark:text-text-dark-main rounded-xl py-3 px-3 border border-border-light dark:border-border-dark focus:border-primary outline-none text-sm" style={{colorScheme: userSettings?.theme === 'light' ? 'light' : 'dark'}} /> </div> </div> <div className="flex flex-col gap-2 pt-1"> <div onClick={() => setIsRecurring(!isRecurring)} className="flex items-center justify-between p-2.5 rounded-xl bg-background-light dark:bg-surface-darker border border-border-light dark:border-border-dark cursor-pointer hover:border-primary/40 transition-all"> <div className="flex items-center gap-2"> <span className="material-symbols-outlined text-[18px] text-text-light-muted dark:text-text-dark-muted">repeat</span> <span className="text-xs font-bold text-text-light-main dark:text-text-dark-main">Repeat</span> </div> <div className={`w-8 h-4 rounded-full relative transition-colors ${isRecurring ? 'bg-primary' : 'bg-gray-300 dark:bg-border-dark'}`}> <div className={`absolute top-0.5 size-3 bg-white rounded-full shadow transition-all ${isRecurring ? 'left-4.5' : 'left-0.5'}`} /> </div> </div> {isRecurring && ( <div className="flex gap-1.5 flex-wrap animate-fade-in"> {(['daily', 'weekly', 'monthly', 'yearly'] as const).map(f => ( <button key={f} type="button" onClick={() => setRecurrenceFreq(f)} className={`px-2.5 py-1 rounded-full text-[11px] font-bold capitalize transition-all ${recurrenceFreq === f ? 'bg-primary text-[#131811] shadow-glow' : 'bg-background-light dark:bg-surface-darker text-text-light-muted dark:text-text-dark-muted hover:bg-primary/10'}`}>{f}</button> ))} </div> )} </div> </div> <button onClick={handleAddTransaction} disabled={isAdding} className="mt-2 w-full bg-primary hover:bg-primary-hover text-[#131811] font-bold py-3.5 rounded-xl shadow-glow transition-all flex items-center justify-center gap-2 disabled:opacity-50 transform active:scale-[0.98]"> {isAdding ? <span className="material-symbols-outlined animate-spin">sync</span> : <span className="material-symbols-outlined">add</span>} {isAdding ? 'Saving...' : 'Add Transaction'} </button> </div> </div> );
+          case 'quickAdd': return ( <div className="col-span-2 md:col-span-2 lg:col-span-4 bg-surface-light dark:bg-surface-dark border border-border-light dark:border-border-dark rounded-[2rem] p-6 shadow-card-light dark:shadow-card hover:shadow-lg transition-shadow"> <div className="flex items-center gap-2 mb-6"> <div className="size-8 rounded-full bg-primary flex items-center justify-center text-[#142210] shadow-glow"><span className="material-symbols-outlined text-lg">add</span></div> <h3 className="text-xl font-bold text-text-light-main dark:text-text-dark-main">New Transaction</h3> </div> <div className="flex flex-col gap-5"> <div className="flex bg-gray-100 dark:bg-surface-darker p-1.5 rounded-xl border border-gray-200 dark:border-border-dark"> <button onClick={() => handleTypeChange('expense')} className={`flex-1 py-2.5 text-sm font-bold rounded-lg transition-all ${formData.type === 'expense' ? 'bg-white dark:bg-surface-dark text-danger dark:text-red-400 shadow-sm border border-danger/30' : 'text-text-light-muted dark:text-text-dark-muted hover:text-text-light-main dark:hover:text-text-dark-main'}`}>Expense</button> <button onClick={() => handleTypeChange('income')} className={`flex-1 py-2.5 text-sm font-bold rounded-lg transition-all ${formData.type === 'income' ? 'bg-white dark:bg-surface-dark text-primary shadow-sm border border-primary/30' : 'text-text-light-muted dark:text-text-dark-muted hover:text-text-light-main dark:hover:text-text-dark-main'}`}>Income</button> </div> <div className="space-y-4"> <div className="flex flex-col gap-1.5"> <label className="text-xs font-bold text-text-light-muted dark:text-text-dark-muted ml-1 uppercase">Description</label> <div className="relative"> <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 text-lg">edit_note</span> <input name="title" value={formData.title} onChange={handleInputChange} type="text" placeholder="e.g. Groceries" className="w-full bg-background-light dark:bg-surface-darker text-text-light-main dark:text-text-dark-main rounded-xl py-3 pl-10 pr-4 border border-border-light dark:border-border-dark focus:border-primary focus:ring-1 focus:ring-primary outline-none text-sm transition-all" /> </div> </div> <div className="grid grid-cols-2 gap-3"> <div className="flex flex-col gap-1.5"> <label className="text-xs font-bold text-text-light-muted dark:text-text-dark-muted ml-1 uppercase">Amount</label> <div className="relative"> <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 font-bold text-lg">{currencySymbol}</span> <input name="amount" value={formData.amount} onChange={handleInputChange} type="number" placeholder="0.00" className="w-full bg-background-light dark:bg-surface-darker text-text-light-main dark:text-text-dark-main rounded-xl py-3 pl-9 pr-4 border border-border-light dark:border-border-dark focus:border-primary outline-none text-sm font-bold tracking-wide" /> </div> </div> <div className="flex flex-col gap-1.5"> <label className="text-xs font-bold text-text-light-muted dark:text-text-dark-muted ml-1 uppercase">Method</label> <select name="paymentMethod" value={formData.paymentMethod} onChange={handleInputChange} className="w-full bg-background-light dark:bg-surface-darker text-text-light-main dark:text-text-dark-main rounded-xl py-3 px-3 border border-border-light dark:border-border-dark focus:border-primary outline-none text-sm appearance-none cursor-pointer"> {userSettings?.paymentMethods.map(m => <option key={m} value={m}>{m}</option>)} </select> </div> </div> <div className="grid grid-cols-2 gap-3"> <div className="flex flex-col gap-1.5"> <label className="text-xs font-bold text-text-light-muted dark:text-text-dark-muted ml-1 uppercase">Category</label> <select name="category" value={formData.category} onChange={handleInputChange} className="w-full bg-background-light dark:bg-surface-darker text-text-light-main dark:text-text-dark-main rounded-xl py-3 px-3 border border-border-light dark:border-border-dark focus:border-primary outline-none text-sm appearance-none cursor-pointer"> {(formData.type === 'income' ? (userSettings?.incomeCategories || DEFAULT_INCOME_CATEGORIES) : (userSettings?.expenseCategories || DEFAULT_EXPENSE_CATEGORIES)).map(cat => <option key={cat} value={cat}>{cat}</option>)} </select> </div> <div className="flex flex-col gap-1.5"> <label className="text-xs font-bold text-text-light-muted dark:text-text-dark-muted ml-1 uppercase">Date</label> <input name="date" type="date" value={formData.date} onChange={handleInputChange} className="w-full bg-background-light dark:bg-surface-darker text-text-light-main dark:text-text-dark-main rounded-xl py-3 px-3 border border-border-light dark:border-border-dark focus:border-primary outline-none text-sm" style={{colorScheme: userSettings?.theme === 'light' ? 'light' : 'dark'}} /> </div> </div> <div className="flex flex-col gap-2 pt-1"> <div onClick={() => setIsRecurring(!isRecurring)} className="flex items-center justify-between p-2.5 rounded-xl bg-background-light dark:bg-surface-darker border border-border-light dark:border-border-dark cursor-pointer hover:border-primary/40 transition-all"> <div className="flex items-center gap-2"> <span className="material-symbols-outlined text-[18px] text-text-light-muted dark:text-text-dark-muted">repeat</span> <span className="text-xs font-bold text-text-light-main dark:text-text-dark-main">Repeat</span> </div> <div className={`w-8 h-4 rounded-full relative transition-colors ${isRecurring ? 'bg-primary' : 'bg-gray-300 dark:bg-border-dark'}`}> <div className={`absolute top-0.5 size-3 bg-white rounded-full shadow transition-all ${isRecurring ? 'left-4.5' : 'left-0.5'}`} /> </div> </div> {isRecurring && ( <div className="flex gap-1.5 flex-wrap animate-fade-in"> {(['daily', 'weekly', 'monthly', 'yearly'] as const).map(f => ( <button key={f} type="button" onClick={() => setRecurrenceFreq(f)} className={`px-2.5 py-1 rounded-full text-[11px] font-bold capitalize transition-all ${recurrenceFreq === f ? 'bg-primary text-[#131811] shadow-glow' : 'bg-background-light dark:bg-surface-darker text-text-light-muted dark:text-text-dark-muted hover:bg-primary/10'}`}>{f}</button> ))} </div> )} </div> </div> <button onClick={handleAddTransaction} disabled={isAdding} className="mt-2 w-full bg-primary hover:bg-primary-hover text-[#131811] font-bold py-3.5 rounded-xl shadow-glow transition-all flex items-center justify-center gap-2 disabled:opacity-50 transform active:scale-[0.98]"> {isAdding ? <span className="material-symbols-outlined animate-spin">sync</span> : <span className="material-symbols-outlined">add</span>} {isAdding ? 'Saving...' : 'Add Transaction'} </button> </div> </div> );
           case 'breakdown': 
             const prevTotalBreakdown = breakdownType === 'income' ? previousPeriodStats.income : previousPeriodStats.expense;
-            const breakdownChangeValue = prevTotalBreakdown !== 0 ? ((breakdownStats.total - prevTotalBreakdown) / Math.abs(prevTotalBreakdown)) * 100 : 0;
-            return ( <div className="col-span-2 md:col-span-1 lg:col-span-8 bg-surface-light dark:bg-surface-dark border border-border-light dark:border-border-dark rounded-[2.5rem] p-8 flex flex-col gap-8 shadow-card-light dark:shadow-card relative overflow-visible group min-h-[400px]"> <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 z-20"> <div className="flex items-center gap-3"> <div className="size-10 rounded-full border border-border-light dark:border-white/20 flex items-center justify-center text-text-light-main dark:text-primary bg-surface-light dark:bg-surface-dark shadow-sm"><span className="material-symbols-outlined text-sm">donut_large</span></div> <div> <h3 className="text-lg font-bold text-text-light-main dark:text-white tracking-wide leading-tight">Financial Breakdown</h3> <p className="text-xs text-text-light-muted dark:text-text-dark-muted font-medium">{dashboardViewMode === 'year' ? dashboardDate.getFullYear() : dashboardDate.toLocaleDateString('default', {month:'short', year:'numeric'})}</p> </div> </div> <div className="hidden sm:flex items-center gap-2 bg-gray-100 dark:bg-surface-darker rounded-full p-1 border border-border-light dark:border-border-dark self-start sm:self-auto"> <button onClick={() => handleDateNavigate('prev')} className="size-8 rounded-full flex items-center justify-center hover:bg-white dark:hover:bg-surface-dark text-text-light-muted dark:text-text-dark-muted transition-colors"><span className="material-symbols-outlined text-sm">chevron_left</span></button> <span className="text-xs font-bold text-text-light-main dark:text-text-dark-main px-2 min-w-[80px] text-center select-none">{dashboardViewMode === 'year' ? dashboardDate.getFullYear() : dashboardDate.toLocaleDateString('default', {month:'short', year:'2-digit'})}</span> <button onClick={() => handleDateNavigate('next')} className="size-8 rounded-full flex items-center justify-center hover:bg-white dark:hover:bg-surface-dark text-text-light-muted dark:text-text-dark-muted transition-colors"><span className="material-symbols-outlined text-sm">chevron_right</span></button> </div> </div> <div className="w-full flex flex-col md:flex-row items-center gap-6 justify-center"> <div className="shrink-0 relative flex flex-col items-center gap-6 w-full md:w-auto"> <div className="flex sm:hidden items-center gap-2 bg-gray-100 dark:bg-surface-darker rounded-full p-1 border border-border-light dark:border-border-dark mb-[-10px] z-10"> <button onClick={() => handleDateNavigate('prev')} className="size-8 rounded-full flex items-center justify-center hover:bg-white dark:hover:bg-surface-dark text-text-light-muted dark:text-text-dark-muted transition-colors"><span className="material-symbols-outlined text-sm">chevron_left</span></button> <span className="text-xs font-bold text-text-light-main dark:text-text-dark-main px-4 min-w-[80px] text-center select-none">{dashboardViewMode === 'year' ? dashboardDate.getFullYear() : dashboardDate.toLocaleDateString('default', {month:'short', year:'2-digit'})}</span> <button onClick={() => handleDateNavigate('next')} className="size-8 rounded-full flex items-center justify-center hover:bg-white dark:hover:bg-surface-dark text-text-light-muted dark:text-text-dark-muted transition-colors"><span className="material-symbols-outlined text-sm">chevron_right</span></button> </div> <DonutChart data={breakdownStats.data} total={breakdownStats.total} currencySymbol={currencySymbol} change={breakdownChangeValue} label={breakdownType === 'expense' ? 'Expenses' : 'Income'} className="size-56 md:size-64" isExpense={breakdownType === 'expense'} /> <div className="flex bg-gray-100 dark:bg-black/30 rounded-full p-1.5 border border-border-light dark:border-border-dark w-fit shadow-sm"> <button onClick={() => setBreakdownType('income')} className={`px-6 py-2 rounded-full text-xs font-bold uppercase transition-all ${breakdownType === 'income' ? 'bg-white dark:bg-surface-dark shadow-md text-primary' : 'text-text-light-muted dark:text-gray-400 hover:text-text-light-main'}`}>Income</button> <button onClick={() => setBreakdownType('expense')} className={`px-6 py-2 rounded-full text-xs font-bold uppercase transition-all ${breakdownType === 'expense' ? 'bg-white dark:bg-surface-dark shadow-md text-danger' : 'text-text-light-muted dark:text-gray-400 hover:text-text-light-main'}`}>Expense</button> </div> </div> <div className="w-full md:w-56 flex-1 flex flex-col gap-1.5 max-h-72 overflow-y-auto custom-scrollbar pr-2"> {breakdownStats.legends.length > 0 ? ( breakdownStats.legends.map((item, idx) => ( <div key={idx} className="flex items-center justify-between px-3 py-2 rounded-xl hover:bg-gray-50 dark:hover:bg-surface-darker transition-colors group border border-transparent hover:border-border-light dark:hover:border-border-dark/50"> <div className="flex items-center gap-3"> <div className="size-3 rounded-full shadow-sm" style={{backgroundColor: item.color}}></div> <span className="text-sm font-bold text-text-light-main dark:text-text-dark-main group-hover:text-primary transition-colors">{item.name}</span> </div> <div className="flex flex-col items-end"> <span className="text-sm font-bold text-text-light-main dark:text-text-dark-main tracking-tight">{currencySymbol}{formatCompact(item.value)}</span> <span className="text-[10px] font-bold text-text-light-muted dark:text-text-dark-muted bg-gray-100 dark:bg-black/20 px-1.5 py-0.5 rounded-md">{item.percent}%</span> </div> </div> )) ) : ( <div className="text-center py-8 text-text-light-muted dark:text-text-dark-muted opacity-60"> <span className="material-symbols-outlined text-3xl mb-2">data_usage</span> <p className="text-xs">No data for this period</p> </div> )} </div> </div> </div> );
+            const breakdownChangeValue = percentChange(breakdownStats.total, prevTotalBreakdown) ?? undefined;
+            return ( <div className="col-span-2 md:col-span-1 lg:col-span-8 bg-surface-light dark:bg-surface-dark border border-border-light dark:border-border-dark rounded-[2.5rem] p-8 flex flex-col gap-8 shadow-card-light dark:shadow-card relative overflow-visible group min-h-[400px]"> <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 z-20"> <div className="flex items-center gap-3"> <div className="size-10 rounded-full border border-border-light dark:border-white/20 flex items-center justify-center text-text-light-main dark:text-primary bg-surface-light dark:bg-surface-dark shadow-sm"><span className="material-symbols-outlined text-sm">donut_large</span></div> <div> <h3 className="text-lg font-bold text-text-light-main dark:text-white tracking-wide leading-tight">Financial Breakdown</h3> <p className="text-xs text-text-light-muted dark:text-text-dark-muted font-medium">{dashboardViewMode === 'year' ? dashboardDate.getFullYear() : dashboardDate.toLocaleDateString('default', {month:'short', year:'numeric'})}</p> </div> </div> <div className="hidden sm:flex items-center gap-2 bg-gray-100 dark:bg-surface-darker rounded-full p-1 border border-border-light dark:border-border-dark self-start sm:self-auto"> <button onClick={() => handleDateNavigate('prev')} className="size-8 rounded-full flex items-center justify-center hover:bg-white dark:hover:bg-surface-dark text-text-light-muted dark:text-text-dark-muted transition-colors"><span className="material-symbols-outlined text-sm">chevron_left</span></button> <span className="text-xs font-bold text-text-light-main dark:text-text-dark-main px-2 min-w-[80px] text-center select-none">{dashboardViewMode === 'year' ? dashboardDate.getFullYear() : dashboardDate.toLocaleDateString('en-GB', {month:'short', year:'numeric'})}</span> <button onClick={() => handleDateNavigate('next')} className="size-8 rounded-full flex items-center justify-center hover:bg-white dark:hover:bg-surface-dark text-text-light-muted dark:text-text-dark-muted transition-colors"><span className="material-symbols-outlined text-sm">chevron_right</span></button> </div> </div> <div className="w-full flex flex-col md:flex-row items-center gap-6 justify-center"> <div className="shrink-0 relative flex flex-col items-center gap-6 w-full md:w-auto"> <div className="flex sm:hidden items-center gap-2 bg-gray-100 dark:bg-surface-darker rounded-full p-1 border border-border-light dark:border-border-dark mb-[-10px] z-10"> <button onClick={() => handleDateNavigate('prev')} className="size-8 rounded-full flex items-center justify-center hover:bg-white dark:hover:bg-surface-dark text-text-light-muted dark:text-text-dark-muted transition-colors"><span className="material-symbols-outlined text-sm">chevron_left</span></button> <span className="text-xs font-bold text-text-light-main dark:text-text-dark-main px-4 min-w-[80px] text-center select-none">{dashboardViewMode === 'year' ? dashboardDate.getFullYear() : dashboardDate.toLocaleDateString('en-GB', {month:'short', year:'numeric'})}</span> <button onClick={() => handleDateNavigate('next')} className="size-8 rounded-full flex items-center justify-center hover:bg-white dark:hover:bg-surface-dark text-text-light-muted dark:text-text-dark-muted transition-colors"><span className="material-symbols-outlined text-sm">chevron_right</span></button> </div> <DonutChart data={breakdownStats.data} total={breakdownStats.total} currencySymbol={currencySymbol} change={breakdownChangeValue} changeLabel={`vs last ${dashboardViewMode}`} label={breakdownType === 'expense' ? 'Expenses' : 'Income'} className="size-56 md:size-64" isExpense={breakdownType === 'expense'} /> <div className="flex bg-gray-100 dark:bg-black/30 rounded-full p-1.5 border border-border-light dark:border-border-dark w-fit shadow-sm"> <button onClick={() => setBreakdownType('income')} className={`px-6 py-2 rounded-full text-xs font-bold uppercase transition-all ${breakdownType === 'income' ? 'bg-white dark:bg-surface-dark shadow-md text-primary' : 'text-text-light-muted dark:text-gray-400 hover:text-text-light-main'}`}>Income</button> <button onClick={() => setBreakdownType('expense')} className={`px-6 py-2 rounded-full text-xs font-bold uppercase transition-all ${breakdownType === 'expense' ? 'bg-white dark:bg-surface-dark shadow-md text-danger' : 'text-text-light-muted dark:text-gray-400 hover:text-text-light-main'}`}>Expense</button> </div> </div> <div className="w-full md:w-56 flex-1 flex flex-col gap-1.5 max-h-72 overflow-y-auto custom-scrollbar pr-2"> {breakdownStats.legends.length > 0 ? ( breakdownStats.legends.map((item, idx) => ( <div key={idx} className="flex items-center justify-between px-3 py-2 rounded-xl hover:bg-gray-50 dark:hover:bg-surface-darker transition-colors group border border-transparent hover:border-border-light dark:hover:border-border-dark/50"> <div className="flex items-center gap-3"> <div className="size-3 rounded-full shadow-sm" style={{backgroundColor: item.color}}></div> <span className="text-sm font-bold text-text-light-main dark:text-text-dark-main group-hover:text-primary transition-colors">{item.name}</span> </div> <div className="flex flex-col items-end"> <span className="text-sm font-bold text-text-light-main dark:text-text-dark-main tracking-tight">{currencySymbol}{formatCompact(item.value)}</span> <span className="text-[10px] font-bold text-text-light-muted dark:text-text-dark-muted bg-gray-100 dark:bg-black/20 px-1.5 py-0.5 rounded-md">{item.percent}%</span> </div> </div> )) ) : ( <div className="text-center py-8 text-text-light-muted dark:text-text-dark-muted opacity-60"> <span className="material-symbols-outlined text-3xl mb-2">data_usage</span> <p className="text-xs">No data for this period</p> </div> )} </div> </div> </div> );
           case 'recent': return ( 
             <div className="col-span-2 md:col-span-2 lg:col-span-8 flex flex-col gap-4">
                 <div className="flex items-center justify-between px-2">
@@ -710,12 +697,12 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ onNavigate }) => {
                             <span className="material-symbols-outlined text-text-light-main dark:text-text-dark-main text-xl">history</span> Recent Transactions
                         </div>
                         <span className="text-text-light-muted dark:text-text-dark-muted text-sm font-normal">•</span>
-                        <button onClick={() => onNavigate && onNavigate(View.TRANSACTIONS_CALENDAR)} className="text-primary text-sm font-bold hover:underline cursor-pointer">Full History</button>
+                        <button onClick={() => navigate(ROUTES.TRANSACTION_HISTORY)} className="text-primary text-sm font-bold hover:underline cursor-pointer">Full History</button>
                     </h3>
                 </div>
-                <div className="flex flex-col gap-3">
-                    {loading ? ([1,2,3,4].map(i => <Skeleton key={i} className="h-20 w-full rounded-2xl"/>)) : filteredList.length > 0 ? (
-                        filteredList.map(tx => {
+                <div className="flex flex-col gap-3 stagger">
+                    {loading ? ([1,2,3,4].map(i => <Skeleton key={i} className="h-20 w-full rounded-2xl"/>)) : recentTransactions.length > 0 ? (
+                        recentTransactions.map(tx => {
                             const style = CATEGORY_STYLES[tx.category] || CATEGORY_STYLES['Other'];
                             return (
                                 <div key={tx.id} onClick={() => setViewingTransaction(tx)} className="group bg-surface-light dark:bg-surface-dark border border-border-light dark:border-border-dark hover:border-gray-300 dark:hover:border-border-dark/70 rounded-2xl p-4 flex items-center justify-between transition-all hover:bg-gray-50 dark:hover:bg-surface-darker relative shadow-card-light dark:shadow-none cursor-pointer">
@@ -727,8 +714,8 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ onNavigate }) => {
                                         </div>
                                     </div>
                                     <div className="flex items-center gap-4">
-                                        <p className={`text-lg font-black tracking-tight ${tx.type === 'income' ? 'text-primary' : 'text-danger dark:text-red-400'}`}>{tx.type === 'income' ? '+' : '-'}{currencySymbol}{tx.amount.toFixed(2)}</p>
-                                        <button onClick={(e) => { e.stopPropagation(); setDeleteId(tx.id); }} className="size-8 rounded-full bg-danger/10 text-danger flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-danger hover:text-white" title="Delete Transaction"><span className="material-symbols-outlined text-[18px]">delete</span></button>
+                                        <p className={`text-lg font-black tracking-tight ${tx.type === 'income' ? 'text-primary' : 'text-danger dark:text-red-400'}`}>{formatMoney(tx.type === 'income' ? tx.amount : -tx.amount, currencySymbol, { signed: true })}</p>
+                                        <button onClick={(e) => { e.stopPropagation(); setDeleteId(tx.id); }} className="size-8 rounded-full bg-danger/10 text-danger flex items-center justify-center opacity-100 lg:opacity-0 lg:group-hover:opacity-100 lg:focus-within:opacity-100 lg:focus:opacity-100 transition-opacity hover:bg-danger hover:text-white" title="Delete Transaction"><span className="material-symbols-outlined text-[18px]">delete</span></button>
                                     </div>
                                 </div>
                             );
@@ -794,7 +781,7 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ onNavigate }) => {
         </div>
       )}
       {/* Widget Customization Modal */}
-      {showWidgetEditor && ( <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm"> <div className="bg-surface-light dark:bg-surface-dark border border-border-light dark:border-border-dark rounded-3xl p-6 w-[calc(100vw-32px)] md:w-[80vw] lg:max-w-[400px] shadow-2xl animate-slide-up"><div className="flex justify-between items-center mb-4"> <h2 className="text-xl font-bold text-text-light-main dark:text-text-dark-main">Customize Bento</h2> <button onClick={() => setShowWidgetEditor(false)} className="text-text-light-muted dark:text-text-dark-muted hover:text-text-light-main dark:hover:text-text-dark-main"><span className="material-symbols-outlined">close</span></button> </div> <div className="flex flex-col gap-2 max-h-[50vh] overflow-y-auto custom-scrollbar mb-4"> {editorOrder.map((id, idx) => ( <div key={id} className={`flex items-center justify-between p-3 bg-background-light dark:bg-surface-darker rounded-xl border border-border-light dark:border-border-dark transition-opacity ${!widgets[id] ? 'opacity-60' : 'opacity-100'}`}> <div className="flex items-center gap-3"> <div className="flex flex-col gap-1"> <button onClick={() => handleEditorReorder(id, 'up')} disabled={idx === 0} className="size-7 flex items-center justify-center rounded-lg bg-gray-200 dark:bg-border-dark hover:bg-gray-300 dark:hover:bg-border-dark/80 disabled:opacity-20 transition-colors"><span className="material-symbols-outlined text-sm font-bold">keyboard_arrow_up</span></button> <button onClick={() => handleEditorReorder(id, 'down')} disabled={idx === editorOrder.length - 1} className="size-7 flex items-center justify-center rounded-lg bg-gray-200 dark:bg-border-dark hover:bg-gray-300 dark:hover:bg-border-dark/80 disabled:opacity-20 transition-colors"><span className="material-symbols-outlined text-sm font-bold">keyboard_arrow_down</span></button> </div> <span className="text-text-light-main dark:text-text-dark-main font-medium text-sm">{WIDGET_LABELS[id] || id}</span> </div> <div onClick={() => toggleWidget(id)} className={`w-12 h-6 rounded-full cursor-pointer relative transition-colors ${widgets[id] ? 'bg-primary' : 'bg-gray-300 dark:bg-border-dark'}`}><div className={`absolute top-1 size-4 bg-white rounded-full shadow-md transition-all ${widgets[id] ? 'left-7' : 'left-1'}`}></div></div> </div> ))} </div> <button onClick={handleSaveLayout} className="w-full py-3 bg-primary text-[#131811] font-bold rounded-xl shadow-glow hover:bg-primary-hover transition-colors">Save Layout</button> </div> </div> )}
+      {showWidgetEditor && ( <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm"> <div className="bg-surface-light dark:bg-surface-dark border border-border-light dark:border-border-dark rounded-3xl p-6 w-[calc(100vw-32px)] md:w-[80vw] lg:max-w-[400px] shadow-2xl animate-slide-up"><div className="flex justify-between items-center mb-4"> <h2 className="text-xl font-bold text-text-light-main dark:text-text-dark-main">Customize Bento</h2> <button onClick={() => setShowWidgetEditor(false)} className="text-text-light-muted dark:text-text-dark-muted hover:text-text-light-main dark:hover:text-text-dark-main"><span className="material-symbols-outlined">close</span></button> </div> <div className="flex flex-col gap-2 max-h-[50vh] overflow-y-auto custom-scrollbar mb-4"> {editorOrder.map((id, idx) => ( <div key={id} className={`flex items-center justify-between p-3 bg-background-light dark:bg-surface-darker rounded-xl border border-border-light dark:border-border-dark transition-opacity ${!widgets[id] ? 'opacity-60' : 'opacity-100'}`}> <div className="flex items-center gap-3"> <div className="flex flex-col gap-1"> <button onClick={() => handleEditorReorder(id, 'up')} disabled={idx === 0} className="size-7 flex items-center justify-center rounded-lg bg-gray-200 dark:bg-border-dark hover:bg-gray-300 dark:hover:bg-border-dark/80 disabled:opacity-20 transition-colors"><span className="material-symbols-outlined text-sm font-bold">keyboard_arrow_up</span></button> <button onClick={() => handleEditorReorder(id, 'down')} disabled={idx === editorOrder.length - 1} className="size-7 flex items-center justify-center rounded-lg bg-gray-200 dark:bg-border-dark hover:bg-gray-300 dark:hover:bg-border-dark/80 disabled:opacity-20 transition-colors"><span className="material-symbols-outlined text-sm font-bold">keyboard_arrow_down</span></button> </div> <span className="text-text-light-main dark:text-text-dark-main font-medium text-sm">{WIDGET_LABELS[id] || id}</span> </div> <button type="button" role="switch" aria-checked={!!widgets[id]} aria-label={`Show ${WIDGET_LABELS[id] || id}`} onClick={() => toggleWidget(id)} className={`w-12 h-6 rounded-full cursor-pointer relative transition-colors shrink-0 ${widgets[id] ? 'bg-primary' : 'bg-gray-300 dark:bg-border-dark'}`}><span className={`absolute top-1 size-4 bg-white rounded-full shadow-md transition-all ${widgets[id] ? 'left-7' : 'left-1'}`}></span></button> </div> ))} </div> <button onClick={handleSaveLayout} className="w-full py-3 bg-primary text-[#131811] font-bold rounded-xl shadow-glow hover:bg-primary-hover transition-colors">Save Layout</button> </div> </div> )}
       {/* CSV Import Modal */}
       {showImportModal && <CSVImportModal onClose={() => setShowImportModal(false)} />}
 
@@ -962,7 +949,7 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ onNavigate }) => {
               </button>
 
               <button
-                onClick={() => { setInsightText(null); setInsightJson(null); }}
+                onClick={resetInsight}
                 className="flex-1 py-3 rounded-xl border border-white/10 text-white/60 text-xs font-bold uppercase hover:bg-white/5"
               >
                 Back
@@ -980,13 +967,15 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ onNavigate }) => {
 
         </div>
         <div className="flex justify-end items-center gap-2">
-          <button onClick={() => { setInsightOpen(true); setInsightText(null); setInsightJson(null); setInsightError(null); setInsightParseError(null); handleInsight(); }} className="flex items-center justify-center size-10 rounded-full bg-surface-light dark:bg-surface-dark border border-border-light dark:border-border-dark text-text-light-muted dark:text-text-dark-muted hover:text-primary hover:border-primary transition-all duration-200 ease-out shadow-sm relative overflow-hidden hover:scale-[1.05] active:scale-[0.95]" title="Gemini Neural Insight">
+          <button onClick={() => { setInsightOpen(true); resetInsight(); handleInsight(); }} className="flex items-center justify-center size-10 rounded-full bg-surface-light dark:bg-surface-dark border border-border-light dark:border-border-dark text-text-light-muted dark:text-text-dark-muted hover:text-primary hover:border-primary transition-all duration-200 ease-out shadow-sm relative overflow-hidden hover:scale-[1.05] active:scale-[0.95]" title="Gemini Neural Insight">
             <span className="material-symbols-outlined text-[22px]">magic_button</span>
           </button>
-          <button onClick={() => { setShowNotifications(true); markNotificationsRead(); }} className="flex items-center justify-center size-10 rounded-full bg-surface-light dark:bg-surface-dark border border-border-light dark:border-border-dark text-text-light-muted dark:text-text-dark-muted hover:text-primary hover:border-primary transition-all duration-200 ease-out shadow-sm relative overflow-hidden hover:scale-[1.05] active:scale-[0.95]" title="Notifications">
+          <button onClick={() => setShowNotifications(true)} aria-label={`Notifications${unreadNotifications ? `, ${unreadNotifications} unread` : ''}`} className="relative flex items-center justify-center size-10 rounded-full bg-surface-light dark:bg-surface-dark border border-border-light dark:border-border-dark text-text-light-muted dark:text-text-dark-muted hover:text-primary hover:border-primary transition-all duration-200 ease-out shadow-sm relative overflow-hidden hover:scale-[1.05] active:scale-[0.95]" title="Notifications">
             <span className="material-symbols-outlined text-[22px]">notifications</span>
-            {notifications.some(n => !n.read) && (
-              <span className="absolute top-2 right-2 size-2 bg-rose-500 rounded-full border border-white dark:border-surface-dark"></span>
+            {unreadNotifications > 0 && (
+              <span key={unreadNotifications} className="absolute -top-1 -right-1 min-w-5 h-5 px-1 rounded-full bg-rose-500 text-white text-[10px] font-black flex items-center justify-center border-2 border-background-light dark:border-background-dark animate-pop">
+                {unreadNotifications > 9 ? '9+' : unreadNotifications}
+              </span>
             )}
           </button>
 
@@ -1016,7 +1005,7 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ onNavigate }) => {
 
             {/* Mobile Profile Avatar */}
           <button
-            onClick={() => onNavigate?.(View.SETTINGS)}
+            onClick={() => navigate(ROUTES.SETTINGS)}
             className="md:hidden relative ml-1 active:scale-95 transition-transform"
           >
             <img
@@ -1036,7 +1025,7 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ onNavigate }) => {
       
 
       {/* Welcome Message */}
-      <div className="mb-2 animate-slide-up mt-4"> <div className="flex items-center flex-wrap gap-x-4 gap-y-2 mb-3"> <h1 className="text-5xl md:text-6xl font-black text-text-light-main dark:text-text-dark-main tracking-tight leading-none"> Hello, <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-emerald-600">{userSettings?.displayName?.split(' ')[0] || "Guest"}</span> </h1> </div> <p className="text-xxl font-small text-text-light-muted dark:text-text-dark-muted">Your finances are looking good.</p> </div>
+      <div className="mb-2 animate-slide-up mt-4"> <div className="flex items-center flex-wrap gap-x-4 gap-y-2 mb-3"> <h1 className="text-5xl md:text-6xl font-black text-text-light-main dark:text-text-dark-main tracking-tight leading-none"> Hello, <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-emerald-600">{userSettings?.displayName?.split(' ')[0] || "Guest"}</span> </h1> </div> <p className="text-xxl font-small text-text-light-muted dark:text-text-dark-muted">{monthSummary}</p> </div>
       
       {/* Widget Grid */}
       <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-12 gap-6 animate-slide-up delay-100"> 
@@ -1047,51 +1036,7 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ onNavigate }) => {
         ))}
       </div>
 
-      {/* Notifications Panel */}
-      {showNotifications && (
-        <div className="fixed inset-0 z-[200] flex justify-end animate-fade-in" onClick={() => setShowNotifications(false)}>
-            <div className="absolute inset-0 bg-black/40 backdrop-blur-sm"></div>
-            <div className="relative w-full max-w-sm bg-surface-light dark:bg-surface-dark h-full shadow-2xl animate-slide-left flex flex-col" onClick={e => e.stopPropagation()}>
-                <div className="p-6 border-b border-border-light dark:border-border-dark flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                        <span className="material-symbols-outlined text-primary">notifications</span>
-                        <h2 className="text-xl font-black uppercase tracking-tight">Notifications</h2>
-                    </div>
-                    <button onClick={() => setShowNotifications(false)} className="size-10 rounded-full hover:bg-gray-100 dark:hover:bg-surface-darker flex items-center justify-center transition-colors">
-                        <span className="material-symbols-outlined">close</span>
-                    </button>
-                </div>
-
-                <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-3">
-                    {notifications.length > 0 ? (
-                        notifications.map(notif => (
-                            <div key={notif.id} className="p-4 bg-gray-50 dark:bg-surface-darker rounded-2xl border border-border-light dark:border-border-dark group hover:border-primary/30 transition-all">
-                                <div className="flex justify-between items-start mb-1">
-                                    <h3 className="font-bold text-sm text-text-light-main dark:text-text-dark-main">{notif.title}</h3>
-                                    <span className="text-[10px] text-text-light-muted opacity-60">{new Date(notif.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                                </div>
-                                <p className="text-xs text-text-light-muted dark:text-text-dark-muted leading-relaxed">{notif.body}</p>
-                            </div>
-                        ))
-                    ) : (
-                        <div className="flex-1 flex flex-col items-center justify-center text-center opacity-40">
-                            <span className="material-symbols-outlined text-6xl mb-4">notifications_off</span>
-                            <p className="text-sm font-bold uppercase tracking-widest">No notifications yet</p>
-                            <p className="text-xs">We'll let you know when things happen.</p>
-                        </div>
-                    )}
-                </div>
-
-                {notifications.length > 0 && (
-                    <div className="p-4 border-t border-border-light dark:border-border-dark">
-                        <button onClick={clearNotifications} className="w-full py-3 text-xs font-black uppercase tracking-[0.2em] text-danger hover:bg-danger/10 rounded-xl transition-all">
-                            Clear All
-                        </button>
-                    </div>
-                )}
-            </div>
-        </div>
-      )}
+      {showNotifications && <NotificationsPanel onClose={() => setShowNotifications(false)} />}
     </div>
   );
 };

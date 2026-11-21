@@ -1,5 +1,11 @@
+// CSV import dialog with a per-row preview (valid / warning / error) before
+// anything is saved. Opened from the Dashboard, History and Settings. Parsing lives in utils/csv.ts.
 import React, { useState, useRef, useCallback } from 'react';
 import { useStore } from '../context/Store';
+import { useDialog } from './ui/DialogProvider';
+import { getCurrencySymbol } from '../utils/currency';
+import { parseCsvLine, normaliseDate, parseAmount } from '../utils/csv';
+import { cleanMerchantName, guessCategory } from '../utils/merchant';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -27,72 +33,6 @@ interface ImportResult {
   skipped: number;
 }
 
-// ─── CSV Parsing Helpers ──────────────────────────────────────────────────────
-
-/** Parse a single RFC-4180 CSV line respecting quoted fields. */
-function parseCsvLine(line: string): string[] {
-  const result: string[] = [];
-  let cur = '';
-  let inQuotes = false;
-
-  for (let i = 0; i < line.length; i++) {
-    const ch = line[i];
-    if (ch === '"') {
-      if (inQuotes && line[i + 1] === '"') {
-        cur += '"';
-        i++; // skip escaped quote
-      } else {
-        inQuotes = !inQuotes;
-      }
-    } else if (ch === ',' && !inQuotes) {
-      result.push(cur.trim());
-      cur = '';
-    } else {
-      cur += ch;
-    }
-  }
-  result.push(cur.trim());
-  return result;
-}
-
-/** Attempt to normalise many date formats to YYYY-MM-DD. Returns null if unparseable. */
-function normaliseDate(raw: string): string | null {
-  const s = raw.trim();
-  if (!s) return null;
-
-  // Already ISO
-  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
-    const d = new Date(s);
-    return isNaN(d.getTime()) ? null : s;
-  }
-  // DD/MM/YYYY or DD-MM-YYYY
-  const dmy = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
-  if (dmy) {
-    const [, d, m, y] = dmy;
-    const dt = new Date(`${y}-${m.padStart(2,'0')}-${d.padStart(2,'0')}`);
-    return isNaN(dt.getTime()) ? null : dt.toISOString().split('T')[0];
-  }
-  // MM/DD/YYYY
-  const mdy = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-  if (mdy) {
-    const [, m, d, y] = mdy;
-    const dt = new Date(`${y}-${m.padStart(2,'0')}-${d.padStart(2,'0')}`);
-    return isNaN(dt.getTime()) ? null : dt.toISOString().split('T')[0];
-  }
-  // Try native Date parsing as last resort (e.g. "19 Jul 2025", epoch ms)
-  const dt = new Date(s);
-  if (!isNaN(dt.getTime())) return dt.toISOString().split('T')[0];
-
-  return null;
-}
-
-/** Strip currency symbols and thousand separators, return a positive float or NaN. */
-function parseAmount(raw: string): number {
-  const cleaned = raw.replace(/[₹$€£¥,\s]/g, '').trim();
-  const n = parseFloat(cleaned);
-  return n;
-}
-
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 interface CSVImportModalProps {
@@ -103,6 +43,7 @@ const VALID_TYPES = ['income', 'expense'];
 
 const CSVImportModal: React.FC<CSVImportModalProps> = ({ onClose }) => {
   const { addTransaction, transactions, userSettings, isDemo } = useStore();
+  const dialog = useDialog();
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -167,8 +108,11 @@ const CSVImportModal: React.FC<CSVImportModalProps> = ({ onClose }) => {
       if (!date) errors.push(`Invalid date: "${rawDate}"`);
 
       // ── Title ──
-      const title = (cols[1] || '').trim();
-      if (!title) errors.push('Title is required');
+      // Bank narrations ("UPI/Zomato/XXpayu@…") become readable names ("Zomato");
+      // the original text is kept in the note so nothing is lost.
+      const rawTitle = (cols[1] || '').trim();
+      if (!rawTitle) errors.push('Title is required');
+      const title = cleanMerchantName(rawTitle);
 
       // ── Amount ──
       const rawAmount = cols[2] || '';
@@ -184,17 +128,21 @@ const CSVImportModal: React.FC<CSVImportModalProps> = ({ onClose }) => {
       }
 
       // ── Category ──
+      // Blank, unknown or "Other" categories are guessed from the merchant name
+      // when it clearly matches one of the user's categories.
       let category = (cols[4] || '').trim();
-      if (category) {
-        const inExpense = knownExpenseCats.has(category);
-        const inIncome  = knownIncomeCats.has(category);
-        if (!inExpense && !inIncome) {
+      const known = category && (knownExpenseCats.has(category) || knownIncomeCats.has(category));
+      if (!known || category === 'Other') {
+        const guessed = guessCategory(title, type === 'income' ? knownIncomeCats : knownExpenseCats);
+        if (guessed) {
+          category = guessed;
+        } else if (!category) {
+          category = 'Other';
+          warnings.push('Category is blank — defaulted to "Other"');
+        } else if (!known) {
           warnings.push(`Unknown category "${category}" — mapped to "Other"`);
           category = 'Other';
         }
-      } else {
-        category = 'Other';
-        warnings.push('Category is blank — defaulted to "Other"');
       }
 
       // ── Payment Method ──
@@ -204,13 +152,18 @@ const CSVImportModal: React.FC<CSVImportModalProps> = ({ onClose }) => {
       }
 
       // ── Note ──
-      const note = (cols[6] || '').trim();
+      const typedNote = (cols[6] || '').trim();
+      const note = title !== rawTitle
+        ? [typedNote, `Bank ref: ${rawTitle}`].filter(Boolean).join(' · ')
+        : typedNote;
 
       // ── Duplicate checks (only if row is otherwise valid) ──
       if (errors.length === 0) {
         const dedupKey = `${date}|${title.toLowerCase()}|${amount}`;
+        // Earlier imports stored the raw narration as the title, so check that too.
+        const rawKey = `${date}|${rawTitle.toLowerCase()}|${amount}`;
 
-        if (existingSet.has(dedupKey)) {
+        if (existingSet.has(dedupKey) || existingSet.has(rawKey)) {
           warnings.push('Possible duplicate: same date, title & amount already exists');
         }
         if (seenInFile.has(dedupKey)) {
@@ -245,7 +198,7 @@ const CSVImportModal: React.FC<CSVImportModalProps> = ({ onClose }) => {
   // ── File reading ──────────────────────────────────────────────────────────
   const handleFile = (file: File) => {
     if (!file.name.endsWith('.csv') && file.type !== 'text/csv') {
-      alert('Please select a valid .csv file.');
+      dialog.toast('Choose a .csv file', 'error');
       return;
     }
     setFileName(file.name);
@@ -273,7 +226,7 @@ const CSVImportModal: React.FC<CSVImportModalProps> = ({ onClose }) => {
   // ── Import ────────────────────────────────────────────────────────────────
   const handleImport = async () => {
     if (isDemo) {
-      alert('Import is not available in Demo mode.');
+      dialog.toast('Import isn’t available in Guest mode', 'info');
       return;
     }
     const toImport = rows.filter(r => r.status !== 'error');
@@ -315,7 +268,7 @@ const CSVImportModal: React.FC<CSVImportModalProps> = ({ onClose }) => {
     return r.status === showFilter;
   });
 
-  const currencySymbol = userSettings?.currency === 'USD' ? '$' : userSettings?.currency === 'EUR' ? '€' : '₹';
+  const currencySymbol = getCurrencySymbol(userSettings?.currency);
 
   // ── Status dot helper ─────────────────────────────────────────────────────
   const StatusDot: React.FC<{ status: RowStatus }> = ({ status }) => {

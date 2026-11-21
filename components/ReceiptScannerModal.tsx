@@ -1,5 +1,8 @@
+// Camera dialog that photographs a receipt and asks Gemini for the merchant,
+// total, date and category. Used from the transaction details panel.
 import React, { useEffect, useRef, useState } from 'react';
-import { createGeminiClient } from '../utils/gemini';
+import { createGeminiClient, GEMINI_MODEL } from '../utils/gemini';
+import { extractJsonObject } from '../utils/json';
 
 export type ReceiptScanResult = {
   merchant?: string;
@@ -76,7 +79,7 @@ const ReceiptScannerModal: React.FC<ReceiptScannerModalProps> = ({ onClose, onRe
       const base64 = dataUrl.split(',')[1];
       const ai = createGeminiClient();
       const response = await ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
+        model: GEMINI_MODEL,
         contents: {
           parts: [
             { inlineData: { mimeType: 'image/jpeg', data: base64 } },
@@ -86,9 +89,8 @@ const ReceiptScannerModal: React.FC<ReceiptScannerModalProps> = ({ onClose, onRe
         config: { responseMimeType: 'application/json' }
       });
 
-      const raw = response.text.trim();
-      const jsonText = raw.includes('{') ? raw.slice(raw.indexOf('{'), raw.lastIndexOf('}') + 1) : raw;
-      const parsed = JSON.parse(jsonText);
+      const parsed = extractJsonObject<Record<string, any>>(response.text);
+      if (!parsed) throw new Error('Could not parse receipt. Try again.');
 
       onResult({
         merchant: parsed.merchant || parsed.vendor || parsed.store,

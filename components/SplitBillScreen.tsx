@@ -1,17 +1,27 @@
+// Split Bill page (/split-bill): divide an expense between people.
+// Still a static design preview: the bill, people and amounts are sample data
+// and the buttons do nothing. It isn't linked from the navigation; the banner
+// below makes that clear to anyone who opens the URL.
 import React from 'react';
+import { Link } from 'react-router';
+import { ROUTES } from '../routes';
 
 const SplitBillScreen: React.FC = () => {
   return (
     <div className="w-full max-w-7xl mx-auto p-4 lg:p-10 grid grid-cols-1 lg:grid-cols-12 gap-8">
       {/* Left Column */}
       <div className="lg:col-span-8 flex flex-col gap-6">
+        <div role="note" className="flex items-start gap-3 rounded-2xl border border-amber-400/40 bg-amber-400/10 px-4 py-3 text-sm text-amber-700 dark:text-amber-200">
+          <span className="material-symbols-outlined text-base mt-0.5" aria-hidden="true">construction</span>
+          <p><strong>Preview.</strong> Bill splitting isn't available yet. Everything on this page is sample data, and the buttons don't do anything.</p>
+        </div>
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-2 mb-1">
-              <a className="text-sm text-text-light-muted dark:text-text-dark-muted hover:text-primary flex items-center gap-1 cursor-pointer">
-                <span className="material-symbols-outlined text-[16px]">arrow_back</span> Back to Transactions
-              </a>
+              <Link to={ROUTES.TRANSACTIONS} className="text-sm text-text-light-muted dark:text-text-dark-muted hover:text-primary flex items-center gap-1">
+                <span className="material-symbols-outlined text-[16px]" aria-hidden="true">arrow_back</span> Back to Transactions
+              </Link>
             </div>
             <h1 className="text-3xl lg:text-4xl font-bold tracking-tight text-text-light-main dark:text-text-dark-main">Resolve Expense</h1>
             <p className="text-text-light-muted dark:text-text-dark-muted mt-1">Avoid awkwardness. Split it fair and square.</p>
@@ -130,7 +140,7 @@ const SplitBillScreen: React.FC = () => {
 
           <div className="flex flex-col sm:flex-row gap-4 justify-end pt-4 border-t border-border-light dark:border-border-dark">
             <button className="px-6 py-3 rounded-full text-text-light-muted dark:text-text-dark-muted font-medium text-sm hover:bg-gray-100 dark:hover:bg-border-dark transition-colors">Cancel</button>
-            <button className="px-8 py-3 bg-primary hover:bg-primary-hover text-background-dark font-bold rounded-full text-sm transition-all shadow-[0_0_20px_rgba(70,236,19,0.3)] hover:shadow-[0_0_30px_rgba(70,236,19,0.4)] flex items-center gap-2">
+            <button disabled title="Not available yet" className="px-8 py-3 bg-primary text-background-dark font-bold rounded-full text-sm transition-all opacity-50 cursor-not-allowed shadow-[0_0_20px_rgba(70,236,19,0.3)] hover:shadow-[0_0_30px_rgba(70,236,19,0.4)] flex items-center gap-2">
               Send Request <span className="material-symbols-outlined text-[18px]">send</span>
             </button>
           </div>

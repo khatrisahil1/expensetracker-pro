@@ -1,45 +1,34 @@
-
+// Transactions page (/transactions): add a transaction by hand or by scanning a
+// receipt with the camera (Gemini fills in the fields), plus recent activity.
 import React, { useState, useRef, useEffect } from 'react';
-import { Type } from "@google/genai";
-import { createGeminiClient } from '../utils/gemini';
+import { createGeminiClient, GEMINI_MODEL } from '../utils/gemini';
+import { extractJsonObject } from '../utils/json';
+import { compressDataUrl, drawScaledJpeg, RECEIPT_MAX_SIDE } from '../utils/image';
 import { useStore } from '../context/Store';
-import { View } from '../types';
+import { useDialog } from './ui/DialogProvider';
+import { useNavigate } from 'react-router';
+import { ROUTES } from '../routes';
+import { CATEGORY_STYLES } from '../constants/categories';
+import { getCurrencySymbol } from '../utils/currency';
+import { formatDisplayDate, toLocalISODate } from '../utils/date';
+import { formatMoney } from '../utils/format';
 
-interface ScannerScreenProps {
-    onNavigate: (view: View) => void;
-}
 
-// Styling definitions for category badges
-const CATEGORY_STYLES: Record<string, { icon: string, colorClass: string }> = {
-    "Food": { icon: "restaurant", colorClass: "text-orange-500 bg-orange-500/10 border-orange-500/20" },
-    "Housing": { icon: "home", colorClass: "text-blue-500 bg-blue-500/10 border-blue-500/20" },
-    "Rent": { icon: "real_estate_agent", colorClass: "text-indigo-400 bg-indigo-400/10 border-indigo-400/20" },
-    "Transportation": { icon: "directions_car", colorClass: "text-purple-500 bg-purple-500/10 border-purple-500/20" },
-    "Entertainment": { icon: "movie", colorClass: "text-pink-500 bg-pink-500/10 border-pink-500/20" },
-    "Shopping": { icon: "shopping_bag", colorClass: "text-yellow-500 bg-yellow-500/10 border-yellow-500/20" },
-    "Health": { icon: "medical_services", colorClass: "text-red-400 bg-red-400/10 border-red-400/20" },
-    "Utilities": { icon: "bolt", colorClass: "text-cyan-400 bg-cyan-400/10 border-cyan-400/20" },
-    "Salary": { icon: "payments", colorClass: "text-primary bg-primary/10 border-primary/20" },
-    "Other": { icon: "receipt", colorClass: "text-gray-400 bg-gray-400/10 border-gray-400/20" }
-};
-
-const formatDisplayDate = (dateStr: string) => {
-    if (!dateStr) return '';
-    const d = new Date(dateStr);
-    return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' });
-};
-
-export const ScannerScreen: React.FC<ScannerScreenProps> = ({ onNavigate }) => {
+export const TransactionsScreen: React.FC = () => {
+    const navigate = useNavigate();
   const { addTransaction, transactions, userSettings, setViewingTransaction } = useStore();
+  const dialog = useDialog();
   
   // Camera & Image State
   const [showCamera, setShowCamera] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  /** Result of the last save, shown under the Save button. */
+  const [saveStatus, setSaveStatus] = useState<{ kind: 'success' | 'error'; message: string } | null>(null);
   
   // Refs for Media Elements
   const videoRef = useRef<HTMLVideoElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
   const fallbackInputRef = useRef<HTMLInputElement>(null);
   const [stream, setStream] = useState<MediaStream | null>(null);
 
@@ -47,7 +36,7 @@ export const ScannerScreen: React.FC<ScannerScreenProps> = ({ onNavigate }) => {
   const [formData, setFormData] = useState({
     amount: '',
     merchant: '',
-    date: new Date().toISOString().split('T')[0],
+    date: toLocalISODate(),
     category: 'Food',
     type: 'expense' as 'expense' | 'income',
     paymentMethod: 'UPI',
@@ -56,7 +45,8 @@ export const ScannerScreen: React.FC<ScannerScreenProps> = ({ onNavigate }) => {
     subscriptionFrequency: 'monthly' as 'monthly' | 'yearly' | 'weekly'
   });
 
-  const recentTransactions = transactions.slice(0, 10);
+  // Newest by transaction date (the store's order is by when rows were created).
+  const recentTransactions = [...transactions].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 10);
 
   // Initialize form defaults from user settings
   useEffect(() => {
@@ -95,11 +85,6 @@ export const ScannerScreen: React.FC<ScannerScreenProps> = ({ onNavigate }) => {
 
       const mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
       // Verify resolution meets minimum quality
-      const track = mediaStream.getVideoTracks()[0];
-      if (track) {
-          const settings = track.getSettings();
-          // Low-res warning is handled silently
-      }
 
       setStream(mediaStream);
       setShowCamera(true);
@@ -110,7 +95,7 @@ export const ScannerScreen: React.FC<ScannerScreenProps> = ({ onNavigate }) => {
             videoRef.current.srcObject = mediaStream;
             videoRef.current.play().catch(e => {
                 console.error("Video play failed:", e);
-                alert("Camera feed could not start: " + e.message);
+                dialog.toast('Camera could not start: ' + e.message, 'error');
             });
         } 
       }, 100);
@@ -125,10 +110,10 @@ export const ScannerScreen: React.FC<ScannerScreenProps> = ({ onNavigate }) => {
       if (fallbackInputRef.current) {
           // Fallback to native OS camera/file picker
           // Only show alert if it's a permission issue, otherwise just fallback
-          if (err.name === 'NotAllowedError') alert(errorMsg);
+          if (err.name === 'NotAllowedError') dialog.toast(errorMsg, 'error');
           fallbackInputRef.current.click();
       } else {
-          alert("Camera Error: " + errorMsg);
+          dialog.toast('Camera error: ' + errorMsg, 'error');
       }
     }
   };
@@ -140,20 +125,13 @@ export const ScannerScreen: React.FC<ScannerScreenProps> = ({ onNavigate }) => {
   };
 
   const captureImage = () => {
-    if (videoRef.current && canvasRef.current) {
-      const canvas = canvasRef.current;
-      canvas.width = videoRef.current.videoWidth;
-      canvas.height = videoRef.current.videoHeight;
-      const ctx = canvas.getContext('2d');
-      if (ctx) {
-        // Draw current video frame to canvas
-        ctx.drawImage(videoRef.current, 0, 0);
-        // Convert to base64 JPEG
-        const img = canvas.toDataURL('image/jpeg', 0.8);
-        setPreviewImage(img);
-        stopCamera();
-        analyzeReceipt(img);
-      }
+    if (videoRef.current) {
+      // Scaled down: a full-resolution frame can exceed Firestore's 1 MiB
+      // document limit, which made saving with a photo fail.
+      const img = drawScaledJpeg(videoRef.current, RECEIPT_MAX_SIDE);
+      setPreviewImage(img);
+      stopCamera();
+      analyzeReceipt(img);
     }
   };
 
@@ -164,7 +142,7 @@ export const ScannerScreen: React.FC<ScannerScreenProps> = ({ onNavigate }) => {
       const ai = createGeminiClient();
       // Use Gemini Flash for speed and cost efficiency
       const response = await ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
+        model: GEMINI_MODEL,
         contents: {
           parts: [
             // Pass the image data
@@ -176,42 +154,60 @@ export const ScannerScreen: React.FC<ScannerScreenProps> = ({ onNavigate }) => {
         config: { responseMimeType: 'application/json' }
       });
       
-      const data = JSON.parse(response.text);
+      const data = extractJsonObject<{ totalAmount?: number | string; merchant?: string; date?: string; category?: string }>(response.text);
+      if (!data) throw new Error('Could not read the receipt. Please fill in the details.');
+      // Only accept a category the user actually has, or the dropdown shows a blank value.
+      const known = formData.type === 'income' ? userSettings?.incomeCategories : userSettings?.expenseCategories;
       // Populate form with AI results
       setFormData(prev => ({
         ...prev,
         amount: data.totalAmount?.toString() || prev.amount,
         merchant: data.merchant || prev.merchant,
         date: data.date || prev.date,
-        category: data.category || prev.category
+        category: data.category && known?.includes(data.category) ? data.category : prev.category
       }));
     } catch (e: any) {
-      alert(e?.message || "Analysis failed.");
+      dialog.toast(e?.message || 'Couldn’t read the receipt', 'error');
     } finally { setIsProcessing(false); }
   };
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     const amt = parseFloat(formData.amount);
-    if (isNaN(amt) || !formData.merchant) return;
-    await addTransaction({
-      title: formData.merchant, 
-      amount: amt, 
-      date: formData.date, 
-      category: formData.category,
-      type: formData.type, 
-      note: formData.notes, 
-      paymentMethod: formData.paymentMethod,
-      isSubscription: formData.isSubscription,
-      subscriptionFrequency: formData.subscriptionFrequency,
-      attachment: previewImage || undefined,
-    });
-    setFormData(prev => ({ ...prev, amount: '', merchant: '', notes: '', isSubscription: false }));
-    setPreviewImage(null);
-    alert("Saved!");
+    if (isNaN(amt) || amt <= 0) { setSaveStatus({ kind: 'error', message: 'Enter an amount greater than 0.' }); return; }
+    if (!formData.merchant.trim()) { setSaveStatus({ kind: 'error', message: 'Enter a merchant or description.' }); return; }
+
+    setIsSaving(true);
+    setSaveStatus(null);
+    try {
+      await addTransaction({
+        title: formData.merchant.trim(),
+        amount: amt,
+        date: formData.date,
+        category: formData.category,
+        type: formData.type,
+        note: formData.notes,
+        paymentMethod: formData.paymentMethod,
+        // Subscription fields only when it is one; otherwise every manual entry
+        // got a subscriptionFrequency and looked half-configured.
+        ...(formData.isSubscription
+          ? { isSubscription: true, subscriptionFrequency: formData.subscriptionFrequency, subscriptionStatus: 'active' as const }
+          : {}),
+        ...(previewImage ? { attachment: previewImage } : {}),
+      });
+      setFormData(prev => ({ ...prev, amount: '', merchant: '', notes: '', isSubscription: false }));
+      setPreviewImage(null);
+      setSaveStatus({ kind: 'success', message: `Saved "${formData.merchant.trim()}".` });
+    } catch (err: any) {
+      // Previously an error here was swallowed and the form just sat there.
+      console.error('Saving transaction failed', err);
+      setSaveStatus({ kind: 'error', message: err?.message || 'Could not save. Please try again.' });
+    } finally {
+      setIsSaving(false);
+    }
   };
 
-  const currencySymbol = userSettings?.currency === 'USD' ? '$' : userSettings?.currency === 'EUR' ? '€' : '₹';
+  const currencySymbol = getCurrencySymbol(userSettings?.currency);
 
   return (
     <div className="container mx-auto px-4 py-6 md:py-10 max-w-[1400px] animate-fade-in overflow-y-auto pb-24">
@@ -260,7 +256,7 @@ export const ScannerScreen: React.FC<ScannerScreenProps> = ({ onNavigate }) => {
                         <span className="material-symbols-outlined text-[18px]">{CATEGORY_STYLES[cat]?.icon || 'label'}</span>{cat}
                       </button>
                     ))}
-                    <button type="button" onClick={() => onNavigate(View.SETTINGS)} className="size-10 rounded-full border border-border-light dark:border-border-dark flex items-center justify-center text-text-light-muted hover:bg-gray-100 dark:hover:bg-surface-darker transition-colors"><span className="material-symbols-outlined text-[20px]">add</span></button>
+                    <button type="button" onClick={() => navigate(ROUTES.SETTINGS)} className="size-10 rounded-full border border-border-light dark:border-border-dark flex items-center justify-center text-text-light-muted hover:bg-gray-100 dark:hover:bg-surface-darker transition-colors"><span className="material-symbols-outlined text-[20px]">add</span></button>
                   </div>
                 </div>
               )}
@@ -337,16 +333,21 @@ export const ScannerScreen: React.FC<ScannerScreenProps> = ({ onNavigate }) => {
 
               <div className="grid grid-cols-2 gap-4">
                 <button type="button" onClick={startCamera} className="flex-1 bg-gray-100 dark:bg-surface-darker hover:bg-gray-200 dark:hover:bg-border-dark py-3.5 rounded-2xl text-xs font-black uppercase tracking-widest flex items-center justify-center gap-2 transition-all"><span className="material-symbols-outlined text-[18px]">photo_camera</span>Scan Receipt</button>
-                <label className="flex-1 bg-gray-100 dark:bg-surface-darker hover:bg-gray-200 dark:hover:bg-border-dark py-3.5 rounded-2xl text-xs font-black uppercase tracking-widest flex items-center justify-center gap-2 cursor-pointer transition-all"><span className="material-symbols-outlined text-[18px]">cloud_upload</span>Upload File<input type="file" className="hidden" accept="image/*" onChange={(e) => { const f = e.target.files?.[0]; if(f) { const r = new FileReader(); r.onloadend = () => analyzeReceipt(r.result as string); r.readAsDataURL(f); }}} /></label>
+                <label className="flex-1 bg-gray-100 dark:bg-surface-darker hover:bg-gray-200 dark:hover:bg-border-dark py-3.5 rounded-2xl text-xs font-black uppercase tracking-widest flex items-center justify-center gap-2 cursor-pointer transition-all"><span className="material-symbols-outlined text-[18px]">cloud_upload</span>Upload File<input type="file" className="hidden" accept="image/*" onChange={(e) => { const f = e.target.files?.[0]; if(f) { const r = new FileReader(); r.onloadend = async () => { try { const img = await compressDataUrl(r.result as string, RECEIPT_MAX_SIDE); setPreviewImage(img); analyzeReceipt(img); } catch (err: any) { setSaveStatus({ kind: 'error', message: err?.message || 'Could not read that image.' }); } }; r.readAsDataURL(f); }}} /></label>
                 
                 {/* Hidden Fallback Input for Camera */}
                 <input ref={fallbackInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if(f) { const r = new FileReader(); r.onloadend = () => analyzeReceipt(r.result as string); r.readAsDataURL(f); }}} />
               </div>
 
-              <button type="submit" disabled={!formData.amount || !formData.merchant || isProcessing} className="w-full bg-primary hover:bg-primary-hover text-[#131811] font-black py-5 rounded-[2rem] shadow-glow transition-all flex items-center justify-center gap-2 transform active:scale-[0.98] disabled:opacity-50 disabled:grayscale">
-                {isProcessing ? <span className="material-symbols-outlined animate-spin">sync</span> : <span className="material-symbols-outlined">check_circle</span>}
-                {isProcessing ? 'SCANNING...' : 'SAVE TRANSACTION'}
+              <button type="submit" disabled={!formData.amount || !formData.merchant || isProcessing || isSaving} className="w-full bg-primary hover:bg-primary-hover text-[#131811] font-black py-5 rounded-[2rem] shadow-glow transition-all flex items-center justify-center gap-2 transform active:scale-[0.98] disabled:opacity-50 disabled:grayscale">
+                {isProcessing || isSaving ? <span className="material-symbols-outlined animate-spin">sync</span> : <span className="material-symbols-outlined">check_circle</span>}
+                {isProcessing ? 'SCANNING...' : isSaving ? 'SAVING...' : 'SAVE TRANSACTION'}
               </button>
+              {saveStatus && (
+                <p role="status" className={`-mt-6 text-center text-sm font-bold ${saveStatus.kind === 'success' ? 'text-primary' : 'text-danger'}`}>
+                  {saveStatus.message}
+                </p>
+              )}
             </form>
 
             {/* Camera Overlay */}
@@ -359,7 +360,6 @@ export const ScannerScreen: React.FC<ScannerScreenProps> = ({ onNavigate }) => {
                 </div>
               </div>
             )}
-            <canvas ref={canvasRef} className="hidden" />
           </div>
         </div>
 
@@ -367,9 +367,9 @@ export const ScannerScreen: React.FC<ScannerScreenProps> = ({ onNavigate }) => {
         <div className="lg:col-span-5 flex flex-col gap-6">
             <div className="flex items-center justify-between px-2">
                 <h3 className="text-xl font-black text-text-light-main dark:text-text-dark-main flex items-center gap-2"><span className="material-symbols-outlined text-primary">history</span> Recent Activity</h3>
-                <button onClick={() => onNavigate(View.TRANSACTIONS_CALENDAR)} className="text-primary text-xs font-black uppercase tracking-widest hover:underline flex items-center gap-1 group">Full History<span className="material-symbols-outlined text-[14px] group-hover:translate-x-0.5 transition-transform">arrow_forward</span></button>
+                <button onClick={() => navigate(ROUTES.TRANSACTION_HISTORY)} className="text-primary text-xs font-black uppercase tracking-widest hover:underline flex items-center gap-1 group">Full History<span className="material-symbols-outlined text-[14px] group-hover:translate-x-0.5 transition-transform">arrow_forward</span></button>
             </div>
-            <div className="flex flex-col gap-3">
+            <div className="flex flex-col gap-3 stagger">
                 {recentTransactions.map(tx => {
                     const style = CATEGORY_STYLES[tx.category] || CATEGORY_STYLES['Other'];
                     return (
@@ -389,7 +389,7 @@ export const ScannerScreen: React.FC<ScannerScreenProps> = ({ onNavigate }) => {
                                     <p className="text-[10px] text-text-light-muted dark:text-text-dark-muted uppercase font-black tracking-widest opacity-60">{formatDisplayDate(tx.date)}</p>
                                 </div>
                             </div>
-                            <p className={`text-xl font-black ${tx.type === 'income' ? 'text-primary' : 'text-danger'}`}>{tx.type === 'income' ? '+' : '-'}{currencySymbol}{tx.amount.toFixed(2)}</p>
+                            <p className={`text-xl font-black ${tx.type === 'income' ? 'text-primary' : 'text-danger'}`}>{formatMoney(tx.type === 'income' ? tx.amount : -tx.amount, currencySymbol, { signed: true })}</p>
                         </div>
                     );
                 })}

@@ -1,3 +1,4 @@
+// Search box and filters (type, category, method, dates, amounts) for the History page.
 import React, { useState } from 'react';
 import { useStore } from '../context/Store';
 
@@ -76,7 +77,7 @@ const SearchFilterBar: React.FC<SearchFilterBarProps> = ({
             type="text"
             value={filters.searchQuery}
             onChange={(e) => handleChange('searchQuery', e.target.value)}
-            placeholder="Search by title, category, or note..."
+            placeholder="Search name, category, amount or month"
             className="w-full bg-surface-light dark:bg-surface-dark border border-border-light dark:border-border-dark text-text-light-main dark:text-text-dark-main rounded-2xl py-3 pl-10 pr-10 outline-none text-sm font-bold focus:border-primary transition-all shadow-sm"
           />
           {filters.searchQuery && (

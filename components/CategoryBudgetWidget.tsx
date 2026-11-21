@@ -1,9 +1,12 @@
+// Dashboard widget: spending against each category budget for the current month.
 import React, { useState, useMemo } from 'react';
 import { useStore } from '../context/Store';
+import { getCurrencySymbol } from '../utils/currency';
+import { parseLocalDate } from '../utils/date';
 
 const CategoryBudgetWidget: React.FC = () => {
   const { transactions, userSettings, updateUserSettings } = useStore();
-  const currencySymbol = userSettings?.currency === 'USD' ? '$' : userSettings?.currency === 'EUR' ? '€' : '₹';
+  const currencySymbol = getCurrencySymbol(userSettings?.currency);
 
   const [editingCategory, setEditingCategory] = useState<string | null>(null);
   const [limitInput, setLimitInput] = useState('');
@@ -23,7 +26,7 @@ const CategoryBudgetWidget: React.FC = () => {
     const spendMap: Record<string, number> = {};
 
     transactions.forEach((tx) => {
-      const d = new Date(tx.date);
+      const d = parseLocalDate(tx.date);
       if (tx.type === 'expense' && d.getMonth() === currentMonth && d.getFullYear() === currentYear) {
         spendMap[tx.category] = (spendMap[tx.category] || 0) + tx.amount;
       }

@@ -1,5 +1,10 @@
-import React, { useState, useMemo, useEffect } from 'react';
+// Simulator page (/simulator): project the balance forward with what-if events
+// such as a trip or a big purchase.
+import React, { useState, useMemo } from 'react';
 import { useStore } from '../context/Store';
+import { getCurrencySymbol } from '../utils/currency';
+import { formatDisplayDate, parseLocalDate, toLocalISODate } from '../utils/date';
+import { formatMoney } from '../utils/format';
 
 interface SimulationItem {
   id: string;
@@ -16,17 +21,15 @@ const SimulatorScreen: React.FC = () => {
   // 0 to 100 slider, maps to 1 month to 24 months
   const [sliderVal, setSliderVal] = useState(12); 
   
-  // Scenario State
-  const [scenarios, setScenarios] = useState<SimulationItem[]>([
-    { id: '1', name: "Bali Trip", amount: -18000, date: new Date(new Date().setMonth(new Date().getMonth() + 2)).toISOString().split('T')[0], active: true, icon: "flight" },
-    { id: '2', name: "New Laptop", amount: -8500, date: new Date(new Date().setMonth(new Date().getMonth() + 1)).toISOString().split('T')[0], active: true, icon: "laptop_mac" }
-  ]);
+  // Scenario State. Starts empty: it used to open with a made-up "Bali Trip" and
+  // "New Laptop" already pulling down every user's forecast.
+  const [scenarios, setScenarios] = useState<SimulationItem[]>([]);
 
   // Form State
   const [newItem, setNewItem] = useState({ name: '', amount: '', date: '' });
 
   // --- 1. CALCULATE BASELINE METRICS ---
-  const { currentBalance, avgMonthlyNet, monthlyBurnRate, monthlyIncome } = useMemo(() => {
+  const { currentBalance, avgMonthlyNet } = useMemo(() => {
     // 1. Current Balance
     const income = transactions.filter(t => t.type === 'income').reduce((acc, t) => acc + t.amount, 0);
     const expense = transactions.filter(t => t.type === 'expense').reduce((acc, t) => acc + t.amount, 0);
@@ -80,7 +83,7 @@ const SimulatorScreen: React.FC = () => {
         // B. Simulation: Baseline - Scenarios that happen by this month
         let scenarioImpact = 0;
         scenarios.filter(s => s.active).forEach(s => {
-            const sDate = new Date(s.date);
+            const sDate = parseLocalDate(s.date);
             // If scenario date is before or in this month
             if (sDate <= futureDate) {
                 scenarioImpact += s.amount; // amount is negative for expense
@@ -131,7 +134,7 @@ const SimulatorScreen: React.FC = () => {
           id: Math.random().toString(36).substr(2, 9),
           name: newItem.name,
           amount: isExpense ? -Math.abs(amt) : Math.abs(amt),
-          date: newItem.date || new Date().toISOString().split('T')[0],
+          date: newItem.date || toLocalISODate(),
           active: true,
           icon: 'payments'
       };
@@ -148,7 +151,7 @@ const SimulatorScreen: React.FC = () => {
       setScenarios(scenarios.filter(s => s.id !== id));
   };
 
-  const currencySymbol = userSettings?.currency === 'USD' ? '$' : userSettings?.currency === 'EUR' ? '€' : '₹';
+  const currencySymbol = getCurrencySymbol(userSettings?.currency);
 
   // --- GRAPH DRAWING HELPERS ---
   const GraphPath = ({ points, color, isDashed = false, isFilled = false }: { points: number[], color: string, isDashed?: boolean, isFilled?: boolean }) => {
@@ -226,7 +229,7 @@ const SimulatorScreen: React.FC = () => {
             </p>
             <div className={`flex items-center gap-1 text-sm font-bold mt-2 ${avgMonthlyNet >= 0 ? 'text-primary' : 'text-danger'}`}>
               <span className="material-symbols-outlined text-base">{avgMonthlyNet >= 0 ? 'trending_up' : 'trending_down'}</span>
-              <span>{avgMonthlyNet >= 0 ? '+' : ''}{currencySymbol}{avgMonthlyNet.toFixed(0)} / mo</span>
+              <span>{formatMoney(Math.round(avgMonthlyNet), currencySymbol, { signed: true })} / month</span>
             </div>
           </div>
         </div>
@@ -369,7 +372,7 @@ const SimulatorScreen: React.FC = () => {
 
               <div className="flex flex-col gap-3 max-h-[250px] overflow-y-auto pr-2 custom-scrollbar">
                  <p className="text-xs font-bold text-text-light-muted dark:text-text-dark-muted uppercase tracking-wider">Active Simulations</p>
-                 {scenarios.length === 0 && <p className="text-xs text-text-light-muted opacity-50">No scenarios added yet.</p>}
+                 {scenarios.length === 0 && <p className="text-xs text-text-light-muted opacity-50">No scenarios yet. Add a planned purchase above to see how it changes your forecast.</p>}
                  {scenarios.map((sim) => (
                     <div key={sim.id} className={`flex items-center justify-between p-3 rounded-xl border transition-all cursor-pointer ${sim.active ? 'bg-gray-50 dark:bg-border-dark/30 border-border-light dark:border-border-dark/50' : 'bg-transparent border-transparent opacity-50 grayscale'}`} onClick={() => toggleScenario(sim.id)}>
                        <div className="flex items-center gap-3">
@@ -378,7 +381,7 @@ const SimulatorScreen: React.FC = () => {
                           </div>
                           <div className="flex flex-col">
                              <span className="text-sm font-bold text-text-light-main dark:text-text-dark-main">{sim.name}</span>
-                             <span className="text-xs text-text-light-muted dark:text-text-dark-muted">{sim.date}</span>
+                             <span className="text-xs text-text-light-muted dark:text-text-dark-muted">{formatDisplayDate(sim.date)}</span>
                           </div>
                        </div>
                        <div className="flex flex-col items-end">
@@ -387,7 +390,7 @@ const SimulatorScreen: React.FC = () => {
                           </span>
                           <button 
                              onClick={(e) => { e.stopPropagation(); removeScenario(sim.id); }}
-                             className="text-[10px] text-danger opacity-0 group-hover:opacity-100 hover:underline mt-1"
+                             className="text-[10px] text-danger opacity-100 lg:opacity-0 lg:group-hover:opacity-100 lg:focus-within:opacity-100 lg:focus:opacity-100 hover:underline mt-1"
                           >
                              Remove
                           </button>

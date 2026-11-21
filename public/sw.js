@@ -57,7 +57,14 @@ self.addEventListener("fetch", (event) => {
           caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
           return res;
         })
-        .catch(() => caches.match(FALLBACK_PAGE))
+        // Offline: serve the cached app shell so client-side routes (/budget, ...)
+        // still render. The offline page is only a last resort.
+        .catch(async () =>
+          (await caches.match(event.request)) ||
+          (await caches.match("/index.html")) ||
+          (await caches.match("/")) ||
+          caches.match(FALLBACK_PAGE)
+        )
     );
     return;
   }
