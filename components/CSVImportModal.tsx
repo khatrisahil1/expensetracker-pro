@@ -5,7 +5,7 @@ import { useStore } from '../context/Store';
 import { useDialog } from './ui/DialogProvider';
 import { getCurrencySymbol } from '../utils/currency';
 import { parseCsvLine, normaliseDate, parseAmount } from '../utils/csv';
-import { cleanMerchantName, guessCategory } from '../utils/merchant';
+import { cleanMerchantName, guessCategory, inferPaymentMethod, learnCategories, noteWithOldMethod } from '../utils/merchant';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -93,6 +93,8 @@ const CSVImportModal: React.FC<CSVImportModalProps> = ({ onClose }) => {
     // Per-CSV duplicate detection (to catch duplicates within the file itself)
     const seenInFile = new Set<string>();
 
+    // How the user has filed merchants before, so new rows follow the same habits.
+    const learned = learnCategories(transactions);
     const knownExpenseCats = new Set(userSettings?.expenseCategories || []);
     const knownIncomeCats  = new Set(userSettings?.incomeCategories  || []);
     const defaultPayment   = userSettings?.paymentMethods?.[0] || 'Cash';
@@ -133,7 +135,7 @@ const CSVImportModal: React.FC<CSVImportModalProps> = ({ onClose }) => {
       let category = (cols[4] || '').trim();
       const known = category && (knownExpenseCats.has(category) || knownIncomeCats.has(category));
       if (!known || category === 'Other') {
-        const guessed = guessCategory(title, type === 'income' ? knownIncomeCats : knownExpenseCats);
+        const guessed = guessCategory(title, type === 'income' ? knownIncomeCats : knownExpenseCats, learned, type === 'income' ? 'income' : 'expense');
         if (guessed) {
           category = guessed;
         } else if (!category) {
@@ -146,13 +148,20 @@ const CSVImportModal: React.FC<CSVImportModalProps> = ({ onClose }) => {
       }
 
       // ── Payment Method ──
-      let paymentMethod = (cols[5] || '').trim();
-      if (!paymentMethod) {
-        paymentMethod = defaultPayment;
+      // Statements often put a note in this column ("Salary credit."), which used
+      // to create a new fake method per note. Unknown values become one of the
+      // user's methods (guessed from the statement text) and move to the note.
+      const methods = userSettings?.paymentMethods || [];
+      const rawMethod = (cols[5] || '').trim();
+      let paymentMethod = rawMethod || defaultPayment;
+      let movedMethod = '';
+      if (rawMethod && methods.length && !methods.some(m => m.toLowerCase() === rawMethod.toLowerCase())) {
+        paymentMethod = inferPaymentMethod(`${rawMethod} ${rawTitle}`, methods);
+        movedMethod = rawMethod;
       }
 
       // ── Note ──
-      const typedNote = (cols[6] || '').trim();
+      const typedNote = movedMethod ? noteWithOldMethod((cols[6] || '').trim(), movedMethod) : (cols[6] || '').trim();
       const note = title !== rawTitle
         ? [typedNote, `Bank ref: ${rawTitle}`].filter(Boolean).join(' · ')
         : typedNote;

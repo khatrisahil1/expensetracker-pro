@@ -16,9 +16,10 @@ import BackupRestoreModal from './BackupRestoreModal';
 import CSVImportModal from './CSVImportModal';
 import { DetailHeader, Group, Row, Switch, rowInputClass } from './settings/SettingsList';
 import { useDialog } from './ui/DialogProvider';
+import AvatarEditor from './AvatarEditor';
+import { celebrate } from '../utils/celebrate';
 import { downloadFile, downloadTransactionsCsv } from '../utils/csv';
 import { toLocalISODate } from '../utils/date';
-import { compressImageFile, AVATAR_MAX_SIDE } from '../utils/image';
 import { requestNotificationPermission } from '../utils/notifications';
 import { NOTIFICATION_TONES, TONE_DESCRIPTIONS, isTone, playTone, type NotificationTone } from '../utils/sounds';
 import { CURRENCIES, getCurrencySymbol } from '../utils/currency';
@@ -68,6 +69,7 @@ const SettingsScreen: React.FC = () => {
   const [isSaving, setIsSaving] = useState(false);
   /** True while App Lock is being turned on or off, so the switch shows a spinner. */
   const [pinBusy, setPinBusy] = useState(false);
+  const [showAvatarEditor, setShowAvatarEditor] = useState(false);
   /** Message inside the PIN keypad, e.g. when the two entries didn't match. */
   const [pinError, setPinError] = useState('');
   const [showBackupModal, setShowBackupModal] = useState(false);
@@ -135,17 +137,16 @@ const SettingsScreen: React.FC = () => {
     }
   };
 
-  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  /** Save from the picture editor ('' removes the picture). */
+  const handleAvatarSave = async (avatar: string) => {
     try {
-      const avatar = await compressImageFile(file, AVATAR_MAX_SIDE);
       setAccountForm(prev => ({ ...prev, avatar }));
       await updateUserSettings({ avatar });
-      showToast('Photo updated');
+      showToast(avatar ? 'Picture updated' : 'Picture removed');
+      if (avatar) celebrate(null, 'hearts', 12);
     } catch (err) {
-      console.error('Avatar upload failed', err);
-      showToast('Could not use that photo', 'error');
+      console.error('Avatar save failed', err);
+      showToast('Could not save the picture', 'error');
     }
   };
 
@@ -265,6 +266,7 @@ const SettingsScreen: React.FC = () => {
       await setAppPin(updated);
       setShowPinSetup(false);
       showToast(wasOn ? 'PIN changed' : 'App Lock is on');
+      celebrate(null, 'confetti', 14);
     } catch (err) {
       setPinError(err instanceof Error ? err.message : 'Could not save the PIN.');
     } finally {
@@ -307,6 +309,10 @@ const SettingsScreen: React.FC = () => {
         return (
           <div className="flex flex-col gap-8 stagger">
             <Group header="Name and details" footer="Your name appears in greetings around the app. The other details are optional and only stored on your account.">
+              <Row label="Profile picture" onClick={() => setShowAvatarEditor(true)}
+                trailing={<span className="size-9 rounded-full overflow-hidden bg-primary/15 text-primary text-xs font-black flex items-center justify-center ring-2 ring-primary/20">
+                  {userSettings?.avatar ? <img src={userSettings.avatar} alt="" className="w-full h-full object-cover" /> : (initials || '?')}
+                </span>} />
               <Row label="Name" trailing={<input aria-label="Name" className={rowInputClass} value={accountForm.name} onChange={e => setAccountForm({ ...accountForm, name: e.target.value })} placeholder="Required" />} />
               <Row label="Email" value={user?.email || '—'} />
               <Row label="Gender" trailing={
@@ -484,8 +490,8 @@ const SettingsScreen: React.FC = () => {
         <div className="pointer-events-none absolute -top-24 -right-20 size-64 rounded-full bg-primary/20 blur-[90px]" aria-hidden="true" />
         <div className="pointer-events-none absolute -bottom-28 -left-16 size-56 rounded-full bg-sky-500/10 blur-[90px]" aria-hidden="true" />
         <div className="relative flex flex-col items-center text-center gap-4">
-          <label className="relative cursor-pointer group animate-pop" title="Change photo">
-            <span className="sr-only">Change profile photo</span>
+          <button type="button" onClick={() => setShowAvatarEditor(true)} className="relative cursor-pointer group animate-pop" title="Edit picture">
+            <span className="sr-only">Edit profile picture</span>
             {/* Gradient ring that slowly turns on hover */}
             <span className="absolute -inset-1 rounded-full bg-[conic-gradient(from_0deg,#2ECC71,#38bdf8,#a78bfa,#2ECC71)] opacity-80 group-hover:animate-[spin_4s_linear_infinite]" aria-hidden="true" />
             <span className="relative block size-24 rounded-full overflow-hidden border-4 border-surface-light dark:border-surface-dark bg-gradient-to-br from-primary/40 to-sky-500/30">
@@ -494,10 +500,13 @@ const SettingsScreen: React.FC = () => {
                 : <span className="w-full h-full flex items-center justify-center text-white text-3xl font-black">{initials || '?'}</span>}
             </span>
             <span className="absolute -bottom-1 -right-1 size-8 rounded-full bg-primary text-[#131811] border-4 border-surface-light dark:border-surface-dark flex items-center justify-center transition-transform group-hover:scale-110">
-              <span className="material-symbols-outlined text-[16px]" aria-hidden="true">photo_camera</span>
+              <span className="material-symbols-outlined text-[16px]" aria-hidden="true">edit</span>
             </span>
-            <input type="file" accept="image/*" className="sr-only" onChange={handleAvatarUpload} />
-          </label>
+          </button>
+          {showAvatarEditor && (
+            <AvatarEditor current={userSettings?.avatar} gender={userSettings?.gender} initials={initials || '?'}
+              onSave={handleAvatarSave} onClose={() => setShowAvatarEditor(false)} />
+          )}
           <div className="flex flex-col gap-1">
             <h2 className="text-2xl md:text-3xl font-black tracking-tight text-text-light-main dark:text-text-dark-main">{displayName}</h2>
             <p className="text-sm font-medium text-text-light-muted dark:text-text-dark-muted">{user?.email || 'Guest'}</p>

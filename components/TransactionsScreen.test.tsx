@@ -10,7 +10,7 @@ const addTransaction = vi.fn();
 // the page's settings effect forever.
 const store = {
   addTransaction,
-  transactions: [],
+  transactions: [] as { id: string; title: string; category: string; type: 'expense' | 'income'; date: string; amount: number }[],
   setViewingTransaction: vi.fn(),
   userSettings: {
     currency: 'INR',
@@ -85,5 +85,27 @@ describe('adding a transaction', () => {
     const { container } = renderPage();
     await fillAndSave(container, '10', '  Tea  ');
     expect(addTransaction.mock.calls[0][0].title).toBe('Tea');
+  });
+});
+
+describe('automatic category', () => {
+  afterEach(() => { store.transactions = []; });
+  const merchantInput = (c: HTMLElement) => c.querySelector('form input[type="text"]') as HTMLInputElement;
+  const categorySelect = (c: HTMLElement) => [...c.querySelectorAll('form select')].find(s => [...(s as HTMLSelectElement).options].some(o => o.value === 'Rent')) as HTMLSelectElement;
+
+  it('picks the category used for that merchant before', () => {
+    store.transactions = [{ id: 'x', title: 'Cafe 31', category: 'Rent', type: 'expense', date: '2026-11-01', amount: 10 }];
+    const { container } = renderPage();
+    fireEvent.change(merchantInput(container), { target: { value: 'Cafe 31' } });
+    expect(categorySelect(container).value).toBe('Rent');
+    expect(screen.getByText('Picked for you')).toBeTruthy();
+  });
+
+  it('stops once the user picks a category themselves', () => {
+    store.transactions = [{ id: 'x', title: 'Cafe 31', category: 'Rent', type: 'expense', date: '2026-11-01', amount: 10 }];
+    const { container } = renderPage();
+    fireEvent.change(categorySelect(container), { target: { value: 'Food' } });
+    fireEvent.change(merchantInput(container), { target: { value: 'Cafe 31' } });
+    expect(categorySelect(container).value).toBe('Food');
   });
 });

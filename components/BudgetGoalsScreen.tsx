@@ -3,6 +3,7 @@
 import React, { useState, useMemo } from 'react';
 import { useStore, SavingsGoal } from '../context/Store';
 import { useDialog } from './ui/DialogProvider';
+import { celebrate } from '../utils/celebrate';
 import { CATEGORY_STYLES, PAYMENT_METHOD_COLORS, FALLBACK_CHART_COLORS } from '../constants/categories';
 import { useFinancialInsight } from '../hooks/useFinancialInsight';
 import { getCurrencySymbol } from '../utils/currency';
@@ -195,6 +196,11 @@ const BudgetGoalsScreen: React.FC = () => {
             return g;
         });
         await updateUserSettings({ savingsGoals: goals });
+        // Coins for every deposit; a bigger burst when the goal is reached.
+        const goal = goals.find(g => g.id === showFundModal.id);
+        const reached = goal && goal.targetAmount > 0 && goal.currentAmount >= goal.targetAmount && goal.currentAmount - amount < goal.targetAmount;
+        celebrate(null, reached ? 'confetti' : 'coins', reached ? 40 : 16);
+        if (reached) dialog.toast(`Goal reached: ${goal!.name} 🎉`);
         setShowFundModal(null);
         setFundAmount('');
     };

@@ -22,7 +22,7 @@ vi.mock('../context/Store', () => ({ useStore: () => store }));
 const stub = (label: string) => () => <div>{label}</div>;
 vi.mock('../components/LoginScreen', () => ({ default: stub('LOGIN PAGE') }));
 vi.mock('../components/OnboardingScreen', () => ({ default: stub('ONBOARDING PAGE') }));
-vi.mock('../components/LoadingScreen', () => ({ LoadingScreen: stub('LOADING') }));
+vi.mock('../components/LoadingScreen', () => ({ LoadingScreen: stub('LOADING'), PageLoader: stub('PAGE LOADING') }));
 vi.mock('../components/PinLockScreen', () => ({ PinLockScreen: stub('PIN LOCK') }));
 vi.mock('../components/AppLayout', () => ({ default: () => <Outlet /> }));
 vi.mock('../components/DashboardScreen', () => ({ default: stub('DASHBOARD PAGE') }));

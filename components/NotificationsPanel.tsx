@@ -108,7 +108,7 @@ const NotificationsPanel: React.FC<{ onClose: () => void }> = ({ onClose }) => {
           {groups.length === 0 ? (
             <div className="flex-1 flex flex-col items-center justify-center text-center gap-2 animate-fade-in">
               <span className="size-16 rounded-full bg-gray-100 dark:bg-white/5 flex items-center justify-center text-text-light-muted animate-pop">
-                <span className="material-symbols-outlined text-3xl" aria-hidden="true">{filter === 'unread' ? 'mark_email_read' : 'notifications_off'}</span>
+                <span className="material-symbols-outlined text-3xl animate-float" aria-hidden="true">{filter === 'unread' ? 'mark_email_read' : 'notifications_off'}</span>
               </span>
               <p className="font-bold text-text-light-main dark:text-text-dark-main">{filter === 'unread' ? 'You’re all caught up' : 'No notifications yet'}</p>
               <p className="text-xs text-text-light-muted max-w-[220px]">{filter === 'unread' ? 'Nothing unread right now.' : 'Budget alerts, reminders and summaries will show up here.'}</p>

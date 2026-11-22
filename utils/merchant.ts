@@ -69,12 +69,49 @@ const CATEGORY_KEYWORDS: Record<string, string[]> = {
   Rent: ['rent', 'nobroker', 'housing'],
 };
 
+/** Key used to recognise the same merchant across rows: the tidy name, lowercased, single-spaced. */
+export const merchantKey = (title: string) => cleanMerchantName(title).toLowerCase().replace(/\s+/g, ' ').trim();
+
+/** Categories learned from the user's own history: merchant key → category. */
+export type LearnedCategories = Map<string, string>;
+
+/**
+ * Learn categories from how the user has already filed things. For each
+ * merchant, the category used most often (ignoring "Other") wins. So once
+ * "Cafe 31" has been put in Food, other "Cafe 31" rows can follow.
+ */
+export function learnCategories(transactions: { title: string; category: string; type: 'income' | 'expense' }[]): LearnedCategories {
+  const counts = new Map<string, Map<string, number>>();
+  for (const t of transactions) {
+    if (!t.category || t.category === 'Other') continue;
+    const key = `${t.type}|${merchantKey(t.title)}`;
+    if (key.endsWith('|')) continue;
+    const perCat = counts.get(key) ?? new Map<string, number>();
+    perCat.set(t.category, (perCat.get(t.category) ?? 0) + 1);
+    counts.set(key, perCat);
+  }
+  const learned: LearnedCategories = new Map();
+  for (const [key, perCat] of counts) {
+    const [best] = [...perCat.entries()].sort((a, b) => b[1] - a[1]);
+    learned.set(key, best[0]);
+  }
+  return learned;
+}
+
 /**
  * Guess a category from a merchant name, limited to `allowed` (the user's own
- * categories). Returns null when nothing matches.
+ * categories). The user's own history comes first, then the keyword list.
+ * Returns null when nothing matches.
  */
-export function guessCategory(name: string, allowed: Iterable<string>): string | null {
+export function guessCategory(
+  name: string,
+  allowed: Iterable<string>,
+  learned?: LearnedCategories,
+  type: 'income' | 'expense' = 'expense',
+): string | null {
   const allowedSet = new Set(allowed);
+  const fromHistory = learned?.get(`${type}|${merchantKey(name)}`);
+  if (fromHistory && allowedSet.has(fromHistory)) return fromHistory;
   const lower = ` ${name.toLowerCase().replace(/[^\p{L}\p{N} ]/gu, ' ')} `;
   for (const [category, words] of Object.entries(CATEGORY_KEYWORDS)) {
     if (!allowedSet.has(category)) continue;
@@ -94,7 +131,7 @@ export interface TidyUp {
   note: string;
 }
 
-interface TidyInput { id: string; title: string; category: string; type: 'income' | 'expense'; note?: string }
+interface TidyInput { id: string; title: string; category: string; type: 'income' | 'expense'; note?: string; paymentMethod?: string }
 
 /**
  * Suggestions for saved transactions: readable names for bank narrations, and a
@@ -107,12 +144,13 @@ export function suggestTidyUps(
   expenseCategories: string[],
   incomeCategories: string[],
 ): TidyUp[] {
+  const learned = learnCategories(transactions);
   const out: TidyUp[] = [];
   for (const t of transactions) {
     const title = cleanMerchantName(t.title);
     const allowed = t.type === 'income' ? incomeCategories : expenseCategories;
     const needsCategory = t.category === 'Other' || !allowed.includes(t.category);
-    const category = needsCategory ? guessCategory(title, allowed) ?? t.category : t.category;
+    const category = needsCategory ? guessCategory(title, allowed, learned, t.type) ?? t.category : t.category;
     if (title === t.title && category === t.category) continue;
     const note = title !== t.title
       ? [t.note, `Bank ref: ${t.title}`].filter(Boolean).join(' · ')
@@ -121,3 +159,55 @@ export function suggestTidyUps(
   }
   return out;
 }
+
+/** Rows whose payment method isn't one of the user's, grouped by that value. */
+export interface MethodFix {
+  /** The value found in the Method column, e.g. "Salary credit." */
+  value: string;
+  ids: string[];
+  /** Best guess among the user's methods, from the statement text. */
+  suggested: string;
+}
+
+/**
+ * Pick one of the user's payment methods from a row's text. Bank narrations
+ * say how the money moved: "UPI/…" → UPI, "POS …" → a card, NEFT/IMPS/salary
+ * → the bank account. Falls back to the user's first method.
+ */
+export function inferPaymentMethod(text: string, methods: string[]): string {
+  const find = (re: RegExp) => methods.find(m => re.test(m));
+  const t = text.toUpperCase();
+  if (/\bUPI\b|@[A-Z]{2,}/.test(t)) return find(/upi/i) ?? methods[0];
+  if (/\bPOS\b|\bCARD\b|X{4,}\d{4}/.test(t)) return find(/card|credit|debit/i) ?? find(/bank|sav|acc/i) ?? methods[0];
+  if (/\b(NEFT|IMPS|RTGS|ACH|ATM|SALARY|INTEREST)\b/.test(t)) return find(/bank|sav|acc/i) ?? methods[0];
+  if (/\bCASH\b/.test(t)) return find(/cash/i) ?? methods[0];
+  return methods[0];
+}
+
+/**
+ * Imported statements sometimes put a note in the Method column ("Salary
+ * credit.", "Groceries/household purchase."), creating dozens of fake payment
+ * methods. Group those rows by value and suggest a real method for each group
+ * (the most common guess among its rows).
+ */
+export function suggestMethodFixes(transactions: TidyInput[], methods: string[]): MethodFix[] {
+  if (methods.length === 0) return [];
+  const known = new Set(methods.map(m => m.toLowerCase()));
+  const groups = new Map<string, { value: string; ids: string[]; votes: Map<string, number> }>();
+  for (const t of transactions) {
+    const value = (t.paymentMethod || '').trim();
+    if (!value || known.has(value.toLowerCase())) continue;
+    const g = groups.get(value) ?? { value, ids: [], votes: new Map() };
+    g.ids.push(t.id);
+    const guess = inferPaymentMethod(`${value} ${t.title} ${t.note ?? ''}`, methods);
+    g.votes.set(guess, (g.votes.get(guess) ?? 0) + 1);
+    groups.set(value, g);
+  }
+  return [...groups.values()]
+    .map(g => ({ value: g.value, ids: g.ids, suggested: [...g.votes.entries()].sort((a, b) => b[1] - a[1])[0][0] }))
+    .sort((a, b) => b.ids.length - a.ids.length);
+}
+
+/** The note to save when a row's fake method is replaced: keep the old text. */
+export const noteWithOldMethod = (note: string | undefined, oldMethod: string) =>
+  [oldMethod.replace(/\.$/, ''), note].filter(Boolean).join(' · ');

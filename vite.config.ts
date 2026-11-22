@@ -3,6 +3,39 @@ import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 import basicSsl from '@vitejs/plugin-basic-ssl';
+import type { Plugin } from 'vite';
+
+/**
+ * Dev only: answer the old service-worker URLs (/sw.js, /dev-sw.js) with a
+ * worker that removes itself. Browsers that registered one of the old workers
+ * (a phone on the Wi-Fi URL, say) fetch it on their next update check, and it
+ * unregisters, clears its caches and reloads the page, instead of serving a
+ * stale "You're offline" page for ever.
+ */
+const retireOldServiceWorkers = (): Plugin => ({
+  name: 'retire-old-service-workers',
+  apply: 'serve',
+  configureServer(server) {
+    const killSwitch = `
+      self.addEventListener('install', () => self.skipWaiting());
+      self.addEventListener('activate', (event) => {
+        event.waitUntil((async () => {
+          await self.registration.unregister();
+          const keys = await caches.keys();
+          await Promise.all(keys.map((k) => caches.delete(k)));
+          const clients = await self.clients.matchAll({ type: 'window' });
+          clients.forEach((c) => c.navigate(c.url));
+        })());
+      });`;
+    server.middlewares.use((req, res, next) => {
+      const path = (req.url || '').split('?')[0];
+      if (path !== '/sw.js' && path !== '/dev-sw.js') return next();
+      res.setHeader('Content-Type', 'application/javascript');
+      res.setHeader('Cache-Control', 'no-store');
+      res.end(killSwitch);
+    });
+  },
+});
 
 export default defineConfig(({ mode }) => {
     const env = loadEnv(mode, '.', '');
@@ -19,12 +52,16 @@ export default defineConfig(({ mode }) => {
       plugins: [
         react(),
         ...(phone ? [basicSsl()] : []),
+        retireOldServiceWorkers(),
 
         VitePWA({
             registerType: 'autoUpdate',
 
+            // No service worker in `npm run dev`: it cached dev pages and kept
+            // serving them (or an offline page) after the code or server changed.
+            // Offline support is tested with `npm run build && npm run preview`.
             devOptions: {
-              enabled: true,
+              enabled: false,
             },
 
             includeAssets: [
@@ -51,19 +88,8 @@ export default defineConfig(({ mode }) => {
                   },
                 },
 
-                // Firestore background sync
-                {
-                  urlPattern: /firestore.googleapis.com/,
-                  handler: 'NetworkOnly',
-                  options: {
-                    backgroundSync: {
-                      name: 'expense-sync',
-                      options: {
-                        maxRetentionTime: 24 * 60, // minutes
-                      },
-                    },
-                  },
-                },
+                // Firestore isn't cached here: the Firestore SDK keeps its own
+                // offline cache and queues writes until the connection returns.
               ],
             },
 

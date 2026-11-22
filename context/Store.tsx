@@ -38,6 +38,7 @@ import { DEFAULT_EXPENSE_CATEGORIES, DEFAULT_INCOME_CATEGORIES, DEFAULT_PAYMENT_
 import { toLocalISODate, addInterval } from '../utils/date';
 import { STORAGE_KEYS, UNDO_WINDOW_MS, MAX_STORED_NOTIFICATIONS } from '../constants/app';
 import { playTone } from '../utils/sounds';
+import { settleWrite } from '../utils/offline';
 
 // --- SECURITY HELPERS ---
 /** SHA-256 hash a string using the Web Crypto API. Returns a lowercase hex digest. */
@@ -88,6 +89,7 @@ const createDb = () => {
   }
 };
 const db = createDb();
+
 
 // --- TYPE DEFINITIONS ---
 export interface RecurrenceRule {
@@ -207,6 +209,8 @@ export interface OnboardingData {
   /** Monthly expense limit. */
   budget: number;
   goal: NonNullable<UserSettings['financialGoal']>;
+  /** Profile picture chosen during setup (data URL), if any. */
+  avatar?: string;
 }
 
 interface UndoState {
@@ -328,7 +332,7 @@ const deleteInBatches = async (refs: DocumentReference[]) => {
   for (let i = 0; i < refs.length; i += 450) {
     const batch = writeBatch(db);
     refs.slice(i, i + 450).forEach(ref => batch.delete(ref));
-    await batch.commit();
+    await settleWrite(batch.commit());
   }
 };
 
@@ -714,7 +718,7 @@ export const StoreProvider = ({ children }: PropsWithChildren) => {
   const updateUserSettings = async (settings: Partial<UserSettings>) => {
     if (isDemo) { setUserSettings(prev => prev ? ({...prev, ...settings}) : null); return; }
     if(!user) return;
-    await setDoc(doc(db, 'users', user.uid), settings, { merge: true });
+    await settleWrite(setDoc(doc(db, 'users', user.uid), settings, { merge: true }));
   };
 
   const completeOnboarding = async (data: OnboardingData) => {
@@ -722,6 +726,7 @@ export const StoreProvider = ({ children }: PropsWithChildren) => {
       displayName: data.name, age: data.age, gender: data.gender, currency: data.currency,
       monthlyIncomeGoal: data.income, monthlyExpenseLimit: data.budget,
       financialGoal: data.goal, hasCompletedOnboarding: true,
+      ...(data.avatar ? { avatar: data.avatar } : {}),
       notificationPrefs: {
         dailyCheckIn: true,
         budgetThresholds: true,
@@ -741,13 +746,13 @@ export const StoreProvider = ({ children }: PropsWithChildren) => {
 
   const updateWidgetOrder = async (newOrder: string[]) => {
     setWidgetOrder(newOrder);
-    if (user && !isDemo) await setDoc(doc(db, 'users', user.uid), { widgetOrder: newOrder }, { merge: true });
+    if (user && !isDemo) await settleWrite(setDoc(doc(db, 'users', user.uid), { widgetOrder: newOrder }, { merge: true }));
   };
 
   const toggleWidget = async (key: string) => {
     const newWidgets = { ...widgets, [key]: !widgets[key] };
     setWidgets(newWidgets);
-    if (user && !isDemo) await setDoc(doc(db, 'users', user.uid), { widgets: newWidgets }, { merge: true });
+    if (user && !isDemo) await settleWrite(setDoc(doc(db, 'users', user.uid), { widgets: newWidgets }, { merge: true }));
   };
 
   // --- BIO & LOCK ---
@@ -825,10 +830,10 @@ export const StoreProvider = ({ children }: PropsWithChildren) => {
       // 2. Persist to backend
       if (user && !isDemo) {
           try {
-              await updateDoc(doc(db, 'users', user.uid), {
+              await settleWrite(updateDoc(doc(db, 'users', user.uid), {
                   appPin: deleteField(),
                   biometricEnabled: false
-              });
+              }));
           } catch (e) {
               console.error("Failed to remove PIN from DB", e);
           }
@@ -867,7 +872,7 @@ export const StoreProvider = ({ children }: PropsWithChildren) => {
       setTransactions(prev => [{ ...tx, id: crypto.randomUUID(), userId: user.uid, createdAt: nowStamp() }, ...prev]);
       return;
     }
-    await addDoc(collection(db, 'transactions'), { ...tx, userId: user.uid, createdAt: Timestamp.now() });
+    await settleWrite(addDoc(collection(db, 'transactions'), { ...tx, userId: user.uid, createdAt: Timestamp.now() }));
   };
 
   const deleteTransaction = async (id: string) => {
@@ -875,7 +880,7 @@ export const StoreProvider = ({ children }: PropsWithChildren) => {
     // Ownership guard: only delete if this transaction belongs to the current user
     if (!transactions.some(t => t.id === id)) return;
     if (isDemo) { setTransactions(prev => prev.filter(t => t.id !== id)); return; }
-    await deleteDoc(doc(db, 'transactions', id));
+    await settleWrite(deleteDoc(doc(db, 'transactions', id)));
   };
 
   // The duplicate check reads a ref, not the state updater, so the tone plays
@@ -931,7 +936,7 @@ export const StoreProvider = ({ children }: PropsWithChildren) => {
     const withRemovals = Object.fromEntries(
       Object.entries(fields).map(([key, value]) => [key, value === undefined ? deleteField() : value])
     );
-    await setDoc(doc(db, 'transactions', id), { ...withRemovals, userId: user.uid }, { merge: true });
+    await settleWrite(setDoc(doc(db, 'transactions', id), { ...withRemovals, userId: user.uid }, { merge: true }));
   };
 
   const restoreTransaction = async (tx: Transaction) => {
@@ -940,7 +945,7 @@ export const StoreProvider = ({ children }: PropsWithChildren) => {
     if (tx.userId !== user.uid) return;
     if (isDemo) { setTransactions(prev => [tx, ...prev.filter(t => t.id !== tx.id)]); return; }
     const { id, ...data } = tx;
-    await setDoc(doc(db, 'transactions', id), data);
+    await settleWrite(setDoc(doc(db, 'transactions', id), data));
   };
 
   const showUndo = (tx: Transaction) => {
@@ -960,7 +965,7 @@ export const StoreProvider = ({ children }: PropsWithChildren) => {
       setImpulseItems(prev => [{ ...item, id: crypto.randomUUID(), userId: user.uid }, ...prev]);
       return;
     }
-    await addDoc(collection(db, 'impulse_items'), { ...item, userId: user.uid });
+    await settleWrite(addDoc(collection(db, 'impulse_items'), { ...item, userId: user.uid }));
   };
 
   const deleteImpulseItem = async (id: string, resisted: boolean = false) => {
@@ -973,9 +978,9 @@ export const StoreProvider = ({ children }: PropsWithChildren) => {
     }
     if (resisted && item) {
       // increment() is atomic, so two devices resisting at once both count.
-      await setDoc(doc(db, 'users', user.uid), { realizedSavings: increment(item.price) }, { merge: true });
+      await settleWrite(setDoc(doc(db, 'users', user.uid), { realizedSavings: increment(item.price) }, { merge: true }));
     }
-    await deleteDoc(doc(db, 'impulse_items', id));
+    await settleWrite(deleteDoc(doc(db, 'impulse_items', id)));
   };
 
   // --- AI ---
@@ -1079,15 +1084,15 @@ Respond with JSON only.`;
         // one per launch, stopping at the rule's end date.
         let next = nextOccurrence!;
         while (next <= today && (!rule.endDate || next <= rule.endDate)) {
-          await addDoc(collection(db, 'transactions'), {
+          await settleWrite(addDoc(collection(db, 'transactions'), {
             ...txData,
             date: next,
             userId: user.uid,
             createdAt: Timestamp.now(),
-          });
+          }));
           next = addInterval(next, rule.frequency, rule.interval || 1);
         }
-        await updateDoc(doc(db, 'transactions', template.id), { nextOccurrence: next });
+        await settleWrite(updateDoc(doc(db, 'transactions', template.id), { nextOccurrence: next }));
       }
     } finally {
       recurringProcessingRef.current = false;
@@ -1121,7 +1126,7 @@ Respond with JSON only.`;
     if (data.userSettings) {
       batch.set(doc(db, 'users', user.uid), { ...data.userSettings }, { merge: true });
     }
-    await batch.commit();
+    await settleWrite(batch.commit());
   };
 
   return (

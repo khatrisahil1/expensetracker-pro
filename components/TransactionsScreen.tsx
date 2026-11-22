@@ -1,6 +1,6 @@
 // Transactions page (/transactions): add a transaction by hand or by scanning a
 // receipt with the camera (Gemini fills in the fields), plus recent activity.
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { createGeminiClient, GEMINI_MODEL } from '../utils/gemini';
 import { extractJsonObject } from '../utils/json';
 import { compressDataUrl, drawScaledJpeg, RECEIPT_MAX_SIDE } from '../utils/image';
@@ -11,6 +11,8 @@ import { ROUTES } from '../routes';
 import { CATEGORY_STYLES } from '../constants/categories';
 import { getCurrencySymbol } from '../utils/currency';
 import { formatDisplayDate, toLocalISODate } from '../utils/date';
+import { guessCategory, learnCategories } from '../utils/merchant';
+import { celebrate } from '../utils/celebrate';
 import { formatMoney } from '../utils/format';
 
 
@@ -44,6 +46,29 @@ export const TransactionsScreen: React.FC = () => {
     isSubscription: false,
     subscriptionFrequency: 'monthly' as 'monthly' | 'yearly' | 'weekly'
   });
+
+  // --- Automatic category ---
+  // As a merchant is typed, pick the category the user filed that merchant
+  // under before (or one its name clearly suggests). Stops as soon as the user
+  // picks a category themselves, until the form is cleared.
+  const learned = useMemo(() => learnCategories(transactions), [transactions]);
+  const categoryTouched = useRef(false);
+  const [autoCategory, setAutoCategory] = useState<string | null>(null);
+  const pickCategory = (category: string) => {
+    categoryTouched.current = true;
+    setAutoCategory(null);
+    setFormData(prev => ({ ...prev, category }));
+  };
+  const handleMerchantChange = (merchant: string) => {
+    if (categoryTouched.current || merchant.trim().length < 2) {
+      setFormData(prev => ({ ...prev, merchant }));
+      return;
+    }
+    const allowed = formData.type === 'income' ? userSettings?.incomeCategories || [] : userSettings?.expenseCategories || [];
+    const guess = guessCategory(merchant, allowed, learned, formData.type);
+    setAutoCategory(guess);
+    setFormData(prev => (guess ? { ...prev, merchant, category: guess } : { ...prev, merchant }));
+  };
 
   // Newest by transaction date (the store's order is by when rows were created).
   const recentTransactions = [...transactions].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 10);
@@ -196,8 +221,16 @@ export const TransactionsScreen: React.FC = () => {
         ...(previewImage ? { attachment: previewImage } : {}),
       });
       setFormData(prev => ({ ...prev, amount: '', merchant: '', notes: '', isSubscription: false }));
+      categoryTouched.current = false;
+      setAutoCategory(null);
       setPreviewImage(null);
-      setSaveStatus({ kind: 'success', message: `Saved "${formData.merchant.trim()}".` });
+      celebrate(null, formData.type === 'income' ? 'coins' : 'confetti');
+      setSaveStatus({
+        kind: 'success',
+        message: navigator.onLine
+          ? `Saved "${formData.merchant.trim()}".`
+          : `Saved "${formData.merchant.trim()}" on this device. It will sync when you’re back online.`,
+      });
     } catch (err: any) {
       // Previously an error here was swallowed and the form just sat there.
       console.error('Saving transaction failed', err);
@@ -252,7 +285,7 @@ export const TransactionsScreen: React.FC = () => {
                   <label className="text-[10px] font-black uppercase tracking-widest text-text-light-muted">Quick Category</label>
                   <div className="flex flex-wrap gap-2">
                     {userSettings?.expenseCategories.slice(0, 4).map(cat => (
-                      <button key={cat} type="button" onClick={() => setFormData({...formData, category: cat})} className={`flex items-center gap-2 px-5 py-2.5 rounded-full border text-sm font-bold transition-all ${formData.category === cat ? 'bg-primary border-primary text-[#131811] shadow-glow' : 'bg-transparent border-border-light dark:border-border-dark text-text-light-muted hover:border-primary/50'}`}>
+                      <button key={cat} type="button" onClick={() => pickCategory(cat)} className={`flex items-center gap-2 px-5 py-2.5 rounded-full border text-sm font-bold transition-all ${formData.category === cat ? 'bg-primary border-primary text-[#131811] shadow-glow' : 'bg-transparent border-border-light dark:border-border-dark text-text-light-muted hover:border-primary/50'}`}>
                         <span className="material-symbols-outlined text-[18px]">{CATEGORY_STYLES[cat]?.icon || 'label'}</span>{cat}
                       </button>
                     ))}
@@ -267,7 +300,7 @@ export const TransactionsScreen: React.FC = () => {
                     {formData.type === 'income' ? 'Sender' : 'Merchant'}
                   </label>
                   <div className="relative group">
-                    <input type="text" value={formData.merchant} onChange={(e) => setFormData({...formData, merchant: e.target.value})} className="w-full bg-gray-50 dark:bg-surface-darker border border-border-light dark:border-border-dark rounded-2xl p-4 text-sm font-bold focus:border-primary outline-none transition-all pr-14" placeholder={formData.type === 'income' ? 'e.g. Employer, Client' : 'e.g. Starbucks, Amazon'} />
+                    <input type="text" value={formData.merchant} onChange={(e) => handleMerchantChange(e.target.value)} className="w-full bg-gray-50 dark:bg-surface-darker border border-border-light dark:border-border-dark rounded-2xl p-4 text-sm font-bold focus:border-primary outline-none transition-all pr-14" placeholder={formData.type === 'income' ? 'e.g. Employer, Client' : 'e.g. Starbucks, Amazon'} />
                     <button type="button" onClick={startCamera} className="absolute right-2 top-1/2 -translate-y-1/2 size-10 flex items-center justify-center text-primary hover:bg-primary/10 rounded-xl transition-all"><span className="material-symbols-outlined text-[22px]">qr_code_scanner</span></button>
                   </div>
                 </div>
@@ -276,8 +309,15 @@ export const TransactionsScreen: React.FC = () => {
                   <input type="date" value={formData.date} onChange={(e) => setFormData({...formData, date: e.target.value})} className="w-full bg-gray-50 dark:bg-surface-darker border border-border-light dark:border-border-dark rounded-2xl p-4 text-sm font-bold focus:border-primary outline-none transition-all" style={{colorScheme: 'dark'}} />
                 </div>
                 <div className="flex flex-col gap-2">
-                  <label className="text-[10px] font-black uppercase tracking-widest text-text-light-muted">Category</label>
-                  <select value={formData.category} onChange={(e) => setFormData({...formData, category: e.target.value})} className="w-full bg-gray-50 dark:bg-surface-darker border border-border-light dark:border-border-dark rounded-2xl p-4 text-sm font-bold focus:border-primary outline-none transition-all appearance-none cursor-pointer">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-text-light-muted flex items-center gap-2">
+                    Category
+                    {autoCategory && (
+                      <span className="normal-case tracking-normal text-[11px] font-bold text-primary flex items-center gap-1 animate-fade-in">
+                        <span className="material-symbols-outlined text-[14px]" aria-hidden="true">auto_awesome</span>Picked for you
+                      </span>
+                    )}
+                  </label>
+                  <select value={formData.category} onChange={(e) => pickCategory(e.target.value)} className="w-full bg-gray-50 dark:bg-surface-darker border border-border-light dark:border-border-dark rounded-2xl p-4 text-sm font-bold focus:border-primary outline-none transition-all appearance-none cursor-pointer">
                     {(formData.type === 'income' ? userSettings?.incomeCategories : userSettings?.expenseCategories)?.map(c => <option key={c} value={c}>{c}</option>)}
                   </select>
                 </div>
@@ -344,7 +384,8 @@ export const TransactionsScreen: React.FC = () => {
                 {isProcessing ? 'SCANNING...' : isSaving ? 'SAVING...' : 'SAVE TRANSACTION'}
               </button>
               {saveStatus && (
-                <p role="status" className={`-mt-6 text-center text-sm font-bold ${saveStatus.kind === 'success' ? 'text-primary' : 'text-danger'}`}>
+                <p role="status" key={saveStatus.message} className={`-mt-6 flex items-center justify-center gap-1.5 text-center text-sm font-bold animate-fade-in ${saveStatus.kind === 'success' ? 'text-primary' : 'text-danger'}`}>
+                  <span className={`material-symbols-outlined text-[18px] ${saveStatus.kind === 'success' ? 'animate-pop' : 'animate-shake'}`} aria-hidden="true">{saveStatus.kind === 'success' ? 'check_circle' : 'error'}</span>
                   {saveStatus.message}
                 </p>
               )}

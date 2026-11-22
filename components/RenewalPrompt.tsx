@@ -7,6 +7,7 @@ import { findMissedRenewals, renewalTransaction, type MissedRenewal } from '../u
 import { formatDisplayDate } from '../utils/date';
 import { getCurrencySymbol } from '../utils/currency';
 import { formatMoney } from '../utils/format';
+import { celebrate } from '../utils/celebrate';
 
 /** Subscriptions dismissed with "Later" stay hidden until the page is reloaded. */
 const dismissedThisSession = new Set<string>();
@@ -35,6 +36,7 @@ const RenewalPrompt: React.FC = () => {
     try {
       if (book) {
         for (const date of renewal.dueDates) await addTransaction(renewalTransaction(renewal.subscription, date));
+        celebrate(null, 'coins', 12);
       }
       await updateTransaction(renewal.subscription.id, { nextRenewalDate: renewal.nextRenewalDate });
     } catch (err) {

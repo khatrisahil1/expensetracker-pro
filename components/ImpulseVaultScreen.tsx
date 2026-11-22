@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useStore, ImpulseItem } from '../context/Store';
 import { useDialog } from './ui/DialogProvider';
+import { celebrate } from '../utils/celebrate';
 import { createGeminiClient, GEMINI_MODEL } from '../utils/gemini';
 import { extractJsonObject } from '../utils/json';
 import { getCurrencySymbol } from '../utils/currency';
@@ -155,6 +156,8 @@ const ImpulseVaultScreen: React.FC = () => {
   };
 
   const handleDelete = async (id: string, price: number) => {
+      celebrate(null, 'hearts');
+      dialog.toast(`Nice! ${getCurrencySymbol(userSettings?.currency)}${price.toLocaleString()} stays in your pocket`);
       await deleteImpulseItem(id, true); // true = resisted impulse
   };
 
