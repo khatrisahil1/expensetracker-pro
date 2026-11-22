@@ -2,7 +2,7 @@
 
 > **Start here.** This guide explains what the app does, how the code is organised, how data moves, and what has been changed and why. Sections are collapsible. Click a ▸ to open one. Diagrams render on GitHub, in VS Code (with a Mermaid preview extension) and in most Markdown viewers.
 
-**Last updated:** 23 Nov 2026 (CI, Wrapped, shortcuts, light mode, a11y, speed, Split Bill, push) · **Branch:** `improve/review-fixes-and-ux`
+**Version:** 3.0.0 · **Last updated:** 22 Nov 2026 · **Branch:** `main` · **Live:** https://expensetracker-pro-35f24.web.app
 
 ---
 
@@ -653,6 +653,19 @@ Your store mock creates new objects on every render. Use one stable object (see 
 ---
 
 ## 13. Work log
+
+<details open>
+<summary><b>🏷️ Version 3.0.0 — 22 Nov 2026</b> (tag <code>v3.0.0</code>, PRs #1–#5)</summary>
+
+Everything below, released together:
+- Offline-safe saving, real routing with guards, light mode, screen-reader fixes, ~30% faster startup, CI.
+- New: Monthly Wrapped, Split bills (now a phone tab), home-screen shortcuts, profile picture editor, smart categories, push notifications (client side).
+- Premium login with a live preview card and a 3-step sign-up; haptics; trackpad pull-to-refresh; polished splash.
+- Firestore security rules deployed; hosting cache fixed; the app picks up new deploys automatically.
+- Firebase SDK 12.19. The version shown in Settings now comes from `package.json`.
+
+**Releasing next time:** bump `"version"` in package.json (`npm version x.y.z --no-git-tag-version`), merge, tag `vX.Y.Z` on `main`, `gh release create`, then `npm run build && npx firebase deploy --only hosting`.
+</details>
 
 <details>
 <summary><b>Commit <code>0d74f43</code> — fixes, routing and UX overhaul</b></summary>
