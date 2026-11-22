@@ -116,7 +116,7 @@ const Sidebar: React.FC<SidebarProps> = ({
         <nav className="fixed bottom-0 left-0 right-0 z-50 lg:hidden">
           <div className="  bg-white dark:bg-surface-darker
                   border border-border-light dark:border-border-dark shadow-l
-                  grid grid-cols-5 items-center py-3">
+                  grid items-center py-3" style={{ gridTemplateColumns: `repeat(${MOBILE_NAV_ITEMS.length}, minmax(0, 1fr))` }}>
             {MOBILE_NAV_ITEMS.map(item => (
               <NavLink
                 key={item.to}

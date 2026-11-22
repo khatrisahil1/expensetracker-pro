@@ -39,9 +39,8 @@ export const NAV_ITEMS: NavItem[] = [
 
 /** Bottom bar on phones: a subset of NAV_ITEMS plus the profile/settings page. */
 export const MOBILE_NAV_ITEMS: NavItem[] = [
-  // Vault and Split bills are reached from the pages themselves on phones,
-  // keeping the bar to five tabs.
-  ...NAV_ITEMS.filter(item => item.to !== ROUTES.VAULT && item.to !== ROUTES.SPLIT_BILL),
+  // Vault is linked from the Budget page on phones; everything else gets a tab.
+  ...NAV_ITEMS.filter(item => item.to !== ROUTES.VAULT),
   { to: ROUTES.SETTINGS, label: 'Settings', shortLabel: 'Profile', icon: 'person' },
 ];
 
