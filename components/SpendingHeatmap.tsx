@@ -1,5 +1,8 @@
+// GitHub-style grid of daily spending over the last year (History page, Heatmap tab).
 import React, { useMemo } from 'react';
 import { useStore, Transaction } from '../context/Store';
+import { getCurrencySymbol } from '../utils/currency';
+import { toLocalISODate } from '../utils/date';
 
 interface SpendingHeatmapProps {
   onSelectDate?: (dateStr: string) => void;
@@ -7,7 +10,7 @@ interface SpendingHeatmapProps {
 
 const SpendingHeatmap: React.FC<SpendingHeatmapProps> = ({ onSelectDate }) => {
   const { transactions, userSettings } = useStore();
-  const currencySymbol = userSettings?.currency === 'USD' ? '$' : userSettings?.currency === 'EUR' ? '€' : '₹';
+  const currencySymbol = getCurrencySymbol(userSettings?.currency);
 
   // Generate 52 weeks (364 days) up to today
   const { weeks, dayStatsMap, maxExpense, statsSummary } = useMemo(() => {
@@ -94,7 +97,7 @@ const SpendingHeatmap: React.FC<SpendingHeatmapProps> = ({ onSelectDate }) => {
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h3 className="text-xl font-black text-text-light-main dark:text-text-dark-main flex items-center gap-2">
-            <span className="material-symbols-outlined text-primary">calendar_view_month</span>
+            <span aria-hidden="true" className="material-symbols-outlined text-primary">calendar_view_month</span>
             Spending Heatmap
           </h3>
           <p className="text-xs text-text-light-muted dark:text-text-dark-muted font-medium mt-1">
@@ -149,7 +152,7 @@ const SpendingHeatmap: React.FC<SpendingHeatmapProps> = ({ onSelectDate }) => {
           {weeks.map((week, wIdx) => (
             <div key={wIdx} className="flex flex-col gap-1.5 flex-1">
               {week.map((dateObj) => {
-                const dateStr = dateObj.toISOString().split('T')[0];
+                const dateStr = toLocalISODate(dateObj);
                 const stat = dayStatsMap[dateStr];
                 const exp = stat?.expense || 0;
                 return (

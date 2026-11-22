@@ -1,5 +1,11 @@
+// CSV import dialog with a per-row preview (valid / warning / error) before
+// anything is saved. Opened from the Dashboard, History and Settings. Parsing lives in utils/csv.ts.
 import React, { useState, useRef, useCallback } from 'react';
 import { useStore } from '../context/Store';
+import { useDialog } from './ui/DialogProvider';
+import { getCurrencySymbol } from '../utils/currency';
+import { parseCsvLine, normaliseDate, parseAmount } from '../utils/csv';
+import { cleanMerchantName, guessCategory, inferPaymentMethod, learnCategories, noteWithOldMethod } from '../utils/merchant';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -27,72 +33,6 @@ interface ImportResult {
   skipped: number;
 }
 
-// ─── CSV Parsing Helpers ──────────────────────────────────────────────────────
-
-/** Parse a single RFC-4180 CSV line respecting quoted fields. */
-function parseCsvLine(line: string): string[] {
-  const result: string[] = [];
-  let cur = '';
-  let inQuotes = false;
-
-  for (let i = 0; i < line.length; i++) {
-    const ch = line[i];
-    if (ch === '"') {
-      if (inQuotes && line[i + 1] === '"') {
-        cur += '"';
-        i++; // skip escaped quote
-      } else {
-        inQuotes = !inQuotes;
-      }
-    } else if (ch === ',' && !inQuotes) {
-      result.push(cur.trim());
-      cur = '';
-    } else {
-      cur += ch;
-    }
-  }
-  result.push(cur.trim());
-  return result;
-}
-
-/** Attempt to normalise many date formats to YYYY-MM-DD. Returns null if unparseable. */
-function normaliseDate(raw: string): string | null {
-  const s = raw.trim();
-  if (!s) return null;
-
-  // Already ISO
-  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
-    const d = new Date(s);
-    return isNaN(d.getTime()) ? null : s;
-  }
-  // DD/MM/YYYY or DD-MM-YYYY
-  const dmy = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
-  if (dmy) {
-    const [, d, m, y] = dmy;
-    const dt = new Date(`${y}-${m.padStart(2,'0')}-${d.padStart(2,'0')}`);
-    return isNaN(dt.getTime()) ? null : dt.toISOString().split('T')[0];
-  }
-  // MM/DD/YYYY
-  const mdy = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-  if (mdy) {
-    const [, m, d, y] = mdy;
-    const dt = new Date(`${y}-${m.padStart(2,'0')}-${d.padStart(2,'0')}`);
-    return isNaN(dt.getTime()) ? null : dt.toISOString().split('T')[0];
-  }
-  // Try native Date parsing as last resort (e.g. "19 Jul 2025", epoch ms)
-  const dt = new Date(s);
-  if (!isNaN(dt.getTime())) return dt.toISOString().split('T')[0];
-
-  return null;
-}
-
-/** Strip currency symbols and thousand separators, return a positive float or NaN. */
-function parseAmount(raw: string): number {
-  const cleaned = raw.replace(/[₹$€£¥,\s]/g, '').trim();
-  const n = parseFloat(cleaned);
-  return n;
-}
-
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 interface CSVImportModalProps {
@@ -103,6 +43,7 @@ const VALID_TYPES = ['income', 'expense'];
 
 const CSVImportModal: React.FC<CSVImportModalProps> = ({ onClose }) => {
   const { addTransaction, transactions, userSettings, isDemo } = useStore();
+  const dialog = useDialog();
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -152,6 +93,8 @@ const CSVImportModal: React.FC<CSVImportModalProps> = ({ onClose }) => {
     // Per-CSV duplicate detection (to catch duplicates within the file itself)
     const seenInFile = new Set<string>();
 
+    // How the user has filed merchants before, so new rows follow the same habits.
+    const learned = learnCategories(transactions);
     const knownExpenseCats = new Set(userSettings?.expenseCategories || []);
     const knownIncomeCats  = new Set(userSettings?.incomeCategories  || []);
     const defaultPayment   = userSettings?.paymentMethods?.[0] || 'Cash';
@@ -167,8 +110,11 @@ const CSVImportModal: React.FC<CSVImportModalProps> = ({ onClose }) => {
       if (!date) errors.push(`Invalid date: "${rawDate}"`);
 
       // ── Title ──
-      const title = (cols[1] || '').trim();
-      if (!title) errors.push('Title is required');
+      // Bank narrations ("UPI/Zomato/XXpayu@…") become readable names ("Zomato");
+      // the original text is kept in the note so nothing is lost.
+      const rawTitle = (cols[1] || '').trim();
+      if (!rawTitle) errors.push('Title is required');
+      const title = cleanMerchantName(rawTitle);
 
       // ── Amount ──
       const rawAmount = cols[2] || '';
@@ -184,33 +130,49 @@ const CSVImportModal: React.FC<CSVImportModalProps> = ({ onClose }) => {
       }
 
       // ── Category ──
+      // Blank, unknown or "Other" categories are guessed from the merchant name
+      // when it clearly matches one of the user's categories.
       let category = (cols[4] || '').trim();
-      if (category) {
-        const inExpense = knownExpenseCats.has(category);
-        const inIncome  = knownIncomeCats.has(category);
-        if (!inExpense && !inIncome) {
+      const known = category && (knownExpenseCats.has(category) || knownIncomeCats.has(category));
+      if (!known || category === 'Other') {
+        const guessed = guessCategory(title, type === 'income' ? knownIncomeCats : knownExpenseCats, learned, type === 'income' ? 'income' : 'expense');
+        if (guessed) {
+          category = guessed;
+        } else if (!category) {
+          category = 'Other';
+          warnings.push('Category is blank — defaulted to "Other"');
+        } else if (!known) {
           warnings.push(`Unknown category "${category}" — mapped to "Other"`);
           category = 'Other';
         }
-      } else {
-        category = 'Other';
-        warnings.push('Category is blank — defaulted to "Other"');
       }
 
       // ── Payment Method ──
-      let paymentMethod = (cols[5] || '').trim();
-      if (!paymentMethod) {
-        paymentMethod = defaultPayment;
+      // Statements often put a note in this column ("Salary credit."), which used
+      // to create a new fake method per note. Unknown values become one of the
+      // user's methods (guessed from the statement text) and move to the note.
+      const methods = userSettings?.paymentMethods || [];
+      const rawMethod = (cols[5] || '').trim();
+      let paymentMethod = rawMethod || defaultPayment;
+      let movedMethod = '';
+      if (rawMethod && methods.length && !methods.some(m => m.toLowerCase() === rawMethod.toLowerCase())) {
+        paymentMethod = inferPaymentMethod(`${rawMethod} ${rawTitle}`, methods);
+        movedMethod = rawMethod;
       }
 
       // ── Note ──
-      const note = (cols[6] || '').trim();
+      const typedNote = movedMethod ? noteWithOldMethod((cols[6] || '').trim(), movedMethod) : (cols[6] || '').trim();
+      const note = title !== rawTitle
+        ? [typedNote, `Bank ref: ${rawTitle}`].filter(Boolean).join(' · ')
+        : typedNote;
 
       // ── Duplicate checks (only if row is otherwise valid) ──
       if (errors.length === 0) {
         const dedupKey = `${date}|${title.toLowerCase()}|${amount}`;
+        // Earlier imports stored the raw narration as the title, so check that too.
+        const rawKey = `${date}|${rawTitle.toLowerCase()}|${amount}`;
 
-        if (existingSet.has(dedupKey)) {
+        if (existingSet.has(dedupKey) || existingSet.has(rawKey)) {
           warnings.push('Possible duplicate: same date, title & amount already exists');
         }
         if (seenInFile.has(dedupKey)) {
@@ -245,7 +207,7 @@ const CSVImportModal: React.FC<CSVImportModalProps> = ({ onClose }) => {
   // ── File reading ──────────────────────────────────────────────────────────
   const handleFile = (file: File) => {
     if (!file.name.endsWith('.csv') && file.type !== 'text/csv') {
-      alert('Please select a valid .csv file.');
+      dialog.toast('Choose a .csv file', 'error');
       return;
     }
     setFileName(file.name);
@@ -273,7 +235,7 @@ const CSVImportModal: React.FC<CSVImportModalProps> = ({ onClose }) => {
   // ── Import ────────────────────────────────────────────────────────────────
   const handleImport = async () => {
     if (isDemo) {
-      alert('Import is not available in Demo mode.');
+      dialog.toast('Import isn’t available in Guest mode', 'info');
       return;
     }
     const toImport = rows.filter(r => r.status !== 'error');
@@ -315,7 +277,7 @@ const CSVImportModal: React.FC<CSVImportModalProps> = ({ onClose }) => {
     return r.status === showFilter;
   });
 
-  const currencySymbol = userSettings?.currency === 'USD' ? '$' : userSettings?.currency === 'EUR' ? '€' : '₹';
+  const currencySymbol = getCurrencySymbol(userSettings?.currency);
 
   // ── Status dot helper ─────────────────────────────────────────────────────
   const StatusDot: React.FC<{ status: RowStatus }> = ({ status }) => {
@@ -336,7 +298,7 @@ const CSVImportModal: React.FC<CSVImportModalProps> = ({ onClose }) => {
         <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b border-border-light dark:border-border-dark shrink-0">
           <div className="flex items-center gap-3">
             <div className="size-10 rounded-full bg-primary/10 text-primary flex items-center justify-center shadow-glow">
-              <span className="material-symbols-outlined text-xl">upload_file</span>
+              <span aria-hidden="true" className="material-symbols-outlined text-xl">upload_file</span>
             </div>
             <div>
               <h2 className="text-lg font-black text-text-light-main dark:text-text-dark-main leading-none">Import CSV</h2>
@@ -347,7 +309,7 @@ const CSVImportModal: React.FC<CSVImportModalProps> = ({ onClose }) => {
             onClick={onClose}
             className="size-9 rounded-full flex items-center justify-center text-text-light-muted dark:text-text-dark-muted hover:bg-gray-100 dark:hover:bg-surface-darker hover:text-text-light-main dark:hover:text-text-dark-main transition-colors"
           >
-            <span className="material-symbols-outlined">close</span>
+            <span aria-hidden="true" className="material-symbols-outlined">close</span>
           </button>
         </div>
 
@@ -415,7 +377,7 @@ const CSVImportModal: React.FC<CSVImportModalProps> = ({ onClose }) => {
                     onChange={onFileChange}
                   />
                   <div className={`size-11 rounded-full flex items-center justify-center transition-colors ${isDragging ? 'bg-primary text-[#131811]' : 'bg-gray-100 dark:bg-surface-darker text-text-light-muted dark:text-text-dark-muted'}`}>
-                    <span className="material-symbols-outlined text-xl">upload_file</span>
+                    <span aria-hidden="true" className="material-symbols-outlined text-xl">upload_file</span>
                   </div>
                   <div className="text-center">
                     <p className="font-semibold text-text-light-main dark:text-text-dark-main text-sm">
@@ -438,7 +400,7 @@ const CSVImportModal: React.FC<CSVImportModalProps> = ({ onClose }) => {
               {/* ── Parsing Loader ── */}
               {!isParsed && fileName && rows.length === 0 && (
                 <div className="flex items-center gap-3 text-text-light-muted dark:text-text-dark-muted">
-                  <span className="material-symbols-outlined animate-spin text-primary">sync</span>
+                  <span aria-hidden="true" className="material-symbols-outlined animate-spin text-primary">sync</span>
                   <span className="text-sm">Parsing {fileName}…</span>
                 </div>
               )}
@@ -449,7 +411,7 @@ const CSVImportModal: React.FC<CSVImportModalProps> = ({ onClose }) => {
                   {/* Stats bar */}
                   <div className="flex flex-wrap items-center gap-3">
                     <div className="flex items-center gap-1.5 text-sm font-medium text-text-light-main dark:text-text-dark-main">
-                      <span className="material-symbols-outlined text-base text-primary">table_rows</span>
+                      <span aria-hidden="true" className="material-symbols-outlined text-base text-primary">table_rows</span>
                       <span className="font-bold">{rows.length}</span> rows
                       {fileName && <span className="text-text-light-muted dark:text-text-dark-muted text-xs">· {fileName}</span>}
                     </div>
@@ -482,7 +444,7 @@ const CSVImportModal: React.FC<CSVImportModalProps> = ({ onClose }) => {
                     onClick={() => fileInputRef.current?.click()}
                     className="flex items-center gap-2 text-xs font-bold text-text-light-muted dark:text-text-dark-muted hover:text-primary transition-colors w-fit"
                   >
-                    <span className="material-symbols-outlined text-sm">folder_open</span>
+                    <span aria-hidden="true" className="material-symbols-outlined text-sm">folder_open</span>
                     Choose a different file
                   </button>
                   <input ref={fileInputRef} type="file" accept=".csv,text/csv" className="hidden" onChange={onFileChange} />
@@ -552,7 +514,7 @@ const CSVImportModal: React.FC<CSVImportModalProps> = ({ onClose }) => {
               {/* ── Empty CSV ── */}
               {isParsed && rows.length === 0 && (
                 <div className="flex flex-col items-center justify-center py-10 gap-3 text-text-light-muted dark:text-text-dark-muted">
-                  <span className="material-symbols-outlined text-4xl opacity-40">description</span>
+                  <span aria-hidden="true" className="material-symbols-outlined text-4xl opacity-40">description</span>
                   <p className="text-sm font-bold">No data rows found in this file.</p>
                   <button onClick={() => { setIsParsed(false); setFileName(null); }} className="text-primary text-xs font-bold hover:underline">Try another file</button>
                 </div>
@@ -597,7 +559,7 @@ const CSVImportModal: React.FC<CSVImportModalProps> = ({ onClose }) => {
               disabled={validRows.length === 0}
               className="px-5 py-2.5 rounded-xl bg-primary text-[#131811] text-sm font-bold shadow-glow hover:bg-primary-hover transition-all active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2"
             >
-              <span className="material-symbols-outlined text-lg">upload</span>
+              <span aria-hidden="true" className="material-symbols-outlined text-lg">upload</span>
               Import {validRows.length} Row{validRows.length !== 1 ? 's' : ''}
             </button>
           </div>

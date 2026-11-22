@@ -105,15 +105,50 @@
               },
               pageTransition: {
                 "0%": { opacity: 0, transform: "translateY(12px) scale(0.98)" },
-                "100%": { opacity: 1, transform: "translateY(0) scale(1)" },
+                "100%": { opacity: 1, transform: "none" },
+              },
+              fadeOut: { from: { opacity: 1 }, to: { opacity: 0 } },
+              sheetIn: {
+                from: { opacity: 0, transform: "translateY(24px) scale(0.96)" },
+                to: { opacity: 1, transform: "none" },
+              },
+              sheetOut: {
+                from: { opacity: 1, transform: "none" },
+                to: { opacity: 0, transform: "translateY(16px) scale(0.97)" },
+              },
+              pop: {
+                "0%": { transform: "scale(0.6)", opacity: 0 },
+                "60%": { transform: "scale(1.08)", opacity: 1 },
+                "100%": { transform: "none" },
+              },
+              toastIn: {
+                from: { opacity: 0, transform: "translateY(-12px) scale(0.95)" },
+                to: { opacity: 1, transform: "none" },
+              },
+              shake: {
+                "0%, 100%": { transform: "none" },
+                "20%, 60%": { transform: "translateX(-6px)" },
+                "40%, 80%": { transform: "translateX(6px)" },
               },
             },
             animation: {
               float: "float 6s ease-in-out infinite",
-              "slide-up": "slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards",
-              "slide-left": "slideLeft 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards",
-              "fade-in": "fadeIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards",
-              "page-transition": "pageTransition 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards",
+              // All entrance animations use "backwards": once finished, the element
+              // is back to its own styles with no leftover transform (see below).
+              "slide-up": "slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) backwards",
+              "slide-left": "slideLeft 0.4s cubic-bezier(0.16, 1, 0.3, 1) backwards",
+              "fade-in": "fadeIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) backwards",
+              "fade-out": "fadeOut 0.16s ease-in forwards",
+              "sheet-in": "sheetIn 0.32s cubic-bezier(0.16, 1, 0.3, 1) backwards",
+              "sheet-out": "sheetOut 0.16s ease-in forwards",
+              pop: "pop 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) backwards",
+              "toast-in": "toastIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) backwards",
+              shake: "shake 0.4s ease-in-out",
+              // "backwards", not "forwards": a held last frame keeps a transform
+              // on the page wrapper, which makes it the containing block for
+              // position:fixed and pushed every dialog (goals, import, tidy up)
+              // off-screen. Once the animation ends the wrapper has no transform.
+              "page-transition": "pageTransition 0.35s cubic-bezier(0.16, 1, 0.3, 1) backwards",
             },
           },
         },
@@ -152,26 +187,267 @@ body {
 body.scrolling {
   scrollbar-color: #4f4f4f transparent;
 }
+
+
+/* ===== Boot splash (shown on every load/refresh) =====
+   A piggy bank catches a flipping ₹ coin in its slot (clink!), squishes and hops,
+   over a soft glow that pulses on each clink. Below: wordmark, tagline, slim bar.
+   Plain CSS so it paints before any script runs. The markup lives once, in
+   <template id="boot-template">; index.html stamps it into #boot and
+   LoadingScreen.tsx reuses the same template, so the hand-over is seamless. */
+.boot { position: fixed; inset: 0; z-index: 1000; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px;
+  background: radial-gradient(circle at 50% 45%, rgba(46,204,113,0.14), transparent 55%), #0E1111; color: #e5e7eb;
+  font-family: 'Manrope', system-ui, -apple-system, sans-serif; transition: opacity .4s ease, visibility .4s; }
+.boot.light { background: radial-gradient(circle at 50% 45%, rgba(46,204,113,0.18), transparent 55%), #f6f7f6; color: #111827; }
+.boot.hide { opacity: 0; visibility: hidden; }
+.boot.hide .boot-pig-wrap { transform: scale(1.15); opacity: 0; transition: transform .4s cubic-bezier(.34,1.56,.64,1), opacity .4s; }
+.boot-pig-wrap { position: relative; width: 176px; height: 184px; }
+.boot-pig-wrap svg { width: 100%; height: 100%; overflow: visible; }
+.pb-pig { transform-box: view-box; transform-origin: 112px 160px; animation: pb-squish 2s cubic-bezier(.34,1.56,.64,1) infinite; }
+.pb-shadow { transform-box: view-box; transform-origin: 112px 166px; animation: pb-shadow 2s cubic-bezier(.34,1.56,.64,1) infinite; }
+.pb-coin { transform-box: fill-box; transform-origin: center; animation: pb-drop 2s cubic-bezier(.5,0,.8,.4) infinite; }
+.pb-tail { transform-box: fill-box; transform-origin: right center; animation: pb-tail .8s ease-in-out infinite alternate; }
+.pb-clink { transform-box: fill-box; transform-origin: center bottom; animation: pb-clink 2s ease-out infinite; }
+@keyframes pb-drop {
+  0% { transform: translateY(-40px) scaleX(1); opacity: 0; }
+  8% { opacity: 1; }
+  15% { transform: translateY(-26px) scaleX(.15); }
+  25% { transform: translateY(-12px) scaleX(1); }
+  35% { transform: translateY(4px) scaleX(.15); }
+  44% { transform: translateY(48px) scaleX(1); opacity: 1; }
+  45%, 100% { transform: translateY(48px) scaleX(1); opacity: 0; }
+}
+@keyframes pb-squish { 0%, 42% { transform: none; } 48% { transform: scale(1.07, .9); } 56% { transform: scale(.96, 1.06); } 64% { transform: scale(1.02, .98); } 70% { transform: none; } 78% { transform: translateY(-8px) rotate(-2deg); } 86%, 100% { transform: none; } }
+@keyframes pb-shadow { 0%, 42% { transform: none; opacity: .28; } 48% { transform: scaleX(1.1); opacity: .34; } 78% { transform: scaleX(.82); opacity: .16; } 86%, 100% { transform: none; opacity: .28; } }
+@keyframes pb-tail { from { transform: rotate(-12deg); } to { transform: rotate(16deg); } }
+@keyframes pb-clink { 0%, 43% { transform: scale(.3); opacity: 0; } 48% { transform: scale(1.1); opacity: 1; } 60%, 100% { transform: scale(1.3) translateY(-4px); opacity: 0; } }
+
+.boot-stage { position: relative; display: grid; place-items: center; animation: boot-pop .7s cubic-bezier(.34,1.56,.64,1) both; }
+.boot-glow { position: absolute; width: 230px; height: 230px; border-radius: 999px; top: 50%; left: 50%; translate: -50% -46%;
+  background: radial-gradient(circle, rgba(46,204,113,.22), rgba(46,204,113,0) 65%); animation: boot-glow 2s ease-in-out infinite; }
+.boot-glow::after { content: ""; position: absolute; inset: 34px; border-radius: inherit; border: 1.5px solid rgba(46,204,113,.28); animation: boot-ring 2s ease-out infinite; }
+.boot.light .boot-glow { background: radial-gradient(circle, rgba(46,204,113,.2), rgba(46,204,113,0) 65%); }
+.boot-name { margin: 6px 0 0; font-weight: 800; font-size: 24px; letter-spacing: -0.03em; animation: boot-fade .6s .15s ease-out both; }
+.boot-name b { color: #2ECC71; font-weight: 800; }
+.boot.light .boot-name b { color: #15803d; }
+.boot-tag { margin: -10px 0 0; font-size: 12px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; opacity: .5; animation: boot-fade .6s .3s ease-out both; }
+.boot-bar { position: relative; width: 132px; height: 3px; border-radius: 999px; overflow: hidden; background: rgba(127,127,127,.18); animation: boot-fade .6s .45s ease-out both; }
+.boot-bar::after { content: ""; position: absolute; inset: 0; width: 40%; border-radius: inherit; background: linear-gradient(90deg, transparent, #2ECC71, #7BE3A6, transparent); animation: boot-slide 1.3s cubic-bezier(.65,0,.35,1) infinite; }
+@keyframes boot-slide { from { transform: translateX(-110%); } to { transform: translateX(260%); } }
+@keyframes boot-pop { from { opacity: 0; transform: scale(.85) translateY(10px); } to { opacity: 1; transform: none; } }
+@keyframes boot-glow { 0%, 40%, 100% { opacity: .8; transform: scale(1); } 48% { opacity: 1; transform: scale(1.06); } }
+@keyframes boot-ring { 0%, 44% { transform: scale(.9); opacity: 0; } 48% { opacity: 1; } 75%, 100% { transform: scale(1.25); opacity: 0; } }
+.boot-dots { display: flex; gap: 6px; }
+.boot-dots i { width: 7px; height: 7px; border-radius: 999px; background: #2ECC71; animation: boot-dot 1s ease-in-out infinite; }
+.boot-dots i:nth-child(2) { animation-delay: .15s; } .boot-dots i:nth-child(3) { animation-delay: .3s; }
+@keyframes boot-dot { 0%, 100% { transform: translateY(0); opacity: .35; } 50% { transform: translateY(-6px); opacity: 1; } }
+@keyframes boot-fade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+/* ===== Pull-to-refresh blob (components/PullToRefresh.tsx) ===== */
+@keyframes ptr-boing { 0% { transform: scale(1); } 30% { transform: scale(1.25, 0.8); } 50% { transform: scale(0.88, 1.12); } 70% { transform: scale(1.06, 0.95); } 100% { transform: scale(1); } }
+@keyframes ptr-squash { 0% { transform: scale(1.3, 0.7); } 40% { transform: scale(0.9, 1.12); } 70% { transform: scale(1.05, 0.96); } 100% { transform: scale(1); } }
+@keyframes ptr-jelly { 0%, 100% { transform: scale(1, 1); } 25% { transform: scale(1.08, 0.92); } 50% { transform: scale(0.94, 1.06); } 75% { transform: scale(1.04, 0.97); } }
+@keyframes ptr-flip { from { transform: rotateY(0); } to { transform: rotateY(360deg); } }
+@keyframes ptr-hop { 0% { transform: none; } 40% { transform: translateY(-12px) scale(1.06, 0.95); } 70% { transform: translateY(2px) scale(0.97, 1.04); } 100% { transform: none; } }
+@keyframes ptr-bye { to { transform: scale(0.2); opacity: 0; } }
+
+/* ===== Login screen ===== */
+@keyframes login-drift { 0%, 100% { transform: translate(0, 0) scale(1); } 33% { transform: translate(40px, -30px) scale(1.08); } 66% { transform: translate(-30px, 25px) scale(0.95); } }
+@keyframes login-float { 0%, 100% { transform: translateY(0) rotate(-1deg); } 50% { transform: translateY(-12px) rotate(1.5deg); } }
+@keyframes login-bar { from { width: 0; } }
+@keyframes onb-in-right { from { opacity: 0; transform: translateX(40px); } to { opacity: 1; transform: none; } }
+@keyframes onb-in-left { from { opacity: 0; transform: translateX(-40px); } to { opacity: 1; transform: none; } }
+
+/* ===== Spotlight tutorial & Monthly Wrapped ===== */
+@keyframes spot-pulse { 0% { transform: scale(1); opacity: 1; } 100% { transform: scale(1.45); opacity: 0; } }
+@keyframes spot-press { 0%, 100% { transform: translate(-30%, 10%) scale(1); } 40%, 70% { transform: translate(-30%, 0%) scale(0.86); } }
+@keyframes wrap-bar { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+@keyframes wrap-in { from { opacity: 0; transform: translateY(24px) scale(0.96); } to { opacity: 1; transform: none; } }
+@keyframes wrap-float { 0%, 100% { transform: translateY(0) rotate(-3deg); } 50% { transform: translateY(-14px) rotate(3deg); } }
+@keyframes wrap-grow { from { transform: scaleY(0); } }
+
+/* ===== Chart animations (Dashboard) =====
+   Lines and donut segments draw themselves (pathLength="1" on the element);
+   fills rise from the bottom. Re-keying the chart replays them. */
+.chart-draw { stroke-dasharray: 1; animation: chart-draw 0.9s cubic-bezier(0.65, 0, 0.35, 1) backwards; }
+.chart-wipe { animation: chart-wipe 0.9s cubic-bezier(0.65, 0, 0.35, 1) backwards; }
+.chart-rise { transform-box: fill-box; transform-origin: bottom; animation: chart-rise 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.15s backwards; }
+@keyframes chart-draw { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
+@keyframes chart-wipe { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } }
+@keyframes chart-rise { from { transform: scaleY(0); opacity: 0; } to { transform: none; opacity: 1; } }
+
+/* ===== Light mode text contrast =====
+   The brand green (#2ECC71) is only ~2:1 as text on white, too faint to read.
+   In light mode, green and amber *text* use deeper shades (≥4.5:1). Buttons,
+   fills and borders keep the brand colours. */
+html:not(.dark) .text-primary { color: #15803d; }
+html:not(.dark) .text-emerald-400, html:not(.dark) .text-emerald-500 { color: #047857; }
+html:not(.dark) .text-amber-400 { color: #b45309; }
+html:not(.dark) .text-sky-400 { color: #0369a1; }
+
+/* ===== Micro-interactions =====
+   :where() keeps these at zero specificity, so any Tailwind class on an
+   element still wins. Press feedback uses the standalone `scale` property,
+   which combines with Tailwind's transform utilities instead of replacing
+   them (a centred -translate-x-1/2 button won't jump). */
+:where(button, a[href], [role="button"], [role="switch"], [role="tab"], summary) {
+  transition: scale 0.14s cubic-bezier(0.34, 1.56, 0.64, 1), background-color 0.2s, color 0.2s, border-color 0.2s, box-shadow 0.2s, opacity 0.2s;
+  -webkit-tap-highlight-color: transparent;
+}
+:where(button:not(:disabled), a[href], [role="button"], [role="switch"], [role="tab"]):active { scale: 0.96; }
+
+/* Visible focus ring for keyboard users only. */
+:where(button, a, input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid #2ECC71;
+  outline-offset: 2px;
+}
+
+/* Lists that rise in one item after another: add class="stagger" to the parent. */
+.stagger > * { animation: slideUp 0.45s cubic-bezier(0.16, 1, 0.3, 1) backwards; }
+.stagger > *:nth-child(2) { animation-delay: 30ms; }
+.stagger > *:nth-child(3) { animation-delay: 60ms; }
+.stagger > *:nth-child(4) { animation-delay: 90ms; }
+.stagger > *:nth-child(5) { animation-delay: 120ms; }
+.stagger > *:nth-child(6) { animation-delay: 150ms; }
+.stagger > *:nth-child(7) { animation-delay: 180ms; }
+.stagger > *:nth-child(8) { animation-delay: 210ms; }
+.stagger > *:nth-child(n+9) { animation-delay: 240ms; }
+
+/* Cards that lift slightly on hover (pointer devices only). */
+@media (hover: hover) {
+  .lift { transition: translate 0.25s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.25s, border-color 0.25s; }
+  .lift:hover { translate: 0 -3px; }
+}
+
+/* Progress bars fill smoothly whenever their width changes. */
+.bar-fill { transition: width 0.9s cubic-bezier(0.16, 1, 0.3, 1); }
+
+/* Respect the system "reduce motion" setting everywhere. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    animation-delay: 0ms !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
     </style>
   </head>
 
   <body class="bg-background-light dark:bg-background-dark text-text-light-main dark:text-text-dark-main font-display antialiased">
+    <!-- Boot splash markup (single source). Stamped into #boot below and reused by LoadingScreen.tsx. -->
+    <template id="boot-template">
+      <div class="boot-stage" aria-hidden="true"><div class="boot-glow"></div>
+      <div class="boot-pig-wrap">
+        <svg viewBox="0 -50 220 230" width="220" height="230" overflow="visible">
+          <defs>
+            <linearGradient id="pb-body" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stop-color="#FFD9EA"/>
+              <stop offset=".45" stop-color="#FBA9CF"/>
+              <stop offset="1" stop-color="#E7699F"/>
+            </linearGradient>
+            <radialGradient id="pb-shade" cx="35%" cy="30%" r="75%">
+              <stop offset=".55" stop-color="#000" stop-opacity="0"/>
+              <stop offset="1" stop-color="#9B1F5C" stop-opacity=".28"/>
+            </radialGradient>
+            <linearGradient id="pb-snout" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0" stop-color="#FFC3DD"/>
+              <stop offset="1" stop-color="#EE7FB1"/>
+            </linearGradient>
+            <linearGradient id="pb-leg" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stop-color="#F48DBD"/>
+              <stop offset="1" stop-color="#D9558F"/>
+            </linearGradient>
+            <radialGradient id="pb-coin" cx="35%" cy="30%" r="75%">
+              <stop offset="0" stop-color="#FFF8D6"/>
+              <stop offset=".45" stop-color="#FFD54A"/>
+              <stop offset="1" stop-color="#E0A100"/>
+            </radialGradient>
+            <clipPath id="pb-above-slot"><rect x="0" y="-200" width="220" height="254"/></clipPath>
+          </defs>
+        
+          <!-- ground shadow -->
+          <ellipse class="pb-shadow" cx="112" cy="166" rx="62" ry="8" fill="#000" opacity=".28"/>
+        
+          <g class="pb-pig">
+            <!-- back legs (darker, behind) -->
+            <rect x="58" y="128" width="20" height="30" rx="9" fill="#D45A90"/>
+            <rect x="128" y="128" width="20" height="30" rx="9" fill="#D45A90"/>
+            <!-- tail -->
+            <path class="pb-tail" d="M44 96c-14-4-20 8-12 13 7 4 12-4 6-8-4-3-9 1-7 5" fill="none" stroke="#E7699F" stroke-width="4.5" stroke-linecap="round"/>
+            <!-- back ear -->
+            <path d="M134 54c2-15 11-25 21-27 2 13-3 25-11 31z" fill="#E7699F"/>
+            <!-- body -->
+            <path d="M46 102c0-34 30-58 70-58 38 0 66 22 70 54 3 30-22 50-66 52-46 2-74-16-74-48z" fill="url(#pb-body)"/>
+            <path d="M46 102c0-34 30-58 70-58 38 0 66 22 70 54 3 30-22 50-66 52-46 2-74-16-74-48z" fill="url(#pb-shade)"/>
+            <!-- front legs -->
+            <rect x="74" y="132" width="22" height="30" rx="10" fill="url(#pb-leg)"/>
+            <rect x="146" y="130" width="22" height="30" rx="10" fill="url(#pb-leg)"/>
+            <rect x="74" y="154" width="22" height="8" rx="4" fill="#B8437A"/>
+            <rect x="146" y="152" width="22" height="8" rx="4" fill="#B8437A"/>
+            <!-- coin slot -->
+            <rect x="94" y="49" width="34" height="7" rx="3.5" fill="#A12E66"/>
+            <rect x="96" y="50" width="30" height="3" rx="1.5" fill="#6E1A45"/>
+            <!-- front ear (folded) -->
+            <path d="M146 58c4-16 16-26 28-24-2 14-10 26-22 32z" fill="#F48DBD"/>
+            <path d="M152 56c4-9 10-15 17-16-2 8-7 15-14 19z" fill="#FFC3DD"/>
+            <!-- snout -->
+            <ellipse cx="188" cy="102" rx="16" ry="19" fill="url(#pb-snout)"/>
+            <ellipse cx="188" cy="102" rx="16" ry="19" fill="none" stroke="#D9558F" stroke-opacity=".35" stroke-width="2"/>
+            <ellipse cx="183" cy="100" rx="3" ry="5" fill="#B8437A"/>
+            <ellipse cx="194" cy="100" rx="3" ry="5" fill="#B8437A"/>
+            <!-- happy eye + lashes -->
+            <path class="pb-eye" d="M150 84q7-8 14 0" fill="none" stroke="#3B1026" stroke-width="3.6" stroke-linecap="round"/>
+            <!-- blush + smile -->
+            <ellipse cx="162" cy="102" rx="9" ry="5.5" fill="#FF6B9A" opacity=".45"/>
+            <!-- highlights -->
+            <ellipse cx="84" cy="70" rx="24" ry="9" fill="#fff" opacity=".55" transform="rotate(-18 84 70)"/>
+            <circle cx="112" cy="62" r="3.5" fill="#fff" opacity=".7"/>
+          </g>
+        
+          <!-- clink sparks around the slot on landing -->
+          <g class="pb-clink" stroke="#FFD54A" stroke-width="3" stroke-linecap="round">
+            <path d="M100 40l-6-8"/><path d="M111 37v-10"/><path d="M122 40l6-8"/>
+          </g>
+        
+          <!-- coin: flips while falling, disappears into the slot (clipped at the slot line) -->
+          <g clip-path="url(#pb-above-slot)">
+            <g class="pb-coin">
+              <ellipse cx="111" cy="10" rx="20" ry="20" fill="#C98E00"/>
+              <circle cx="111" cy="8" r="20" fill="url(#pb-coin)"/>
+              <circle cx="111" cy="8" r="15" fill="none" stroke="#C98E00" stroke-width="1.6" opacity=".7"/>
+              <text x="111" y="14.5" text-anchor="middle" font-size="19" font-weight="800" font-family="system-ui, -apple-system, sans-serif" fill="#8A5A00">₹</text>
+              <ellipse cx="103" cy="0" rx="6" ry="3.5" fill="#fff" opacity=".8" transform="rotate(-30 104 2)"/>
+            </g>
+          </g>
+        </svg>
+      </div></div>
+      <p class="boot-name">Expense<b>Tracker</b></p>
+      <p class="boot-tag">Every rupee, accounted for</p>
+      <div class="boot-bar"></div>
+    </template>
+
+    <!-- Boot splash: removed by index.tsx once the app has rendered. -->
+    <div id="boot" class="boot" aria-hidden="true"></div>
+    <script>
+      (function () {
+        var boot = document.getElementById('boot');
+        boot.innerHTML = document.getElementById('boot-template').innerHTML;
+        // Match the splash to the last-used theme before anything paints.
+        try { if (localStorage.getItem('theme') === 'light') boot.classList.add('light'); } catch (e) {}
+      })();
+    </script>
     <div id="root"></div>
 
     <!-- Vite entry -->
     <script type="module" src="/index.tsx"></script>
 
-    <!-- Service worker registration for offline support -->
+    <!-- The service worker is registered by vite-plugin-pwa (production builds
+         only). A second, hand-written /sw.js used to be registered here too; the
+         two fought over the same pages and could keep showing a cached
+         "You're offline" page while the server was up. -->
     <script>
-      if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-          navigator.serviceWorker
-            .register('/sw.js')
-            .then(() => console.log('Service Worker registered.'))
-            .catch((err) => console.warn('Service Worker registration failed:', err));
-        });
-      }
-
       let scrollTimeout;
 
       window.addEventListener("scroll", () => {

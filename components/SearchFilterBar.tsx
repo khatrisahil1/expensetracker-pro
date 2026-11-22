@@ -1,3 +1,4 @@
+// Search box and filters (type, category, method, dates, amounts) for the History page.
 import React, { useState } from 'react';
 import { useStore } from '../context/Store';
 
@@ -69,14 +70,14 @@ const SearchFilterBar: React.FC<SearchFilterBarProps> = ({
       <div className="flex flex-col md:flex-row items-center gap-3">
         {/* Search input */}
         <div className="relative flex-1 w-full">
-          <span className="material-symbols-outlined absolute left-3.5 top-1/2 -translate-y-1/2 text-text-light-muted dark:text-text-dark-muted text-lg">
+          <span aria-hidden="true" className="material-symbols-outlined absolute left-3.5 top-1/2 -translate-y-1/2 text-text-light-muted dark:text-text-dark-muted text-lg">
             search
           </span>
           <input
             type="text"
             value={filters.searchQuery}
             onChange={(e) => handleChange('searchQuery', e.target.value)}
-            placeholder="Search by title, category, or note..."
+            placeholder="Search name, category, amount or month"
             className="w-full bg-surface-light dark:bg-surface-dark border border-border-light dark:border-border-dark text-text-light-main dark:text-text-dark-main rounded-2xl py-3 pl-10 pr-10 outline-none text-sm font-bold focus:border-primary transition-all shadow-sm"
           />
           {filters.searchQuery && (
@@ -84,7 +85,7 @@ const SearchFilterBar: React.FC<SearchFilterBarProps> = ({
               onClick={() => handleChange('searchQuery', '')}
               className="absolute right-3 top-1/2 -translate-y-1/2 text-text-light-muted hover:text-text-light-main dark:hover:text-text-dark-main"
             >
-              <span className="material-symbols-outlined text-base">close</span>
+              <span aria-hidden="true" className="material-symbols-outlined text-base">close</span>
             </button>
           )}
         </div>
@@ -119,7 +120,7 @@ const SearchFilterBar: React.FC<SearchFilterBarProps> = ({
               : 'bg-surface-light dark:bg-surface-dark border-border-light dark:border-border-dark text-text-light-muted dark:text-text-dark-muted hover:border-primary/30'
           }`}
         >
-          <span className="material-symbols-outlined text-base">tune</span>
+          <span aria-hidden="true" className="material-symbols-outlined text-base">tune</span>
           Filters
           {activeCount > 0 && (
             <span className="size-5 rounded-full bg-primary text-[#131811] text-[10px] font-black flex items-center justify-center">

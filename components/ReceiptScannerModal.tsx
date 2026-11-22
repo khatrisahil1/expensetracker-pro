@@ -1,5 +1,8 @@
+// Camera dialog that photographs a receipt and asks Gemini for the merchant,
+// total, date and category. Used from the transaction details panel.
 import React, { useEffect, useRef, useState } from 'react';
-import { createGeminiClient } from '../utils/gemini';
+import { createGeminiClient, GEMINI_MODEL } from '../utils/gemini';
+import { extractJsonObject } from '../utils/json';
 
 export type ReceiptScanResult = {
   merchant?: string;
@@ -74,9 +77,9 @@ const ReceiptScannerModal: React.FC<ReceiptScannerModalProps> = ({ onClose, onRe
 
     try {
       const base64 = dataUrl.split(',')[1];
-      const ai = createGeminiClient();
+      const ai = await createGeminiClient();
       const response = await ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
+        model: GEMINI_MODEL,
         contents: {
           parts: [
             { inlineData: { mimeType: 'image/jpeg', data: base64 } },
@@ -86,9 +89,8 @@ const ReceiptScannerModal: React.FC<ReceiptScannerModalProps> = ({ onClose, onRe
         config: { responseMimeType: 'application/json' }
       });
 
-      const raw = response.text.trim();
-      const jsonText = raw.includes('{') ? raw.slice(raw.indexOf('{'), raw.lastIndexOf('}') + 1) : raw;
-      const parsed = JSON.parse(jsonText);
+      const parsed = extractJsonObject<Record<string, any>>(response.text);
+      if (!parsed) throw new Error('Could not parse receipt. Try again.');
 
       onResult({
         merchant: parsed.merchant || parsed.vendor || parsed.store,
@@ -113,7 +115,7 @@ const ReceiptScannerModal: React.FC<ReceiptScannerModalProps> = ({ onClose, onRe
             <h3 className="text-lg font-black">Receipt Scanner</h3>
             <p className="text-xs text-text-light-muted dark:text-text-dark-muted">Snap a receipt and auto-fill transaction details.</p>
           </div>
-          <button onClick={() => { stopCamera(); onClose(); }} className="size-10 rounded-full hover:bg-gray-100 dark:hover:bg-surface-darker transition-all"><span className="material-symbols-outlined">close</span></button>
+          <button onClick={() => { stopCamera(); onClose(); }} className="size-10 rounded-full hover:bg-gray-100 dark:hover:bg-surface-darker transition-all"><span aria-hidden="true" className="material-symbols-outlined">close</span></button>
         </div>
 
         <div className="p-6">
@@ -126,7 +128,7 @@ const ReceiptScannerModal: React.FC<ReceiptScannerModalProps> = ({ onClose, onRe
               <video ref={videoRef} autoPlay playsInline className="w-full h-full object-cover" />
             ) : (
               <div className="w-full h-full flex flex-col items-center justify-center gap-3 text-text-light-muted">
-                <span className="material-symbols-outlined text-5xl">photo_camera</span>
+                <span aria-hidden="true" className="material-symbols-outlined text-5xl">photo_camera</span>
                 <p className="text-sm">No camera active.</p>
               </div>
             )}

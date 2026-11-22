@@ -1,22 +1,16 @@
-
+// Subscriptions page (/subscriptions): track recurring bills, detect likely
+// subscriptions, and remind before renewal days. Due renewals are offered by
+// RenewalPrompt rather than booked here.
 import React, { useState, useMemo, useEffect } from 'react';
 import { useStore, Transaction } from '../context/Store';
+import { useDialog } from './ui/DialogProvider';
 import { requestNotificationPermission, scheduleSubscriptionReminders } from '../utils/notifications';
-
-const CATEGORY_ICONS: Record<string, string> = {
-    "Food": "restaurant",
-    "Housing": "home",
-    "Transportation": "directions_car",
-    "Entertainment": "movie",
-    "Shopping": "shopping_bag",
-    "Health": "medical_services",
-    "Utilities": "bolt",
-    "Subscription": "subscriptions",
-    "Other": "receipt"
-};
+import { addInterval, parseLocalDate, toLocalISODate } from '../utils/date';
+import { SUBSCRIPTION_CATEGORIES, getCategoryStyle } from '../constants/categories';
 
 const SubscriptionsScreen: React.FC = () => {
     const { transactions, userSettings, addTransaction, updateTransaction, deleteTransaction } = useStore();
+    const dialog = useDialog();
     const [showAddModal, setShowAddModal] = useState(false);
     const [isDetecting, setIsDetecting] = useState(false);
     const [isFlipped, setIsFlipped] = useState(false);
@@ -29,7 +23,7 @@ const SubscriptionsScreen: React.FC = () => {
         amount: '',
         frequency: 'monthly' as 'monthly' | 'yearly' | 'weekly',
         category: 'Subscription',
-        renewalDate: new Date().toISOString().split('T')[0]
+        renewalDate: toLocalISODate()
     });
 
     const subscriptions = useMemo(() => {
@@ -40,48 +34,13 @@ const SubscriptionsScreen: React.FC = () => {
         return subscriptions.filter(s => s.subscriptionStatus !== 'paused');
     }, [subscriptions]);
 
-    // Handle Automatic Renewals and Notifications
+    // Renewal reminders. Missed renewals are no longer booked here: opening this
+    // page used to write charges silently. RenewalPrompt (in AppLayout) asks first.
     useEffect(() => {
-        const processRenewals = async () => {
-            const today = new Date();
-            today.setHours(0, 0, 0, 0);
-
-            for (const sub of subscriptions) {
-                if (!sub.nextRenewalDate || sub.subscriptionStatus === 'paused') continue;
-
-                const renewalDate = new Date(sub.nextRenewalDate);
-                renewalDate.setHours(0, 0, 0, 0);
-
-                if (renewalDate <= today) {
-                    // 1. Record the transaction
-                    await addTransaction({
-                        title: `${sub.title} (Renewal)`,
-                        amount: sub.amount,
-                        date: today.toISOString().split('T')[0],
-                        category: sub.category || 'Subscription',
-                        type: 'expense',
-                        paymentMethod: sub.paymentMethod || 'Other',
-                        note: `Automated renewal for ${sub.title}`
-                    });
-
-                    // 2. Update next renewal date
-                    const nextDate = new Date(renewalDate);
-                    if (sub.subscriptionFrequency === 'yearly') nextDate.setFullYear(nextDate.getFullYear() + 1);
-                    else if (sub.subscriptionFrequency === 'weekly') nextDate.setDate(nextDate.getDate() + 7);
-                    else nextDate.setMonth(nextDate.getMonth() + 1);
-
-                    await updateTransaction(sub.id, { 
-                        nextRenewalDate: nextDate.toISOString().split('T')[0] 
-                    });
-                }
-            }
-        };
-
-        processRenewals();
         requestNotificationPermission().then(granted => {
             if (granted) scheduleSubscriptionReminders(subscriptions);
         });
-    }, [subscriptions.length]); // Run when subscriptions change
+    }, [subscriptions]);
 
     const stats = useMemo(() => {
         const monthly = activeSubscriptions.reduce((acc, sub) => {
@@ -110,7 +69,7 @@ const SubscriptionsScreen: React.FC = () => {
 
     const formatDate = (dateStr: string) => {
         if (!dateStr) return '';
-        const d = new Date(dateStr);
+        const d = parseLocalDate(dateStr);
         return d.toLocaleDateString('en-GB', { 
             day: '2-digit', 
             month: 'long', 
@@ -132,13 +91,13 @@ const SubscriptionsScreen: React.FC = () => {
     };
 
     const handleDelete = async (id: string) => {
-        if (window.confirm("Are you sure you want to delete this subscription?")) {
+        if (await dialog.confirm({ title: 'Delete this subscription?', message: 'Past payments stay in your history.', confirmLabel: 'Delete', destructive: true })) {
             await deleteTransaction(id);
         }
     };
 
     const handleMassDelete = async () => {
-        if (window.confirm(`Delete ${selectedIds.length} subscriptions?`)) {
+        if (await dialog.confirm({ title: `Delete ${selectedIds.length} subscriptions?`, message: 'Past payments stay in your history.', confirmLabel: 'Delete', destructive: true })) {
             for (const id of selectedIds) {
                 await deleteTransaction(id);
             }
@@ -158,7 +117,7 @@ const SubscriptionsScreen: React.FC = () => {
             amount: sub.amount.toString(),
             frequency: sub.subscriptionFrequency || 'monthly',
             category: sub.category || 'Subscription',
-            renewalDate: sub.nextRenewalDate || new Date().toISOString().split('T')[0]
+            renewalDate: sub.nextRenewalDate || toLocalISODate()
         });
         setShowAddModal(true);
     };
@@ -169,33 +128,48 @@ const SubscriptionsScreen: React.FC = () => {
         const patterns = [
             { kw: 'netflix', cat: 'Entertainment' },
             { kw: 'spotify', cat: 'Entertainment' },
-            { kw: 'amazon', cat: 'Shopping' },
-            { kw: 'youtube', cat: 'Entertainment' },
+            { kw: 'amazon prime', cat: 'Entertainment' },
+            { kw: 'youtube premium', cat: 'Entertainment' },
             { kw: 'gym', cat: 'Health' },
             { kw: 'rent', cat: 'Housing' },
             { kw: 'icloud', cat: 'Utilities' },
-            { kw: 'google', cat: 'Utilities' },
+            { kw: 'google one', cat: 'Utilities' },
             { kw: 'adobe', cat: 'Other' },
-            { kw: 'zomato', cat: 'Food' },
-            { kw: 'swiggy', cat: 'Food' }
+            { kw: 'zomato gold', cat: 'Food' },
+            { kw: 'swiggy one', cat: 'Food' }
         ];
-        
+        // Whole-word match, so "rent" does not hit "parent" or "current".
+        const matches = (title: string, kw: string) =>
+            new RegExp(`\\b${kw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i').test(title);
+        const today = toLocalISODate();
+
         let count = 0;
-        for (const tx of transactions) {
-            const match = patterns.find(p => tx.title.toLowerCase().includes(p.kw));
-            if (!tx.isSubscription && match) {
-                await updateTransaction(tx.id, { 
-                    isSubscription: true, 
-                    category: match.cat,
-                    subscriptionFrequency: 'monthly',
-                    subscriptionStatus: 'active',
-                    nextRenewalDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
-                });
-                count++;
-            }
+        for (const p of patterns) {
+            // Skip services that are already tracked as a subscription.
+            if (subscriptions.some(s => matches(s.title, p.kw))) continue;
+
+            // Only the most recent matching expense becomes the subscription. Marking
+            // every past payment created one subscription each, and each one renewed.
+            const latest = transactions
+                .filter(tx => tx.type === 'expense' && !tx.isSubscription && matches(tx.title, p.kw))
+                .sort((a, b) => b.date.localeCompare(a.date))[0];
+            if (!latest) continue;
+
+            // First renewal strictly after today, so no back-dated renewals get booked.
+            let next = addInterval(latest.date, 'monthly');
+            while (next <= today) next = addInterval(next, 'monthly');
+
+            await updateTransaction(latest.id, {
+                isSubscription: true,
+                category: p.cat,
+                subscriptionFrequency: 'monthly',
+                subscriptionStatus: 'active',
+                nextRenewalDate: next
+            });
+            count++;
         }
         setIsDetecting(false);
-        alert(count > 0 ? `Detected ${count} new subscriptions!` : "No new patterns found.");
+        dialog.toast(count > 0 ? `Found ${count} new subscription${count === 1 ? '' : 's'}` : 'No new subscriptions found', count > 0 ? 'success' : 'info');
     };
 
     return (
@@ -215,7 +189,7 @@ const SubscriptionsScreen: React.FC = () => {
                     <p className="text-text-light-muted dark:text-text-dark-muted text-sm md:text-lg">Track, Pause, and Optimize your recurring spend.</p>
                 </div>
                 <button onClick={detectSubscriptions} disabled={isDetecting} className="flex items-center gap-2 px-6 py-3 rounded-2xl bg-primary/10 border border-primary/20 text-primary text-xs font-black uppercase tracking-widest hover:bg-primary/20 transition-all active:scale-95">
-                    <span className={`material-symbols-outlined text-lg ${isDetecting ? 'animate-spin' : ''}`}>{isDetecting ? 'sync' : 'auto_awesome'}</span>
+                    <span aria-hidden="true" className={`material-symbols-outlined text-lg ${isDetecting ? 'animate-spin' : ''}`}>{isDetecting ? 'sync' : 'auto_awesome'}</span>
                     {isDetecting ? 'Analyzing...' : 'Magic Detect'}
                 </button>
             </div>
@@ -242,12 +216,12 @@ const SubscriptionsScreen: React.FC = () => {
                         <div className="relative z-10 flex items-center justify-between mt-8">
                             <div className="flex items-center gap-4">
                                 <div className="size-10 rounded-xl bg-white/20 backdrop-blur-md flex items-center justify-center border border-white/10">
-                                    <span className="material-symbols-outlined">trending_down</span>
+                                    <span aria-hidden="true" className="material-symbols-outlined">trending_down</span>
                                 </div>
                                 <span className="text-xs font-bold opacity-80">{subscriptions.length} detected • {activeSubscriptions.length} active</span>
                             </div>
                             <button onClick={() => setIsFlipped(true)} className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest bg-white/10 hover:bg-white/20 px-4 py-2 rounded-xl transition-all">
-                                Category Breakdown <span className="material-symbols-outlined text-sm">bar_chart</span>
+                                Category Breakdown <span aria-hidden="true" className="material-symbols-outlined text-sm">bar_chart</span>
                             </button>
                         </div>
                     </div>
@@ -259,7 +233,7 @@ const SubscriptionsScreen: React.FC = () => {
                                 <h4 className="text-xl font-black">Monthly Allocation</h4>
                                 <p className="text-[10px] font-black uppercase tracking-widest opacity-50">Where your money goes</p>
                             </div>
-                            <button onClick={() => setIsFlipped(false)} className="size-10 rounded-full bg-white/5 flex items-center justify-center hover:bg-white/10"><span className="material-symbols-outlined">close</span></button>
+                            <button onClick={() => setIsFlipped(false)} aria-label="Close breakdown" className="size-10 rounded-full bg-white/5 flex items-center justify-center hover:bg-white/10"><span aria-hidden="true" className="material-symbols-outlined">close</span></button>
                         </div>
                         <div className="flex flex-col gap-3 max-h-32 overflow-y-auto pr-2">
                             {(Object.entries(stats.breakdown) as [string, number][]).sort((a,b) => b[1] - a[1]).map(([cat, amt]) => {
@@ -288,26 +262,27 @@ const SubscriptionsScreen: React.FC = () => {
                 {/* Active Subs List */}
                 <div className="lg:col-span-8 flex flex-col gap-6">
                     <div className="flex items-center justify-between px-2">
-                        <h4 className="text-xl font-black flex items-center gap-2"><span className="material-symbols-outlined text-primary">list</span> Manage Subscriptions</h4>
+                        <h4 className="text-xl font-black flex items-center gap-2"><span aria-hidden="true" className="material-symbols-outlined text-primary">list</span> Manage Subscriptions</h4>
                         <div className="flex items-center gap-2">
                             {isEditMode && selectedIds.length > 0 && (
                                 <button onClick={handleMassDelete} className="flex items-center gap-2 px-4 py-2 bg-rose-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest animate-scale-up">
-                                    <span className="material-symbols-outlined text-sm">delete_sweep</span>
+                                    <span aria-hidden="true" className="material-symbols-outlined text-sm">delete_sweep</span>
                                     Delete ({selectedIds.length})
                                 </button>
                             )}
                             <button 
-                                onClick={() => { setIsEditMode(!isEditMode); setSelectedIds([]); }} 
+                                onClick={() => { setIsEditMode(!isEditMode); setSelectedIds([]); }}
+                                aria-label={isEditMode ? "Done editing" : "Edit subscriptions"} 
                                 className={`size-10 rounded-xl flex items-center justify-center transition-all ${isEditMode ? 'bg-primary text-black' : 'bg-gray-100 dark:bg-surface-darker hover:bg-primary/20 hover:text-primary'}`}
                             >
-                                <span className="material-symbols-outlined">{isEditMode ? 'close' : 'edit'}</span>
+                                <span aria-hidden="true" className="material-symbols-outlined">{isEditMode ? 'close' : 'edit'}</span>
                             </button>
                         </div>
                     </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 stagger">
                         {subscriptions.length === 0 ? (
                             <div className="col-span-full py-20 text-center opacity-30 bg-surface-light dark:bg-surface-dark border border-dashed border-border-light dark:border-border-dark rounded-[2.5rem]">
-                                <span className="material-symbols-outlined text-6xl mb-4">sentiment_neutral</span>
+                                <span aria-hidden="true" className="material-symbols-outlined text-6xl mb-4">sentiment_neutral</span>
                                 <p className="font-bold">No subscriptions yet.</p>
                             </div>
                         ) : (
@@ -320,13 +295,13 @@ const SubscriptionsScreen: React.FC = () => {
                                     {isEditMode && (
                                         <div className="absolute top-4 left-4 z-20">
                                             <div className={`size-6 rounded-full border-2 flex items-center justify-center transition-all ${selectedIds.includes(sub.id) ? 'bg-primary border-primary' : 'border-border-light dark:border-border-dark'}`}>
-                                                {selectedIds.includes(sub.id) && <span className="material-symbols-outlined text-black text-sm">check</span>}
+                                                {selectedIds.includes(sub.id) && <span aria-hidden="true" className="material-symbols-outlined text-black text-sm">check</span>}
                                             </div>
                                         </div>
                                     )}
                                     <div className={`flex items-start justify-between mb-6 ${isEditMode ? 'pl-8' : ''}`}>
                                         <div className="size-12 rounded-2xl bg-gray-100 dark:bg-surface-darker flex items-center justify-center text-primary group-hover:scale-110 transition-transform border border-border-light dark:border-border-dark">
-                                            <span className="material-symbols-outlined">{CATEGORY_ICONS[sub.category || 'Subscription'] || 'subscriptions'}</span>
+                                            <span aria-hidden="true" className="material-symbols-outlined">{getCategoryStyle(sub.category || 'Subscription').icon}</span>
                                         </div>
                                         <div className="text-right">
                                             <p className="text-xl font-black">{formatCurrency(sub.amount)}</p>
@@ -336,12 +311,12 @@ const SubscriptionsScreen: React.FC = () => {
                                     <div className="mb-6">
                                         <div className="flex items-center justify-between gap-2">
                                             <h5 className="text-lg font-black tracking-tight truncate">{sub.title}</h5>
-                                            <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-all">
+                                            <div className="flex gap-1 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 lg:focus-within:opacity-100 lg:focus:opacity-100 transition-all">
                                                 <button onClick={(e) => { e.stopPropagation(); openEditModal(sub); }} className="size-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center hover:bg-primary hover:text-black transition-all">
-                                                    <span className="material-symbols-outlined text-lg">edit</span>
+                                                    <span aria-hidden="true" className="material-symbols-outlined text-lg">edit</span>
                                                 </button>
                                                 <button onClick={(e) => { e.stopPropagation(); handleDelete(sub.id); }} className="size-8 rounded-lg bg-rose-500/10 text-rose-500 flex items-center justify-center hover:bg-rose-500 hover:text-white transition-all">
-                                                    <span className="material-symbols-outlined text-lg">delete</span>
+                                                    <span aria-hidden="true" className="material-symbols-outlined text-lg">delete</span>
                                                 </button>
                                             </div>
                                         </div>
@@ -349,7 +324,7 @@ const SubscriptionsScreen: React.FC = () => {
                                             <span className="text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">{sub.category}</span>
                                             {sub.nextRenewalDate && (
                                                 <span className="text-[9px] font-bold text-text-light-muted flex items-center gap-1">
-                                                    <span className="material-symbols-outlined text-[12px]">schedule</span>
+                                                    <span aria-hidden="true" className="material-symbols-outlined text-[12px]">schedule</span>
                                                     Due: {formatDate(sub.nextRenewalDate)}
                                                 </span>
                                             )}
@@ -374,13 +349,13 @@ const SubscriptionsScreen: React.FC = () => {
 
                 {/* Renewal Timeline Sidebar */}
                 <div className="lg:col-span-4 flex flex-col gap-6">
-                    <h4 className="text-xl font-black flex items-center gap-2 px-2"><span className="material-symbols-outlined text-rose-500">alarm</span> Upcoming Bills</h4>
+                    <h4 className="text-xl font-black flex items-center gap-2 px-2"><span aria-hidden="true" className="material-symbols-outlined text-rose-500">alarm</span> Upcoming Bills</h4>
                     <div className="bg-surface-light dark:bg-surface-dark border border-border-light dark:border-border-dark rounded-[2.5rem] p-8 flex flex-col gap-8 shadow-sm">
                         {activeSubscriptions.length === 0 ? (
                             <p className="text-xs text-text-light-muted opacity-50 italic">No upcoming renewals found.</p>
                         ) : (
                             activeSubscriptions.slice(0, 5).sort((a,b) => new Date(a.nextRenewalDate || '').getTime() - new Date(b.nextRenewalDate || '').getTime()).map((sub, i) => {
-                                const daysLeft = Math.ceil((new Date(sub.nextRenewalDate || '').getTime() - Date.now()) / (1000*60*60*24));
+                                const daysLeft = Math.ceil((parseLocalDate(sub.nextRenewalDate || '').getTime() - Date.now()) / (1000*60*60*24));
                                 return (
                                     <div key={sub.id} className="flex gap-4 relative group">
                                         {i !== activeSubscriptions.length - 1 && (
@@ -406,19 +381,20 @@ const SubscriptionsScreen: React.FC = () => {
 
                     <div className="bg-primary/5 border border-primary/20 rounded-3xl p-6 flex items-center gap-4">
                         <div className="size-12 rounded-2xl bg-primary flex items-center justify-center text-black">
-                            <span className="material-symbols-outlined text-2xl">auto_fix_high</span>
+                            <span aria-hidden="true" className="material-symbols-outlined text-2xl">auto_fix_high</span>
                         </div>
                         <div>
                             <p className="text-[10px] font-black uppercase tracking-widest text-primary mb-1">Optimizer Tip</p>
-                            <p className="text-xs font-medium text-text-light-muted">You could save {formatCurrency(stats.monthly * 0.15)} by switching to annual plans.</p>
+                            {/* No made-up figure: it used to claim a saving of exactly 15% of the monthly total. */}
+                            <p className="text-xs font-medium text-text-light-muted">Many services charge less per month on an annual plan. Check your monthly subscriptions for one.</p>
                         </div>
                     </div>
                 </div>
             </div>
 
             {/* Quick Add FAB */}
-            <button onClick={() => setShowAddModal(true)} className="fixed bottom-24 right-6 md:right-12 size-16 bg-primary text-black rounded-3xl shadow-glow flex items-center justify-center group hover:scale-110 active:scale-95 transition-all z-40">
-                <span className="material-symbols-outlined text-3xl group-hover:rotate-90 transition-transform">add</span>
+            <button onClick={() => setShowAddModal(true)} aria-label="Add subscription" className="fixed bottom-24 right-6 md:right-12 size-16 bg-primary text-black rounded-3xl shadow-glow flex items-center justify-center group hover:scale-110 active:scale-95 transition-all z-40">
+                <span aria-hidden="true" className="material-symbols-outlined text-3xl group-hover:rotate-90 transition-transform">add</span>
             </button>
 
             {/* Add Modal */}
@@ -439,7 +415,7 @@ const SubscriptionsScreen: React.FC = () => {
                                 <div className="flex flex-col gap-2">
                                     <label className="text-[10px] font-black uppercase tracking-widest opacity-50">Category</label>
                                     <select value={newSub.category} onChange={e => setNewSub({...newSub, category: e.target.value})} className="w-full bg-gray-50 dark:bg-surface-darker border border-border-light dark:border-border-dark rounded-2xl p-4 font-bold outline-none focus:border-primary appearance-none">
-                                        {Object.keys(CATEGORY_ICONS).map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                                        {SUBSCRIPTION_CATEGORIES.map(cat => <option key={cat} value={cat}>{cat}</option>)}
                                     </select>
                                 </div>
                             </div>
@@ -453,7 +429,7 @@ const SubscriptionsScreen: React.FC = () => {
                                     </select>
                                 </div>
                                 <div className="flex flex-col gap-2">
-                                    <label className="text-[10px] font-black uppercase tracking-widest opacity-50">Next Bill</label>
+                                    <label className="text-[10px] font-black uppercase tracking-widest opacity-50">{editingSub ? "Next Bill" : "First Bill"}</label>
                                     <input type="date" value={newSub.renewalDate} onChange={e => setNewSub({...newSub, renewalDate: e.target.value})} className="w-full bg-gray-50 dark:bg-surface-darker border border-border-light dark:border-border-dark rounded-2xl p-4 font-bold outline-none focus:border-primary" style={{colorScheme: 'dark'}} />
                                 </div>
                             </div>
@@ -461,28 +437,37 @@ const SubscriptionsScreen: React.FC = () => {
                                 <button onClick={() => { setShowAddModal(false); setEditingSub(null); }} className="flex-1 py-4 rounded-2xl font-black uppercase tracking-widest text-xs border border-border-light dark:border-border-dark hover:bg-gray-50 dark:hover:bg-white/5 transition-all">Cancel</button>
                                 <button onClick={async () => {
                                     if(!newSub.title || !newSub.amount) return;
+                                    
                                     const data = {
                                         title: newSub.title,
                                         amount: parseFloat(newSub.amount),
                                         category: newSub.category,
                                         isSubscription: true,
                                         subscriptionFrequency: newSub.frequency,
-                                        nextRenewalDate: newSub.renewalDate
                                     };
 
                                     if (editingSub) {
-                                        await updateTransaction(editingSub.id, data);
+                                        // When editing, the date field is pre-filled with the next bill
+                                        // date, so save it as-is. Adding another cycle here skipped a
+                                        // billing period and moved the original charge into the future.
+                                        await updateTransaction(editingSub.id, {
+                                            ...data,
+                                            nextRenewalDate: newSub.renewalDate,
+                                        });
                                     } else {
+                                        // When adding, the date field is the first billing date. Record
+                                        // that charge and schedule the next one a cycle later.
                                         await addTransaction({
                                             ...data,
-                                            date: new Date().toISOString().split('T')[0],
+                                            nextRenewalDate: addInterval(newSub.renewalDate, newSub.frequency),
+                                            date: newSub.renewalDate,
                                             type: 'expense',
                                             subscriptionStatus: 'active'
                                         });
                                     }
                                     setShowAddModal(false);
                                     setEditingSub(null);
-                                    setNewSub({ title: '', amount: '', frequency: 'monthly', category: 'Subscription', renewalDate: new Date().toISOString().split('T')[0] });
+                                    setNewSub({ title: '', amount: '', frequency: 'monthly', category: 'Subscription', renewalDate: toLocalISODate() });
                                 }} className="flex-1 py-4 rounded-2xl bg-primary text-black font-black uppercase tracking-widest text-xs shadow-glow transition-all active:scale-95">
                                     {editingSub ? 'Save Changes' : 'Start Tracking'}
                                 </button>

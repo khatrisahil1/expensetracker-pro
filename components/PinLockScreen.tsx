@@ -1,9 +1,13 @@
-
+// App lock screen. Shown over the current page (the URL is kept) while
+// Store.isAppLocked is true. Supports PIN, biometrics, and resetting the PIN after re-authenticating.
 import React, { useState, useEffect, useCallback } from 'react';
 import { useStore } from '../context/Store';
 
 export const PinLockScreen = () => {
-    const { unlockApp, user, login, setAppPin, userSettings, verifyBiometric } = useStore();
+    const { unlockApp, user, reauthenticate, setAppPin, userSettings, verifyBiometric } = useStore();
+    // Google sign-in accounts have no password, so they confirm through a Google popup instead.
+    const isPasswordUser = !!user?.providerData?.some(p => p.providerId === 'password');
+    const [newPinError, setNewPinError] = useState('');
     const [enteredPin, setEnteredPin] = useState('');
     const [error, setError] = useState(false);
     const [activeKey, setActiveKey] = useState<string | null>(null);
@@ -128,13 +132,21 @@ export const PinLockScreen = () => {
         setResetError('');
         setIsVerifying(true);
         try {
-            if (user?.email) {
-                await login(user.email, resetPassword);
-                setShowResetModal(false);
-                setShowSetPinModal(true);
-            }
+            await reauthenticate(isPasswordUser ? resetPassword : undefined);
+            setResetPassword('');
+            setShowResetModal(false);
+            setShowSetPinModal(true);
         } catch (err: any) {
-            setResetError('Verification failed.');
+            // Say why, instead of a generic "Verification failed."
+            const code: string = err?.code || '';
+            setResetError(
+                code.includes('wrong-password') || code.includes('invalid-credential') ? 'That password isn’t right.'
+                : code.includes('popup-blocked') ? 'The Google sign-in window was blocked. Allow pop-ups for this site and try again.'
+                : code.includes('popup-closed') || code.includes('cancelled-popup') ? 'The Google sign-in window was closed before finishing.'
+                : code.includes('too-many-requests') ? 'Too many attempts. Wait a minute and try again.'
+                : code.includes('network') ? 'No connection. Check your internet and try again.'
+                : err?.message || 'Verification failed.'
+            );
         } finally {
             setIsVerifying(false);
         }
@@ -155,7 +167,7 @@ export const PinLockScreen = () => {
                     ${isActive ? 'scale-90 bg-primary/20 !text-primary shadow-glow' : 'active:scale-95'}
                 `}
             >
-                {icon ? <span className="material-symbols-outlined text-3xl">{icon}</span> : value}
+                {icon ? <span aria-hidden="true" className="material-symbols-outlined text-3xl">{icon}</span> : value}
             </button>
         );
     };
@@ -167,12 +179,16 @@ export const PinLockScreen = () => {
                      <div className="bg-surface-light dark:bg-surface-dark border border-border-light dark:border-border-dark rounded-3xl p-8 w-full max-w-sm shadow-2xl animate-slide-up">
                          <h3 className="text-xl font-bold text-text-light-main dark:text-text-dark-main mb-6">Reset PIN</h3>
                          <form onSubmit={handleReset} className="flex flex-col gap-4">
-                             <input type="password" value={resetPassword} onChange={e => setResetPassword(e.target.value)} className="w-full bg-background-light dark:bg-surface-darker text-text-light-main dark:text-text-dark-main p-3 rounded-xl border border-border-light dark:border-border-dark focus:border-primary outline-none" placeholder="Account Password" />
+                             {isPasswordUser ? (
+                                 <input type="password" value={resetPassword} onChange={e => setResetPassword(e.target.value)} className="w-full bg-background-light dark:bg-surface-darker text-text-light-main dark:text-text-dark-main p-3 rounded-xl border border-border-light dark:border-border-dark focus:border-primary outline-none" placeholder="Account Password" />
+                             ) : (
+                                 <p className="text-sm text-text-light-muted dark:text-text-dark-muted">Confirm it's you by signing in with Google again.</p>
+                             )}
                              {resetError && <p className="text-danger text-xs font-bold">{resetError}</p>}
                              <div className="flex gap-3">
                                  <button type="button" onClick={() => setShowResetModal(false)} className="flex-1 py-3 rounded-xl font-bold text-text-light-muted">Cancel</button>
                                  <button type="submit" disabled={isVerifying} className="flex-1 py-3 rounded-xl font-bold bg-primary text-black flex items-center justify-center gap-2">
-                                     {isVerifying && <span className="material-symbols-outlined animate-spin text-sm">sync</span>}
+                                     {isVerifying && <span aria-hidden="true" className="material-symbols-outlined animate-spin text-sm">sync</span>}
                                      Verify
                                  </button>
                              </div>
@@ -186,7 +202,20 @@ export const PinLockScreen = () => {
                      <div className="bg-surface-light dark:bg-surface-dark border border-border-light dark:border-border-dark rounded-3xl p-8 w-full max-w-sm shadow-2xl animate-slide-up flex flex-col gap-6 text-center">
                          <h3 className="text-xl font-bold text-text-light-main dark:text-text-dark-main">Set New PIN</h3>
                          <input type="password" maxLength={4} value={newPin} onChange={e => setNewPin(e.target.value.replace(/\D/g,''))} className="bg-gray-100 dark:bg-surface-darker text-center text-4xl tracking-widest p-4 rounded-2xl w-full border border-border-light dark:border-border-dark focus:border-primary outline-none" placeholder="••••" />
-                         <button onClick={async () => { await setAppPin(newPin); await unlockApp(newPin); }} className="w-full py-3 rounded-xl font-bold bg-primary text-black shadow-glow">Save & Unlock</button>
+                         {newPinError && <p className="text-danger text-xs font-bold">{newPinError}</p>}
+                         <button
+                            disabled={newPin.length !== 4}
+                            onClick={async () => {
+                                setNewPinError('');
+                                try {
+                                    // setAppPin also unlocks the app.
+                                    await setAppPin(newPin);
+                                } catch (err: any) {
+                                    setNewPinError(err?.message || 'Could not save PIN.');
+                                }
+                            }}
+                            className="w-full py-3 rounded-xl font-bold bg-primary text-black shadow-glow disabled:opacity-50"
+                         >Save & Unlock</button>
                      </div>
                  </div>
              )}
@@ -194,7 +223,7 @@ export const PinLockScreen = () => {
              <div className="flex flex-col items-center gap-10 max-w-sm w-full text-center relative z-10">
                  <div className="mb-4">
                      <div className={`size-20 rounded-[2rem] bg-primary/10 flex items-center justify-center mx-auto mb-8 text-primary shadow-glow transition-transform duration-500 ${isBioVerifying ? 'animate-pulse scale-110' : 'animate-float'}`}>
-                        <span className="material-symbols-outlined text-5xl">lock_person</span>
+                        <span aria-hidden="true" className="material-symbols-outlined text-5xl">lock_person</span>
                      </div>
                      <h1 className="text-3xl font-black text-text-light-main dark:text-text-dark-main tracking-tight uppercase">App Locked</h1>
                      <p className="text-text-light-muted dark:text-text-dark-muted text-sm font-bold mt-2 tracking-widest opacity-60">
@@ -233,7 +262,7 @@ export const PinLockScreen = () => {
                         onClick={handleBiometricUnlock}
                         className="mt-6 text-primary flex items-center gap-2 font-bold uppercase tracking-widest text-xs hover:bg-primary/10 px-4 py-2 rounded-full transition-colors"
                      >
-                         <span className="material-symbols-outlined">fingerprint</span> Use Biometric
+                         <span aria-hidden="true" className="material-symbols-outlined">fingerprint</span> Use Biometric
                      </button>
                  )}
              </div>

@@ -1,0 +1,47 @@
+rules_version = '2';
+
+// Each user can only read and write their own data. The ownership checks in
+// context/Store.tsx run in the browser and can be bypassed; these rules are the
+// real protection.
+//
+// Deploy: npx firebase deploy --only firestore:rules
+// (referenced from firebase.json). Check with --dry-run first.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    // Collections whose documents carry a userId field.
+    function ownsExisting() {
+      return signedIn() && resource.data.userId == request.auth.uid;
+    }
+    function ownsIncoming() {
+      return signedIn() && request.resource.data.userId == request.auth.uid;
+    }
+
+    match /transactions/{id} {
+      allow read, delete: if ownsExisting();
+      allow create: if ownsIncoming();
+      // Ownership can't be transferred: both old and new must belong to the caller.
+      allow update: if ownsExisting() && ownsIncoming();
+    }
+
+    match /impulse_items/{id} {
+      allow read, delete: if ownsExisting();
+      allow create: if ownsIncoming();
+      allow update: if ownsExisting() && ownsIncoming();
+    }
+
+    // Settings and profile, keyed by the user's uid.
+    match /users/{userId} {
+      allow read, write: if signedIn() && request.auth.uid == userId;
+    }
+
+    // Everything else is closed.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

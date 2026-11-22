@@ -1,30 +1,15 @@
-
+// Budget & Goals page (/budget): monthly spending vs last month, category and
+// payment-method charts, savings milestones, and the AI audit.
 import React, { useState, useMemo } from 'react';
 import { useStore, SavingsGoal } from '../context/Store';
+import { useDialog } from './ui/DialogProvider';
+import { celebrate } from '../utils/celebrate';
+import { CATEGORY_STYLES, PAYMENT_METHOD_COLORS, FALLBACK_CHART_COLORS } from '../constants/categories';
+import { useFinancialInsight } from '../hooks/useFinancialInsight';
+import { getCurrencySymbol } from '../utils/currency';
+import { formatDisplayDate, parseLocalDate } from '../utils/date';
+import { formatMoney } from '../utils/format';
 
-const CATEGORY_STYLES: Record<string, { hex: string, icon: string, color: string, bg: string }> = {
-    "Food": { hex: "#f97316", icon: "restaurant", color: "text-orange-500", bg: "bg-orange-500/10" },
-    "Housing": { hex: "#3b82f6", icon: "home", color: "text-blue-500", bg: "bg-blue-500/10" },
-    "Rent": { hex: "#818cf8", icon: "real_estate_agent", color: "text-indigo-400", bg: "bg-indigo-400/10" },
-    "Transportation": { hex: "#a855f7", icon: "directions_car", color: "text-purple-500", bg: "bg-purple-500/10" },
-    "Entertainment": { hex: "#ec4899", icon: "movie", color: "text-pink-500", bg: "bg-pink-500/10" },
-    "Shopping": { hex: "#eab308", icon: "shopping_bag", color: "text-yellow-500", bg: "bg-yellow-500/10" },
-    "Subscription": { hex: "#ad1c43", icon: "subscriptions", color: "text-red-500", bg: "bg-red-500/10" },
-    "Health": { hex: "#f87171", icon: "medical_services", color: "text-red-400", bg: "bg-red-400/10" },
-    "Utilities": { hex: "#22d3ee", icon: "bolt", color: "text-cyan-400", bg: "bg-cyan-400/10" },
-    "Other": { hex: "#9ca3af", icon: "receipt", color: "text-gray-400", bg: "bg-gray-400/10" }
-};
-
-const PAYMENT_METHOD_COLORS: Record<string, string> = {
-    "Cash": "#10b981",
-    "UPI": "#3b82f6",
-    "Savings Account": "#f59e0b",
-    "Credit Card": "#ef4444",
-    "Debit Card": "#06b6d4",
-    "Unspecified": "#9ca3af"
-};
-
-const DEFAULT_COLORS = ["#10b981", "#3b82f6", "#8b5cf6", "#f59e0b", "#ef4444", "#06b6d4","#FF0000"];
 
 const ProgressRing: React.FC<{ percentage: number, color: string, size?: number }> = ({ percentage, color, size = 60 }) => {
     const radius = 25;
@@ -65,7 +50,7 @@ const DonutChart: React.FC<{ data: Record<string, number>, total: number, curren
         accumulatedAngle += angle;
         const color = type === 'category'
             ? (CATEGORY_STYLES[key]?.hex || '#9ca3af')
-            : (PAYMENT_METHOD_COLORS[key] || DEFAULT_COLORS[i % DEFAULT_COLORS.length]);
+            : (PAYMENT_METHOD_COLORS[key] || FALLBACK_CHART_COLORS[i % FALLBACK_CHART_COLORS.length]);
 
         const isHovered = hovered === key;
 
@@ -117,23 +102,24 @@ const DonutChart: React.FC<{ data: Record<string, number>, total: number, curren
 };
 
 const BudgetGoalsScreen: React.FC = () => {
-    const { userSettings, updateUserSettings, transactions, generateFinancialAudit } = useStore();
+    const { userSettings, updateUserSettings, transactions } = useStore();
+    const dialog = useDialog();
     const [activeTab, setActiveTab] = useState<'budget' | 'goals' | 'ai'>('budget');
     const [allocationType, setAllocationType] = useState<'category' | 'payment'>('category');
     const [editingBudget, setEditingBudget] = useState<string | null>(null);
     const [tempValue, setTempValue] = useState('');
 
-    const [aiAuditRaw, setAiAuditRaw] = useState<string | null>(null);
-    const [aiAuditJson, setAiAuditJson] = useState<any | null>(null);
-    const [aiAuditParseError, setAiAuditParseError] = useState<string | null>(null);
-    const [isAuditing, setIsAuditing] = useState(false);
+    const {
+        raw: aiAuditRaw, json: aiAuditJson, loading: isAuditing, notice: aiAuditParseError,
+        run: handleAudit, reset: resetAudit, copyJson: copyInsightJson, exportJson: exportInsightJson,
+    } = useFinancialInsight();
 
     const [showGoalModal, setShowGoalModal] = useState(false);
     const [showFundModal, setShowFundModal] = useState<{ id: string, name: string } | null>(null);
     const [fundAmount, setFundAmount] = useState('');
     const [goalForm, setGoalForm] = useState({ name: '', target: '', date: '', icon: 'savings' });
 
-    const currencySymbol = userSettings?.currency === 'USD' ? '$' : userSettings?.currency === 'EUR' ? '€' : '₹';
+    const currencySymbol = getCurrencySymbol(userSettings?.currency);
 
     // Metrics
     const { currentMonthSpent, previousMonthBalance, categoryActuals, paymentMethodActuals } = useMemo(() => {
@@ -151,7 +137,7 @@ const BudgetGoalsScreen: React.FC = () => {
         const pMethods: Record<string, number> = {};
 
         transactions.forEach(t => {
-            const d = new Date(t.date);
+            const d = parseLocalDate(t.date);
             if (d.getMonth() === curMonth && d.getFullYear() === curYear) {
                 if (t.type === 'expense') {
                     curSpent += t.amount;
@@ -174,64 +160,13 @@ const BudgetGoalsScreen: React.FC = () => {
         };
     }, [transactions]);
 
-    const tryParseJson = (raw: string) => {
-        if (!raw) return null;
-        const trimmed = raw.trim();
-        try {
-            return JSON.parse(trimmed);
-        } catch {
-            // Attempt to extract a JSON object from the text
-            const first = trimmed.indexOf('{');
-            const last = trimmed.lastIndexOf('}');
-            if (first >= 0 && last > first) {
-                const candidate = trimmed.slice(first, last + 1);
-                try {
-                    return JSON.parse(candidate);
-                } catch {
-                    return null;
-                }
-            }
-            return null;
-        }
-    };
+    /** The overall monthly spending limit (also shown on the Dashboard); 0 when none is set. */
+    const monthlyLimit = userSettings?.monthlyExpenseLimit || 0;
+    const limitPercent = monthlyLimit > 0 ? (currentMonthSpent / monthlyLimit) * 100 : 0;
+    /** Sum of the per-category caps. Separate from the monthly limit, and can disagree with it. */
+    const capsTotal = Object.values(userSettings?.categoryBudgets || {}).reduce((sum, v) => sum + (Number(v) || 0), 0);
 
-    const copyInsightJson = async () => {
-        if (!aiAuditJson) return;
-        try {
-            await navigator.clipboard.writeText(JSON.stringify(aiAuditJson, null, 2));
-            setAiAuditParseError('Copied insight JSON to clipboard.');
-            setTimeout(() => setAiAuditParseError(null), 3000);
-        } catch (e) {
-            setAiAuditParseError('Clipboard copy failed.');
-            setTimeout(() => setAiAuditParseError(null), 3000);
-        }
-    };
 
-    const exportInsightJson = () => {
-        if (!aiAuditJson) return;
-        const blob = new Blob([JSON.stringify(aiAuditJson, null, 2)], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = 'insight.json';
-        a.click();
-        URL.revokeObjectURL(url);
-    };
-
-    const handleAudit = async () => {
-        setIsAuditing(true);
-        setAiAuditParseError(null);
-        const res = await generateFinancialAudit();
-        setAiAuditRaw(res);
-        const parsed = res ? tryParseJson(res) : null;
-        if (parsed) {
-            setAiAuditJson(parsed);
-        } else {
-            setAiAuditJson(null);
-            if (res) setAiAuditParseError('Could not parse JSON output; showing raw response.');
-        }
-        setIsAuditing(false);
-    };
 
     const handleAddGoal = async () => {
         if (!goalForm.name.trim() || Number(goalForm.target) <= 0) return;
@@ -261,12 +196,17 @@ const BudgetGoalsScreen: React.FC = () => {
             return g;
         });
         await updateUserSettings({ savingsGoals: goals });
+        // Coins for every deposit; a bigger burst when the goal is reached.
+        const goal = goals.find(g => g.id === showFundModal.id);
+        const reached = goal && goal.targetAmount > 0 && goal.currentAmount >= goal.targetAmount && goal.currentAmount - amount < goal.targetAmount;
+        celebrate(null, reached ? 'confetti' : 'coins', reached ? 40 : 16);
+        if (reached) dialog.toast(`Goal reached: ${goal!.name} 🎉`);
         setShowFundModal(null);
         setFundAmount('');
     };
 
     const handleDeleteGoal = async (id: string) => {
-        if (!confirm("Are you sure you want to delete this milestone?")) return;
+        if (!(await dialog.confirm({ title: 'Delete this goal?', message: 'The money you added stays in your history.', confirmLabel: 'Delete', destructive: true }))) return;
         const goals = (userSettings?.savingsGoals || []).filter(g => g.id !== id);
         await updateUserSettings({ savingsGoals: goals });
     };
@@ -333,7 +273,7 @@ const BudgetGoalsScreen: React.FC = () => {
 
                             <div className="flex justify-center">
                                 <p className="text-xs font-medium text-text-light-muted opacity-60 flex items-center gap-2">
-                                    <span className="material-symbols-outlined text-sm">touch_app</span>
+                                    <span aria-hidden="true" className="material-symbols-outlined text-sm">touch_app</span>
                                     Hover or tap segments for specific metrics.
                                 </p>
                             </div>
@@ -352,16 +292,16 @@ const BudgetGoalsScreen: React.FC = () => {
                                     return (
                                         <div key={goal.id} className="bg-surface-light dark:bg-surface-dark border border-border-light dark:border-border-dark rounded-[2.5rem] p-6 shadow-sm group hover:border-primary/50 transition-all flex flex-col gap-6 relative overflow-hidden">
                                             <div className="flex justify-between items-start">
-                                                <div className="size-12 rounded-2xl bg-primary/10 text-primary flex items-center justify-center transition-transform group-hover:scale-110"><span className="material-symbols-outlined">{goal.icon}</span></div>
+                                                <div className="size-12 rounded-2xl bg-primary/10 text-primary flex items-center justify-center transition-transform group-hover:scale-110"><span aria-hidden="true" className="material-symbols-outlined">{goal.icon}</span></div>
                                                 <div className="flex items-center gap-3">
-                                                    <button onClick={() => setShowFundModal({ id: goal.id, name: goal.name })} className="opacity-0 group-hover:opacity-100 bg-gray-100 dark:bg-surface-darker px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-primary hover:text-black transition-all">Add Funds</button>
-                                                    <button onClick={() => handleDeleteGoal(goal.id)} className="opacity-0 group-hover:opacity-100 text-danger hover:scale-110 transition-all"><span className="material-symbols-outlined text-lg">delete</span></button>
+                                                    <button onClick={() => setShowFundModal({ id: goal.id, name: goal.name })} className="opacity-100 lg:opacity-0 lg:group-hover:opacity-100 lg:focus-within:opacity-100 lg:focus:opacity-100 bg-gray-100 dark:bg-surface-darker px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-primary hover:text-black transition-all">Add Funds</button>
+                                                    <button onClick={() => handleDeleteGoal(goal.id)} className="opacity-100 lg:opacity-0 lg:group-hover:opacity-100 lg:focus-within:opacity-100 lg:focus:opacity-100 text-danger hover:scale-110 transition-all"><span aria-hidden="true" className="material-symbols-outlined text-lg">delete</span></button>
                                                 </div>
                                             </div>
                                             <div className="flex items-center justify-between gap-4">
                                                 <div>
                                                     <h3 className="text-xl font-bold mb-1 truncate max-w-[150px]">{goal.name}</h3>
-                                                    <p className="text-xs font-bold text-text-light-muted uppercase tracking-widest opacity-60">Due: {goal.targetDate || 'TBD'}</p>
+                                                    <p className="text-xs font-bold text-text-light-muted uppercase tracking-widest opacity-60">Due: {goal.targetDate ? formatDisplayDate(goal.targetDate) : 'TBD'}</p>
                                                 </div>
                                                 <ProgressRing percentage={progress} color={progress >= 100 ? '#22c55e' : '#3b82f6'} />
                                             </div>
@@ -385,7 +325,7 @@ const BudgetGoalsScreen: React.FC = () => {
                                 })}
                                 {(userSettings?.savingsGoals || []).length === 0 && (
                                     <div className="col-span-full py-24 bg-surface-light dark:bg-surface-dark rounded-[2.5rem] border border-dashed border-border-light dark:border-border-dark flex flex-col items-center justify-center text-text-light-muted">
-                                        <div className="size-20 rounded-full bg-primary/5 flex items-center justify-center mb-6"><span className="material-symbols-outlined text-4xl opacity-20">flag</span></div>
+                                        <div className="size-20 rounded-full bg-primary/5 flex items-center justify-center mb-6"><span aria-hidden="true" className="material-symbols-outlined text-4xl opacity-20">flag</span></div>
                                         <p className="font-bold text-text-light-main dark:text-white">No active milestones.</p>
                                         <p className="text-xs max-w-[200px] text-center mt-2 opacity-60">Visualize your goals and start securing the funds today.</p>
                                         <button onClick={() => setShowGoalModal(true)} className="mt-6 text-primary text-xs font-black uppercase tracking-[0.2em] hover:underline">Launch Milestone</button>
@@ -403,7 +343,7 @@ const BudgetGoalsScreen: React.FC = () => {
                         <div className="flex items-start justify-between relative z-10">
                           <div>
                             <h2 className="text-2xl md:text-3xl font-bold text-white flex items-center gap-2">
-                              <span className="material-symbols-outlined text-indigo-400">auto_awesome</span>
+                              <span aria-hidden="true" className="material-symbols-outlined text-indigo-400">auto_awesome</span>
                               Gemini Insight
                             </h2>
                             <p className="text-xs text-white/60 mt-1">AI-generated financial insights</p>
@@ -508,7 +448,7 @@ const BudgetGoalsScreen: React.FC = () => {
                             </div>
                           ) : (
                             <div className="flex flex-col items-center justify-center text-center text-white/40 h-full">
-                              <span className="material-symbols-outlined text-4xl mb-2">analytics</span>
+                              <span aria-hidden="true" className="material-symbols-outlined text-4xl mb-2">analytics</span>
                               <p className="text-sm font-bold">AI Audit</p>
                             </div>
                           )}
@@ -524,7 +464,7 @@ const BudgetGoalsScreen: React.FC = () => {
                           </button>
 
                           <button
-                            onClick={() => { setAiAuditRaw(null); setAiAuditJson(null); }}
+                            onClick={resetAudit}
                             className="flex-1 py-3 rounded-xl border border-white/10 text-white/60 text-xs font-bold uppercase hover:bg-white/5"
                           >
                             Back
@@ -538,7 +478,7 @@ const BudgetGoalsScreen: React.FC = () => {
                         <div className="bg-gradient-to-br from-primary to-emerald-600 rounded-[2.5rem] p-4 md:p-8 text-[#131811] shadow-glow flex flex-col justify-between min-h-[180px] md:min-h-[220px] transition-transform hover:scale-[1.01]">
                             <div>
                                 <div className="flex items-center gap-2 mb-2">
-                                    <span className="material-symbols-outlined text-xl md:text-2xl">savings</span>
+                                    <span aria-hidden="true" className="material-symbols-outlined text-xl md:text-2xl">savings</span>
                                     <span className="text-[10px] md:text-xs font-black uppercase tracking-widest opacity-80 hidden md:inline">Realized Savings</span>
                                     <span className="text-[10px] font-black uppercase tracking-widest opacity-80 md:hidden">Saved</span>
                                 </div>
@@ -549,15 +489,16 @@ const BudgetGoalsScreen: React.FC = () => {
                         <div className="bg-surface-light dark:bg-surface-dark border border-border-light dark:border-border-dark rounded-[2.5rem] p-4 md:p-8 flex flex-col justify-between min-h-[180px] md:min-h-[220px] shadow-sm transition-transform hover:scale-[1.01]">
                             <div>
                                 <div className="flex items-center gap-2 mb-2 text-text-light-muted">
-                                    <span className="material-symbols-outlined text-xl md:text-2xl">event_repeat</span>
-                                    <span className="text-[10px] md:text-xs font-black uppercase tracking-widest hidden md:inline">Previous Carryover</span>
-                                    <span className="text-[10px] font-black uppercase tracking-widest md:hidden">Rollover</span>
+                                    <span aria-hidden="true" className="material-symbols-outlined text-xl md:text-2xl">event_repeat</span>
+                                    {/* Last month's income minus spending. Called "Rollover" before, which
+                                        clashed with the Dashboard's "Carried over" (everything before this month). */}
+                                    <span className="text-[10px] md:text-xs font-black uppercase tracking-widest">Last month's net</span>
                                 </div>
-                                <h3 className={`text-2xl md:text-4xl font-black tracking-tight ${previousMonthBalance >= 0 ? 'text-primary' : 'text-danger'}`}>{previousMonthBalance >= 0 ? '+' : '-'}{currencySymbol}{Math.abs(previousMonthBalance).toLocaleString()}</h3>
+                                <h3 className={`text-2xl md:text-4xl font-black tracking-tight ${previousMonthBalance >= 0 ? 'text-primary' : 'text-danger'}`}>{formatMoney(previousMonthBalance, currencySymbol, { signed: true })}</h3>
                             </div>
                             <div className="bg-gray-100 dark:bg-surface-darker p-2 md:p-3 rounded-2xl flex items-center gap-2 md:gap-3">
-                                <span className="material-symbols-outlined text-primary text-sm md:text-base">auto_awesome</span>
-                                <p className="text-[10px] md:text-xs font-bold text-text-light-muted dark:text-gray-400 leading-tight">Automatic rollover from last month.</p>
+                                <span aria-hidden="true" className="material-symbols-outlined text-primary text-sm md:text-base">auto_awesome</span>
+                                <p className="text-[10px] md:text-xs font-bold text-text-light-muted dark:text-gray-400 leading-tight">Income minus spending last month.</p>
                             </div>
                         </div>
                     </div>
@@ -574,7 +515,7 @@ const BudgetGoalsScreen: React.FC = () => {
                             <span className="text-[10px] font-black text-primary px-4 py-1.5 bg-primary/10 rounded-full uppercase tracking-widest border border-primary/20">Active Cycle</span>
                         </div>
 
-                        <div className="flex flex-col gap-4 overflow-y-auto custom-scrollbar flex-1 max-h-[650px] pr-2">
+                        <div className="flex flex-col gap-4 overflow-y-auto custom-scrollbar flex-1 max-h-[650px] pr-2 stagger">
                             {[...(userSettings?.expenseCategories || [])]
                                 .sort((a, b) => {
                                     const aVal = categoryActuals[a] || 0;
@@ -589,9 +530,12 @@ const BudgetGoalsScreen: React.FC = () => {
                                 .map(cat => {
                                     const limit = userSettings.categoryBudgets[cat] || 0;
                                     const actual = categoryActuals[cat] || 0;
-                                    const progress = limit > 0 ? Math.min(100, (actual / limit) * 100) : 0;
+                                    // Real share of the cap (can pass 100%); the bar itself stops at full.
+                                    const progress = limit > 0 ? (actual / limit) * 100 : 0;
                                     const remaining = limit - actual;
-                                    const isOver = remaining < 0;
+                                    // Only "over" against a real cap; with no cap any spending used to show as over budget.
+                                    const hasCap = limit > 0;
+                                    const isOver = hasCap && remaining < 0;
                                     const style = CATEGORY_STYLES[cat] || CATEGORY_STYLES['Other'];
 
                                     return (
@@ -599,12 +543,12 @@ const BudgetGoalsScreen: React.FC = () => {
                                             <div className="flex items-center justify-between">
                                                 <div className="flex items-center gap-4">
                                                     <div className={`size-12 rounded-2xl flex items-center justify-center border border-border-light dark:border-border-dark bg-white dark:bg-surface-dark ${style.color} transition-transform group-hover:scale-110 shadow-sm`}>
-                                                        <span className="material-symbols-outlined">{style.icon}</span>
+                                                        <span aria-hidden="true" className="material-symbols-outlined">{style.icon}</span>
                                                     </div>
                                                     <div className="flex flex-col">
                                                         <span className="font-black text-sm text-text-light-main dark:text-white uppercase tracking-tight">{cat}</span>
-                                                        <span className={`text-[10px] font-bold uppercase tracking-widest ${isOver ? 'text-danger' : 'text-primary'}`}>
-                                                            {isOver ? `Over: ${currencySymbol}${Math.abs(remaining).toLocaleString()}` : `Left: ${currencySymbol}${remaining.toLocaleString()}`}
+                                                        <span className={`text-[10px] font-bold uppercase tracking-widest ${isOver ? 'text-danger' : hasCap ? 'text-primary' : 'text-text-light-muted'}`}>
+                                                            {!hasCap ? 'No cap set' : isOver ? `Over by ${formatMoney(Math.abs(remaining), currencySymbol)}` : `${formatMoney(remaining, currencySymbol)} left`}
                                                         </span>
                                                     </div>
                                                 </div>
@@ -612,20 +556,20 @@ const BudgetGoalsScreen: React.FC = () => {
                                                     {editingBudget === cat ? (
                                                         <div className="flex items-center gap-2 animate-fade-in">
                                                             <input type="number" className="w-24 bg-background-light dark:bg-surface-dark border border-primary rounded-xl py-2 px-3 text-sm font-bold outline-none shadow-glow" value={tempValue} onChange={e => setTempValue(e.target.value)} autoFocus />
-                                                            <button onClick={async () => { const val = Number(tempValue); if (!isNaN(val)) { const buds = { ...userSettings.categoryBudgets, [cat]: val }; await updateUserSettings({ categoryBudgets: buds }); setEditingBudget(null); setTempValue(''); } }} className="size-9 rounded-xl bg-primary text-[#131811] flex items-center justify-center shadow-glow active:scale-95"><span className="material-symbols-outlined text-lg">check</span></button>
+                                                            <button onClick={async () => { const val = Number(tempValue); if (!isNaN(val)) { const buds = { ...userSettings.categoryBudgets, [cat]: val }; await updateUserSettings({ categoryBudgets: buds }); setEditingBudget(null); setTempValue(''); } }} className="size-9 rounded-xl bg-primary text-[#131811] flex items-center justify-center shadow-glow active:scale-95"><span aria-hidden="true" className="material-symbols-outlined text-lg">check</span></button>
                                                         </div>
                                                     ) : (
                                                         <div className="flex flex-col items-end cursor-pointer group/edit" onClick={() => { setEditingBudget(cat); setTempValue(limit.toString()); }}>
-                                                            <span className="text-xl font-black tracking-tighter tabular-nums text-text-light-main dark:text-white group-hover/edit:text-primary transition-colors">{currencySymbol}{limit.toLocaleString()}</span>
-                                                            <span className="text-[10px] font-bold text-text-light-muted flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity uppercase tracking-widest">Adjust Cap <span className="material-symbols-outlined text-[10px]">edit</span></span>
+                                                            <span className="text-xl font-black tracking-tighter tabular-nums text-text-light-main dark:text-white group-hover/edit:text-primary transition-colors">{formatMoney(limit, currencySymbol)}</span>
+                                                            <span className="text-[10px] font-bold text-text-light-muted flex items-center gap-1 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 lg:focus-within:opacity-100 lg:focus:opacity-100 transition-opacity uppercase tracking-widest">Adjust Cap <span aria-hidden="true" className="material-symbols-outlined text-[10px]">edit</span></span>
                                                         </div>
                                                     )}
                                                 </div>
                                             </div>
                                             <div className="flex flex-col gap-2">
                                                 <div className="flex justify-between text-[10px] font-bold uppercase tracking-widest opacity-40">
-                                                    <span>Consumed: {currencySymbol}{actual.toLocaleString()}</span>
-                                                    <span className={isOver ? 'text-danger font-black' : ''}>{progress.toFixed(0)}%</span>
+                                                    <span>Spent: {formatMoney(actual, currencySymbol)}</span>
+                                                    <span className={isOver ? 'text-danger font-black' : ''}>{hasCap ? `${progress.toFixed(0)}%` : '—'}</span>
                                                 </div>
                                                 <div className="h-2 w-full bg-gray-200 dark:bg-black/30 rounded-full overflow-hidden p-0.5 border border-border-light dark:border-border-dark">
                                                     <div className={`h-full rounded-full transition-all duration-1000 ease-out ${isOver ? 'bg-danger' : progress > 85 ? 'bg-orange-500' : 'bg-primary'}`} style={{ width: `${Math.min(100, progress)}%` }}></div>
@@ -639,11 +583,32 @@ const BudgetGoalsScreen: React.FC = () => {
                         <div className="mt-8 pt-8 border-t border-border-light dark:border-border-dark">
                             <div className="flex justify-between items-center mb-4">
                                 <p className="text-[10px] font-black uppercase tracking-[0.2em] text-text-light-muted opacity-60">Monthly Limit</p>
-                                <span className="text-xs font-black text-primary bg-primary/10 px-3 py-1 rounded-full">{((currentMonthSpent / Math.max(1, userSettings?.monthlyExpenseLimit ?? 1)) * 100).toFixed(0)}% </span>
+                                {monthlyLimit > 0 && (
+                                    <span className={`text-xs font-black px-3 py-1 rounded-full ${limitPercent > 100 ? 'text-danger bg-danger/10' : 'text-primary bg-primary/10'}`}>{limitPercent.toFixed(0)}%</span>
+                                )}
                             </div>
-                            <div className="h-6 w-full bg-gray-200 dark:bg-surface-darker rounded-full overflow-hidden p-1.5 border border-border-light dark:border-border-dark">
-                                    <div className="h-full bg-gradient-to-r from-primary via-primary to-emerald-400 rounded-full transition-all duration-1000 ease-out" style={{ width: `${Math.min(100, (currentMonthSpent / Math.max(1, userSettings?.monthlyExpenseLimit ?? 1)) * 100)}%` }}></div>
-                            </div>
+                            {monthlyLimit > 0 ? (
+                                <>
+                                    <p className="text-sm font-bold mb-3 text-text-light-main dark:text-text-dark-main">
+                                        {formatMoney(currentMonthSpent, currencySymbol)} of {formatMoney(monthlyLimit, currencySymbol)}
+                                        <span className={`ml-2 ${limitPercent > 100 ? 'text-danger' : 'text-text-light-muted'}`}>
+                                            {limitPercent > 100
+                                                ? `· Over by ${formatMoney(currentMonthSpent - monthlyLimit, currencySymbol)}`
+                                                : `· ${formatMoney(monthlyLimit - currentMonthSpent, currencySymbol)} left`}
+                                        </span>
+                                    </p>
+                                    <div className="h-6 w-full bg-gray-200 dark:bg-surface-darker rounded-full overflow-hidden p-1.5 border border-border-light dark:border-border-dark">
+                                        <div className={`h-full rounded-full transition-all duration-1000 ease-out ${limitPercent > 100 ? 'bg-danger' : 'bg-gradient-to-r from-primary via-primary to-emerald-400'}`} style={{ width: `${Math.min(100, limitPercent)}%` }}></div>
+                                    </div>
+                                    {capsTotal > monthlyLimit && (
+                                        <p className="text-xs text-text-light-muted dark:text-text-dark-muted mt-3">
+                                            Your category caps add up to {formatMoney(capsTotal, currencySymbol)}, more than this limit.
+                                        </p>
+                                    )}
+                                </>
+                            ) : (
+                                <p className="text-sm text-text-light-muted dark:text-text-dark-muted">No monthly limit set. Set one from the Expenses card on the Dashboard.</p>
+                            )}
                         </div>
                     </div>
                 </div>
@@ -655,10 +620,10 @@ const BudgetGoalsScreen: React.FC = () => {
                     <div className="bg-surface-light dark:bg-surface-dark border border-border-light dark:border-border-dark rounded-[3rem] p-8 md:p-10 w-full max-w-md shadow-2xl animate-slide-up">
                         <div className="flex justify-between items-center mb-8">
                             <div className="flex items-center gap-3">
-                                <div className="size-10 rounded-2xl bg-primary/10 text-primary flex items-center justify-center"><span className="material-symbols-outlined">flag</span></div>
+                                <div className="size-10 rounded-2xl bg-primary/10 text-primary flex items-center justify-center"><span aria-hidden="true" className="material-symbols-outlined">flag</span></div>
                                 <h2 className="text-2xl font-black uppercase tracking-tight">New Milestone</h2>
                             </div>
-                            <button onClick={() => setShowGoalModal(false)} className="size-10 rounded-full hover:bg-gray-100 dark:hover:bg-surface-darker transition-colors"><span className="material-symbols-outlined">close</span></button>
+                            <button onClick={() => setShowGoalModal(false)} className="size-10 rounded-full hover:bg-gray-100 dark:hover:bg-surface-darker transition-colors"><span aria-hidden="true" className="material-symbols-outlined">close</span></button>
                         </div>
                         <div className="flex flex-col gap-6">
                             <div className="flex flex-col gap-2">
@@ -695,7 +660,7 @@ const BudgetGoalsScreen: React.FC = () => {
             {showFundModal && (
                 <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-md flex items-center justify-center p-4 animate-fade-in">
                     <div className="bg-surface-light dark:bg-surface-dark border border-border-light dark:border-border-dark rounded-[2.5rem] sm:rounded-[3rem] p-4 sm:p-8 md:p-8 w-full sm:max-w-sm md:max-w-md lg:max-w-lg xl:max-w-xl max-h-[90vh] overflow-y-auto shadow-2xl animate-slide-up text-center">
-                        <div className="size-16 rounded-3xl bg-primary/10 text-primary flex items-center justify-center mx-auto mb-6"><span className="material-symbols-outlined text-3xl">add_card</span></div>
+                        <div className="size-16 rounded-3xl bg-primary/10 text-primary flex items-center justify-center mx-auto mb-6"><span aria-hidden="true" className="material-symbols-outlined text-3xl">add_card</span></div>
                         <h3 className="text-2xl font-black text-text-light-main dark:text-text-dark-main mb-2">Inject Funds</h3>
                         <p className="text-sm text-text-light-muted mb-8">Securing capital for <span className="text-primary font-bold">{showFundModal.name}</span></p>
 

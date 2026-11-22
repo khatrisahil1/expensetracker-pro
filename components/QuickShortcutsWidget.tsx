@@ -1,5 +1,8 @@
+// Dashboard widget: one-tap buttons that add a preset transaction (e.g. ☕ Coffee ₹50).
 import React, { useState } from 'react';
 import { useStore, QuickShortcut } from '../context/Store';
+import { getCurrencySymbol } from '../utils/currency';
+import { toLocalISODate } from '../utils/date';
 
 const EXPENSE_CATS = ["Food", "Rent", "Transportation", "Shopping", "Entertainment", "Health", "Utilities", "Home", "Other"];
 const INCOME_CATS = ["Salary", "Freelance", "Investments", "Gifts", "Refunds", "Rental", "Other"];
@@ -7,7 +10,7 @@ const INCOME_CATS = ["Salary", "Freelance", "Investments", "Gifts", "Refunds", "
 const QuickShortcutsWidget: React.FC = () => {
   const { userSettings, updateUserSettings, addTransaction, isDemo } = useStore();
   const shortcuts = userSettings?.quickShortcuts || [];
-  const currencySymbol = userSettings?.currency === 'USD' ? '$' : userSettings?.currency === 'EUR' ? '€' : '₹';
+  const currencySymbol = getCurrencySymbol(userSettings?.currency);
 
   const [showModal, setShowModal] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -20,7 +23,7 @@ const QuickShortcutsWidget: React.FC = () => {
 
   const handleTap = async (s: QuickShortcut) => {
     if (isDemo) return;
-    const today = new Date().toISOString().split('T')[0];
+    const today = toLocalISODate();
     await addTransaction({
       title: s.label, amount: s.amount, date: today,
       type: s.type, category: s.category, paymentMethod: s.paymentMethod,
@@ -53,20 +56,20 @@ const QuickShortcutsWidget: React.FC = () => {
     setEditingId(null);
   };
 
-  const cats = form.type === 'expense' ? EXPENSE_CATS : INCOME_CATS;
+  const cats = form.type === 'expense' ? (userSettings?.expenseCategories || EXPENSE_CATS) : (userSettings?.incomeCategories || INCOME_CATS);
 
   return (
     <div className="col-span-2 md:col-span-2 lg:col-span-12 bg-surface-light dark:bg-surface-dark border border-border-light dark:border-border-dark rounded-[2rem] p-5 shadow-card-light dark:shadow-card">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
-          <span className="material-symbols-outlined text-primary text-xl">bolt</span>
+          <span aria-hidden="true" className="material-symbols-outlined text-primary text-xl">bolt</span>
           <h3 className="text-sm font-black uppercase tracking-widest text-text-light-main dark:text-text-dark-main">Quick Shortcuts</h3>
         </div>
         <button
           onClick={() => setShowModal(true)}
           className="size-8 rounded-full bg-primary/10 text-primary flex items-center justify-center hover:bg-primary hover:text-[#131811] transition-all"
         >
-          <span className="material-symbols-outlined text-[18px]">add</span>
+          <span aria-hidden="true" className="material-symbols-outlined text-[18px]">add</span>
         </button>
       </div>
 
@@ -75,7 +78,7 @@ const QuickShortcutsWidget: React.FC = () => {
           onClick={() => setShowModal(true)}
           className="flex items-center gap-3 p-4 rounded-2xl border border-dashed border-border-light dark:border-border-dark text-text-light-muted dark:text-text-dark-muted cursor-pointer hover:border-primary/40 hover:text-primary transition-all"
         >
-          <span className="material-symbols-outlined text-xl">bolt</span>
+          <span aria-hidden="true" className="material-symbols-outlined text-xl">bolt</span>
           <span className="text-sm font-bold">Save your first shortcut for one-tap transactions</span>
         </div>
       ) : (
@@ -119,7 +122,7 @@ const QuickShortcutsWidget: React.FC = () => {
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-black text-text-light-main dark:text-text-dark-main">New Shortcut</h3>
               <button onClick={() => setShowModal(false)} className="size-8 rounded-full hover:bg-gray-100 dark:hover:bg-surface-darker flex items-center justify-center">
-                <span className="material-symbols-outlined text-text-light-muted">close</span>
+                <span aria-hidden="true" className="material-symbols-outlined text-text-light-muted">close</span>
               </button>
             </div>
 
@@ -188,7 +191,7 @@ const QuickShortcutsWidget: React.FC = () => {
               disabled={isSaving || !form.label.trim() || !form.amount}
               className="w-full py-3.5 rounded-xl bg-primary text-[#131811] font-black shadow-glow hover:bg-primary/90 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
             >
-              {isSaving ? <span className="material-symbols-outlined animate-spin text-sm">sync</span> : <span className="material-symbols-outlined text-sm">bolt</span>}
+              {isSaving ? <span aria-hidden="true" className="material-symbols-outlined animate-spin text-sm">sync</span> : <span aria-hidden="true" className="material-symbols-outlined text-sm">bolt</span>}
               Save Shortcut
             </button>
           </div>
