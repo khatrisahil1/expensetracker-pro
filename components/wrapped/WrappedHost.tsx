@@ -2,7 +2,7 @@
 // held (see wrappedEvents), and shows the first-time spotlight tutorial
 // ("press and hold your profile") once there's enough data to wrap.
 import React, { useCallback, useEffect, useState } from 'react';
-import { useLocation } from 'react-router';
+import { useLocation, useSearchParams } from 'react-router';
 import { useStore } from '../../context/Store';
 import { STORAGE_KEYS } from '../../constants/app';
 import { ROUTES } from '../../routes';
@@ -25,6 +25,14 @@ const WrappedHost: React.FC = () => {
   const [showTutorial, setShowTutorial] = useState(false);
 
   useEffect(() => onOpenWrapped(() => { markSeen(); setShowTutorial(false); setOpen(true); }), []);
+
+  // Home-screen shortcut: /?action=wrapped
+  const [searchParams, setSearchParams] = useSearchParams();
+  useEffect(() => {
+    if (searchParams.get('action') !== 'wrapped') return;
+    setSearchParams({}, { replace: true });
+    openWrapped();
+  }, [searchParams, setSearchParams]);
 
   // First visit to the Dashboard with some data: teach the gesture once.
   useEffect(() => {

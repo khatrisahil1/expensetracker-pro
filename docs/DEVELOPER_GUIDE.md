@@ -406,6 +406,21 @@ flowchart LR
 </details>
 
 <details>
+<summary><b>📲 Home-screen shortcuts</b></summary>
+
+Defined in the PWA manifest (`shortcuts` in [vite.config.ts](../vite.config.ts)). Long-press the installed app icon (Android, desktop Chrome/Edge; iOS doesn't support them):
+
+| Shortcut | URL | What happens |
+|---|---|---|
+| Add expense | `/transactions?action=add` | Amount field is focused |
+| Scan receipt | `/transactions?action=scan` | Camera opens |
+| Monthly Wrapped | `/?action=wrapped` | Wrapped story opens |
+| History | `/transactions/history` | History page |
+
+The `?action=` parameter is removed after use, so a refresh doesn't repeat it.
+</details>
+
+<details>
 <summary><b>🔐 Login & setup screens</b></summary>
 
 - [LoginScreen.tsx](../components/LoginScreen.tsx): errors from Firebase are translated to plain language (`authMessage`); the card shakes (Web Animations, keeps focus) and the phone vibrates on error; confetti on success.

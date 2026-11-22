@@ -6,7 +6,7 @@ import { extractJsonObject } from '../utils/json';
 import { compressDataUrl, drawScaledJpeg, RECEIPT_MAX_SIDE } from '../utils/image';
 import { useStore } from '../context/Store';
 import { useDialog } from './ui/DialogProvider';
-import { useNavigate } from 'react-router';
+import { useSearchParams, useNavigate } from 'react-router';
 import { ROUTES } from '../routes';
 import { CATEGORY_STYLES } from '../constants/categories';
 import { getCurrencySymbol } from '../utils/currency';
@@ -83,6 +83,20 @@ export const TransactionsScreen: React.FC = () => {
         }));
     }
   }, [userSettings, formData.type]);
+
+  // Home-screen shortcuts (see vite.config.ts manifest): ?action=add focuses the
+  // amount, ?action=scan opens the camera. The parameter is removed afterwards
+  // so a refresh doesn't repeat it.
+  const amountRef = useRef<HTMLInputElement>(null);
+  const [searchParams, setSearchParams] = useSearchParams();
+  useEffect(() => {
+    const action = searchParams.get('action');
+    if (!action) return;
+    if (action === 'add') setTimeout(() => amountRef.current?.focus(), 300);
+    if (action === 'scan') setTimeout(() => { void startCamera(); }, 300);
+    setSearchParams({}, { replace: true });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // --- CAMERA LOGIC ---
   useEffect(() => {
@@ -267,7 +281,7 @@ export const TransactionsScreen: React.FC = () => {
                 </label>
                 <div className="flex items-center justify-center gap-4 w-full">
                   <span className="text-4xl md:text-5xl font-black text-text-light-subtle opacity-30">{currencySymbol}</span>
-                  <input type="number" step="0.01" value={formData.amount} onChange={(e) => setFormData({...formData, amount: e.target.value})} className="bg-transparent border-none text-6xl md:text-8xl font-black text-text-light-main dark:text-text-dark-main p-0 focus:ring-0 w-auto min-w-[180px] text-center placeholder:text-gray-100 dark:placeholder:text-white/5" placeholder="0.00" />
+                  <input ref={amountRef} type="number" step="0.01" inputMode="decimal" value={formData.amount} onChange={(e) => setFormData({...formData, amount: e.target.value})} className="bg-transparent border-none text-6xl md:text-8xl font-black text-text-light-main dark:text-text-dark-main p-0 focus:ring-0 w-auto min-w-[180px] text-center placeholder:text-gray-100 dark:placeholder:text-white/5" placeholder="0.00" />
                   <div className="flex flex-col gap-1 opacity-30">
                     <button type="button" onClick={() => setFormData(prev => ({...prev, amount: (parseFloat(prev.amount || '0') + 1).toString()}))} className="material-symbols-outlined text-3xl hover:text-primary">expand_less</button>
                     <button type="button" onClick={() => setFormData(prev => ({...prev, amount: Math.max(0, parseFloat(prev.amount || '0') - 1).toString()}))} className="material-symbols-outlined text-3xl hover:text-primary">expand_more</button>

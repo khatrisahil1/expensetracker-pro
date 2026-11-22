@@ -102,6 +102,14 @@ export default defineConfig(({ mode }) => {
               display: 'standalone',
               start_url: '/',
               scope: '/',
+              // Long-press the installed app icon (Android, desktop Chrome/Edge)
+              // to jump straight to these. The app reads ?action= on arrival.
+              shortcuts: [
+                { name: 'Add expense', short_name: 'Add', description: 'Log a new expense', url: '/transactions?action=add', icons: [{ src: '/icon-96x96.png', sizes: '96x96', type: 'image/png' }] },
+                { name: 'Scan receipt', short_name: 'Scan', description: 'Scan a receipt with the camera', url: '/transactions?action=scan', icons: [{ src: '/icon-96x96.png', sizes: '96x96', type: 'image/png' }] },
+                { name: 'Monthly Wrapped', short_name: 'Wrapped', description: 'See your month, wrapped', url: '/?action=wrapped', icons: [{ src: '/icon-96x96.png', sizes: '96x96', type: 'image/png' }] },
+                { name: 'History', short_name: 'History', description: 'Search all transactions', url: '/transactions/history', icons: [{ src: '/icon-96x96.png', sizes: '96x96', type: 'image/png' }] },
+              ],
               icons: [
                 { src: '/pwa-192.png', sizes: '192x192', type: 'image/png' },
                 { src: '/pwa-512.png', sizes: '512x512', type: 'image/png' },
