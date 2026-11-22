@@ -1,0 +1,11 @@
+{
+  "name": "expensetracker-functions",
+  "private": true,
+  "description": "Scheduled push reminders for ExpenseTracker (Firebase Cloud Functions v2). Requires the Blaze plan.",
+  "main": "index.js",
+  "engines": { "node": "22" },
+  "dependencies": {
+    "firebase-admin": "^13.0.0",
+    "firebase-functions": "^6.0.0"
+  }
+}

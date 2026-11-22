@@ -49,6 +49,9 @@ Put these in `.env.local` (git-ignored):
 | Variable | Used by | Notes |
 |---|---|---|
 | `VITE_GEMINI_API_KEY` (or `GEMINI_API_KEY`) | [utils/gemini.ts](../utils/gemini.ts) | AI insights, receipt scanning, link reading. **Currently bundled into the client** — see [Roadmap](#14-roadmap). |
+| `VITE_FCM_VAPID_KEY` | Store `enablePushNotifications` | Public Web Push key (Firebase console → Cloud Messaging → Web Push certificates). Empty = push switch hidden. |
+
+A template is in [.env.example](../.env.example).
 
 Firebase config is in [context/Store.tsx](../context/Store.tsx). The Firebase web `apiKey` is public by design; security comes from Firestore rules.
 </details>
@@ -351,6 +354,35 @@ Typing in History searches **all dates**. Every word must match somewhere (title
 </details>
 
 <details>
+<summary><b>📬 Push notifications (app closed)</b></summary>
+
+```mermaid
+sequenceDiagram
+  participant U as User (Profile → Notifications)
+  participant App
+  participant FCM as Firebase Cloud Messaging
+  participant Fn as functions/index.js (scheduled)
+  participant SW as Service worker (push-sw.js)
+  U->>App: turn on Push notifications
+  App->>FCM: getToken(VAPID key)
+  App->>App: save token on users/{uid}.pushTokens
+  Fn->>FCM: 9 AM: renewals due tomorrow, budget 80%/100%; 9 PM: nothing logged today
+  FCM->>SW: push
+  SW->>U: notification → tap opens /subscriptions, /budget or /transactions?action=add
+```
+
+**Done in the app:** switch, token registration ([Store](../context/Store.tsx) `enablePushNotifications` / `disablePushNotifications`, `firebase/messaging` loaded on demand), service-worker handler ([public/push-sw.js](../public/push-sw.js), imported via `workbox.importScripts`).
+
+**To switch it on (owner):**
+1. Firebase console → Project settings → Cloud Messaging → Web Push certificates → **Generate key pair**; put the public key in `VITE_FCM_VAPID_KEY`.
+2. Upgrade the project to the **Blaze** plan (scheduled functions need it).
+3. Add `"functions": { "source": "functions" }` to `firebase.json`, then `cd functions && npm install && npx firebase deploy --only functions`.
+4. The first run will log links to create the **composite indexes** its queries need (transactions: userId+isSubscription+nextRenewalDate, userId+type+date, userId+date); click them once.
+
+Not available in Guest mode or on iOS Safari unless the app is installed to the home screen (iOS 16.4+).
+</details>
+
+<details>
 <summary><b>🔔 Notifications & tones</b></summary>
 
 - Stay unread until tapped. Panel: All/Unread, Mark all read, per-item delete, Clear all (confirmed).
@@ -649,6 +681,7 @@ Your store mock creates new objects on every render. Use one stable object (see 
 - [ ] Screen-reader pass: label icon-only buttons, hide decorative icons.
 - [x] Code-split heavy features: Gemini SDK and the Lottie player load on demand; React and Firebase are separate cached chunks (startup ≈276 KB gzip, was ≈395 KB).
 - [ ] Gemini fallback for merchants the rules can't categorise.
+- [ ] Push notifications: generate VAPID key, Blaze plan, deploy `functions/` (code is ready).
 - [x] Make Split Bill real.
 
 ---

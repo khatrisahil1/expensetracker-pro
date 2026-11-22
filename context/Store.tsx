@@ -30,7 +30,7 @@ import {
   reauthenticateWithCredential,
   EmailAuthProvider
 } from 'firebase/auth';
-import { initializeFirestore, getFirestore, persistentLocalCache, persistentMultipleTabManager, collection, addDoc, query, where, onSnapshot, getDocs, doc, deleteDoc, Timestamp, setDoc, getDoc, updateDoc, deleteField, writeBatch, increment, type DocumentReference } from 'firebase/firestore';
+import { initializeFirestore, getFirestore, persistentLocalCache, persistentMultipleTabManager, collection, addDoc, query, where, onSnapshot, getDocs, doc, deleteDoc, Timestamp, setDoc, getDoc, updateDoc, deleteField, writeBatch, increment, arrayUnion, arrayRemove, type DocumentReference } from 'firebase/firestore';
 import { checkBudgetThresholds, checkCategoryBudgets, checkDailyReminder, checkMonthlySummary } from '../utils/notifications';
 // Gemini API helpers
 import { createGeminiClient, GEMINI_MODEL } from "../utils/gemini";
@@ -175,6 +175,8 @@ export interface UserSettings {
   shakeToLock?: boolean;
   appPin?: string | null; 
   biometricEnabled?: boolean; 
+  /** True when this account has turned on push notifications on at least one device. */
+  pushEnabled?: boolean;
   /** Split Bill: shared expenses with friends (see utils/split.ts). */
   splitBills?: SplitBill[];
   /** Split Bill: friends' names, most recent first. */
@@ -202,6 +204,9 @@ export interface UserSettings {
 }
 
 /** Answers collected by the onboarding screen. */
+/** Outcome of turning on push notifications. */
+export type PushResult = 'enabled' | 'denied' | 'unsupported' | 'not-configured' | 'error';
+
 export interface OnboardingData {
   name: string;
   age: string;
@@ -312,6 +317,14 @@ interface StoreContextType {
   // --- Notifications ---
   /** Add a notification (skipped if the same one is already unread) and play the chosen tone. */
   addNotification: (title: string, body: string, type?: AppNotification['type']) => void;
+  /**
+   * Turn on push notifications for this device (works when the app is closed).
+   * Needs VITE_FCM_VAPID_KEY and a server sender (see functions/). Resolves to
+   * what happened, so the UI can explain it.
+   */
+  enablePushNotifications: () => Promise<PushResult>;
+  /** Stop push notifications on this device. */
+  disablePushNotifications: () => Promise<void>;
   /** Mark every notification read. */
   markNotificationsRead: () => void;
   /** Mark one notification read or unread. */
@@ -604,6 +617,7 @@ export const StoreProvider = ({ children }: PropsWithChildren) => {
             tipsAndTricks: true
           },
           notificationTune: data.notificationTune || 'Aurora',
+          pushEnabled: data.pushEnabled ?? false,
           splitBills: data.splitBills || [],
           splitFriends: data.splitFriends || [],
         };
@@ -914,6 +928,48 @@ export const StoreProvider = ({ children }: PropsWithChildren) => {
     playTone(userSettings?.notificationTune);
   };
 
+  // --- Push notifications (Firebase Cloud Messaging) ---
+  // The device's token is stored on the user document (pushTokens); a server
+  // function (functions/index.js) sends reminders to it. firebase/messaging is
+  // imported on demand so it isn't in the startup bundle.
+  const PUSH_TOKEN_KEY = 'push:token';
+  const enablePushNotifications = async (): Promise<PushResult> => {
+    const vapidKey = import.meta.env.VITE_FCM_VAPID_KEY as string | undefined;
+    if (!vapidKey) return 'not-configured';
+    if (!user || isDemo) return 'unsupported';
+    if (!('Notification' in window) || !('serviceWorker' in navigator)) return 'unsupported';
+    try {
+      const { isSupported, getMessaging, getToken } = await import('firebase/messaging');
+      if (!(await isSupported())) return 'unsupported';
+      const permission = await Notification.requestPermission();
+      if (permission !== 'granted') return 'denied';
+      const registration = await navigator.serviceWorker.ready;
+      const token = await getToken(getMessaging(app), { vapidKey, serviceWorkerRegistration: registration });
+      if (!token) return 'error';
+      localStorage.setItem(PUSH_TOKEN_KEY, token);
+      await settleWrite(setDoc(doc(db, 'users', user.uid), { pushTokens: arrayUnion(token), pushEnabled: true }, { merge: true }));
+      return 'enabled';
+    } catch (err) {
+      console.error('Push setup failed', err);
+      return 'error';
+    }
+  };
+
+  const disablePushNotifications = async () => {
+    const token = localStorage.getItem(PUSH_TOKEN_KEY);
+    localStorage.removeItem(PUSH_TOKEN_KEY);
+    if (!user || isDemo) return;
+    try {
+      if (token) {
+        const { getMessaging, deleteToken } = await import('firebase/messaging');
+        await deleteToken(getMessaging(app)).catch(() => {});
+      }
+      await settleWrite(setDoc(doc(db, 'users', user.uid), { ...(token ? { pushTokens: arrayRemove(token) } : {}), pushEnabled: false }, { merge: true }));
+    } catch (err) {
+      console.error('Push removal failed', err);
+    }
+  };
+
   const markNotificationsRead = () => {
     setNotifications(prev => prev.map(n => ({...n, read: true})));
   };
@@ -1168,7 +1224,7 @@ Respond with JSON only.`;
       }, isDemo,
       isPinSet: !!appPin, isAppLocked, setAppPin, removeAppPin, unlockApp, lockApp,
       undoState, showUndo, clearUndo,
-      notifications, addNotification, markNotificationsRead, setNotificationRead, deleteNotification, clearNotifications,
+      notifications, addNotification, enablePushNotifications, disablePushNotifications, markNotificationsRead, setNotificationRead, deleteNotification, clearNotifications,
       generateFinancialAudit, verifyBiometric, sendVerificationEmail, reauthenticate,
       exportAllData, importAllData,
     }}>

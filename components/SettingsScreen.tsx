@@ -52,6 +52,7 @@ const SettingsScreen: React.FC = () => {
   const {
     logout, user, updateUserSettings, userSettings, toggleTheme, updatePassword, deleteAccount,
     setAppPin, removeAppPin, sendVerificationEmail, refreshUser, transactions, clearAllTransactions,
+    enablePushNotifications, disablePushNotifications,
   } = useStore();
 
   // --- Navigation -----------------------------------------------------------
@@ -201,6 +202,26 @@ const SettingsScreen: React.FC = () => {
       showToast('All transactions deleted');
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  // Push notifications for this device (works when the app is closed).
+  const pushConfigured = !!import.meta.env.VITE_FCM_VAPID_KEY;
+  const isGuest = !user?.email;
+  const [pushOn, setPushOn] = useState(() => { try { return !!localStorage.getItem('push:token'); } catch { return false; } });
+  const [pushBusy, setPushBusy] = useState(false);
+  const togglePush = async (next: boolean) => {
+    setPushBusy(true);
+    try {
+      if (!next) { await disablePushNotifications(); setPushOn(false); showToast('Push notifications off'); return; }
+      const result = await enablePushNotifications();
+      if (result === 'enabled') { setPushOn(true); showToast('Push notifications on 🔔'); }
+      else if (result === 'denied') showToast('Notifications are blocked. Allow them in your browser settings.', 'error');
+      else if (result === 'unsupported') showToast('This browser can’t receive push notifications. Try installing the app.', 'info');
+      else if (result === 'not-configured') showToast('Push isn’t set up for this app yet.', 'info');
+      else showToast('Couldn’t turn on push notifications.', 'error');
+    } finally {
+      setPushBusy(false);
     }
   };
 
@@ -383,6 +404,13 @@ const SettingsScreen: React.FC = () => {
               {NOTIFICATION_PREFS.map(p => (
                 <Row key={p.id} label={p.label} detail={p.desc} trailing={<Switch label={p.label} checked={notifPrefs[p.id]} onChange={v => toggleNotif(p.id, v)} />} />
               ))}
+            </Group>
+            <Group header="When the app is closed"
+              footer={pushConfigured
+                ? 'Bill reminders and budget alerts arrive even when the app is closed. You can turn this off any time.'
+                : 'Not available yet: push needs a Web Push key and a reminder server to be set up (see the developer guide).'}>
+              <Row icon="notifications_active" tile="indigo" label="Push notifications" detail={pushConfigured ? (pushOn ? 'On for this device' : 'Off') : 'Coming soon'}
+                trailing={<Switch label="Push notifications" checked={pushOn} onChange={togglePush} busy={pushBusy} disabled={!pushConfigured || isGuest} />} />
             </Group>
             <Group header="Sound" footer="Tap a tone to hear it. It plays when a new notification arrives while the app is open.">
               {NOTIFICATION_TONES.map(t => {

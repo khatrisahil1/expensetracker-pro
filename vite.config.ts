@@ -73,6 +73,8 @@ export default defineConfig(({ mode }) => {
             ],
 
             workbox: {
+              // Push notification handlers (public/push-sw.js).
+              importScripts: ['/push-sw.js'],
               // The app uses client-side routes (/budget, /settings, ...). Offline, any
               // page URL must load the app shell so the router can render it. Serving
               // offline.html here broke every deep link and refresh while offline.
