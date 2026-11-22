@@ -145,6 +145,7 @@ docs/                   This guide
 | [sounds.ts](../utils/sounds.ts) | Four notification tones generated with Web Audio. |
 | [celebrate.ts](../utils/celebrate.ts) | Confetti / coins / hearts bursts. |
 | [avatars.ts](../utils/avatars.ts) | 12 built-in avatars drawn as SVG (feminine / masculine / neutral), `presetsFor(gender)`. Add purchased art via `EXTRA_AVATARS`. |
+| [wrapped.ts](../utils/wrapped.ts) | `buildWrapped(transactions, month)`: totals, savings rate, top category, biggest spend, busiest weekday, vs last month, piggy mood. `defaultWrappedMonth`. |
 | [password.ts](../utils/password.ts) | `passwordStrength` → score 0–4, label, hint (sign-up form). |
 | [notifications.ts](../utils/notifications.ts) | Budget, monthly, daily-reminder checks and system notifications. |
 | [gemini.ts](../utils/gemini.ts) / [json.ts](../utils/json.ts) | Gemini client; pull JSON out of model replies. |
@@ -385,6 +386,23 @@ stateDiagram-v2
 - **My photo** tab: upload or take a photo, then crop: drag to move, pinch / wheel / slider to zoom, circular guide. Saved as a 400×400 JPEG (~10–40 KB).
 - **Remove picture** clears it (initials show).
 - Why not amrit.art "Toy Faces"? It's a paid pack ("All rights reserved") and its terms don't say whether files may be bundled in an app. If bought and permitted, drop files in `public/avatars/` and list them in `EXTRA_AVATARS`.
+</details>
+
+<details>
+<summary><b>🎁 Monthly Wrapped</b></summary>
+
+```mermaid
+flowchart LR
+  T[First Dashboard visit<br/>≥3 entries, not seen] --> S[Spotlight tutorial<br/>“press and hold your profile”]
+  S -- Show me / hold avatar --> W[MonthlyWrapped story]
+  A[Hold any WrappedAvatar<br/>ring fills, 600ms] --> W
+  W --> I[Intro] --> M[Money in & out] --> C[Top category] --> B[Biggest spend] --> D[Busiest weekday] --> H[Habits] --> V[Piggy's verdict + Share]
+```
+
+- **Gesture**: [hooks/useLongPress.ts](../hooks/useLongPress.ts) (progress 0→1, cancel on move, tap still works). [WrappedAvatar](../components/wrapped/WrappedAvatar.tsx) is used in the phone Dashboard header and the desktop sidebar; tap = Profile, hold = Wrapped.
+- **Event bus**: `openWrapped()` in [wrappedEvents.ts](../components/wrapped/wrappedEvents.ts); [WrappedHost](../components/wrapped/WrappedHost.tsx) (in AppLayout) renders the story and the tutorial.
+- **Tutorial**: [components/ui/Spotlight.tsx](../components/ui/Spotlight.tsx), a reusable coach mark. Dims the screen except a hole around the first *on-screen* `[data-wrapped-target]`; touches pass through to the avatar. Shown once (`STORAGE_KEYS.WRAPPED_TUTORIAL_SEEN`).
+- **Story**: [MonthlyWrapped.tsx](../components/wrapped/MonthlyWrapped.tsx). Tap right/left, hold to pause, swipe down / ✕ / Esc to close, month picker, auto-advance 5.5 s, share text via Web Share (clipboard fallback). Month shown: last month in the first week of a new month, else this month.
 </details>
 
 <details>

@@ -1,7 +1,8 @@
 // Navigation. Renders the desktop sidebar (and the phone bottom bar) or, with
 // isOpen/onClose, the mobile slide-in drawer. Items come from NAV_ITEMS in routes.ts.
 import React, { useEffect, useState } from 'react';
-import { Link, NavLink } from 'react-router';
+import { Link, NavLink, useNavigate } from 'react-router';
+import WrappedAvatar from './wrapped/WrappedAvatar';
 import { User } from '../types';
 import { ROUTES, NAV_ITEMS, MOBILE_NAV_ITEMS } from '../routes';
 
@@ -17,6 +18,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   isOpen,
   onClose,
 }) => {
+  const navigate = useNavigate();
   const [isMobile, setIsMobile] = useState(false);
 
   useEffect(() => {
@@ -94,20 +96,16 @@ const Sidebar: React.FC<SidebarProps> = ({
         </div>
 
         {/* Desktop profile */}
-        <Link
-          to={ROUTES.SETTINGS}
-          className="flex items-center gap-3 pt-4 border-t border-border-light dark:border-border-dark w-full hover:opacity-80 transition-opacity"
-        >
-          <img
-            src={user.avatar}
-            className="size-10 rounded-full flex-shrink-0"
-            alt="Profile"
-          />
-          <div className="overflow-hidden text-left">
+        {/* Picture: tap = Profile, press and hold = Monthly Wrapped. Name links to Profile. */}
+        <div className="flex items-center gap-3 pt-4 border-t border-border-light dark:border-border-dark w-full">
+          <WrappedAvatar size={40} src={user.avatar && !user.avatar.endsWith('avatar-placeholder.png') ? user.avatar : undefined}
+            initials={user.name.split(/\s+/).map(w => w[0]).join('').slice(0, 2).toUpperCase()}
+            onTap={() => navigate(ROUTES.SETTINGS)} />
+          <Link to={ROUTES.SETTINGS} className="overflow-hidden text-left hover:opacity-80 transition-opacity">
             <p className="text-sm font-medium truncate">{user.name}</p>
             <p className="text-xs text-text-light-muted truncate">{user.email}</p>
-          </div>
-        </Link>
+          </Link>
+        </div>
 
       </aside>
 

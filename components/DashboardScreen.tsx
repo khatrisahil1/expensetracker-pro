@@ -16,6 +16,7 @@ import { formatMoney } from '../utils/format';
 import { useCountUp } from '../hooks/useCountUp';
 import PaymentModeBreakdown from './PaymentModeBreakdown';
 import NotificationsPanel from './NotificationsPanel';
+import WrappedAvatar from './wrapped/WrappedAvatar';
 import { celebrate } from '../utils/celebrate';
 import { sumTotals, signedAmount, calculateStreak, topCategories, percentChange } from '../utils/transactionStats';
 import { useFinancialInsight } from '../hooks/useFinancialInsight';
@@ -1010,23 +1011,11 @@ const DashboardScreen: React.FC = () => {
             )}
           </div>
 
-            {/* Mobile Profile Avatar */}
-          <button
-            onClick={() => navigate(ROUTES.SETTINGS)}
-            className="md:hidden relative ml-1 active:scale-95 transition-transform"
-          >
-            <img
-              src={userSettings?.avatar && userSettings.avatar.trim() !== '' ? userSettings.avatar : '/avatar-placeholder.png'}
-              onError={(e) => {
-                (e.currentTarget as HTMLImageElement).src = '/avatar-placeholder.png';
-              }}
-              alt="Profile"
-              className="size-10 rounded-full object-cover
-                         border-2 border-primary/90
-                         shadow-md"
-            />
-            
-          </button>
+            {/* Mobile profile avatar: tap = Profile, press and hold = Monthly Wrapped */}
+            <WrappedAvatar className="md:hidden ml-1 shadow-md" size={40}
+              src={userSettings?.avatar && userSettings.avatar.trim() !== '' ? userSettings.avatar : undefined}
+              initials={(userSettings?.displayName || 'U').split(/\s+/).map(w => w[0]).join('').slice(0, 2).toUpperCase()}
+              onTap={() => navigate(ROUTES.SETTINGS)} />
         </div>
       </div>
       

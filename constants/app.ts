@@ -19,6 +19,8 @@ export const STORAGE_KEYS = {
   LAST_DAILY_REMINDER: 'last_daily_reminder',
   /** Month the "monthly summary" notification last fired for. */
   LAST_MONTHLY_SUMMARY: 'last_monthly_summary',
+  /** '1' once the "hold your profile for Monthly Wrapped" tutorial has been shown. */
+  WRAPPED_TUTORIAL_SEEN: 'wrapped:tutorialSeen',
   /** Date a given notification (by tag) was last sent; limits each to once a day. */
   notificationSentOn: (tag: string) => `notif_sent_${tag}`,
 } as const;

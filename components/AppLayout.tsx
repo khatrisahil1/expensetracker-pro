@@ -11,6 +11,7 @@ import RenewalPrompt from './RenewalPrompt';
 import { PageLoader } from './LoadingScreen';
 import { useDialog } from './ui/DialogProvider';
 import PullToRefresh from './PullToRefresh';
+import WrappedHost from './wrapped/WrappedHost';
 import { usePullToRefresh } from '../hooks/usePullToRefresh';
 
 /**
@@ -89,6 +90,7 @@ const AppLayout: React.FC = () => {
       <TransactionDetailsPanel />
       <UndoSnackbar />
       <RenewalPrompt />
+      <WrappedHost />
 
       <main className="flex-1 flex flex-col h-full overflow-hidden relative">
         <PullToRefresh pull={pull} phase={pullPhase} dragging={dragging} />
