@@ -85,7 +85,7 @@ A personal finance PWA: log income and expenses, see where money goes, set budge
 | Vault | `/vault` | "Impulse vault": park a wish, resist it, count what you saved. |
 | Profile | `/settings?section=…` | Account, App Lock, notifications & tone, currency/theme, categories, export/backup, help. |
 | Simulator | `/simulator` | "What if" forecast with planned purchases. |
-| Split bills | `/split-bill` | Split with friends (equal / amounts / percent), balances per friend, settle up, reminders via share sheet, optional “my share” expense. In the desktop sidebar; on phones via Transactions → “Split a bill”. |
+| Split bills | `/split-bill` | Split with friends (equal / amounts / percent), balances per friend, settle up, reminders via share sheet, optional “my share” expense. In the desktop sidebar and the phone tab bar (6 tabs: Home, Trans, Subs, Budget, Split, Profile). |
 
 **Guest mode**: "Try as guest" on the login screen. Data lives in `localStorage` only and never reaches Firestore.
 
@@ -722,7 +722,7 @@ Your store mock creates new objects on every render. Use one stable object (see 
 | Wait max 4 s for Firestore acks | Long enough to surface real errors online; short enough not to block offline. |
 | No service worker in dev | Dev pages change constantly; a caching worker served stale or offline pages. |
 | Language / date-format settings removed from UI | Saved but never used anywhere. |
-| Split Bill kept as a labelled preview | Design exists; feature doesn't. Not linked in nav. |
+| Impulse Vault has no phone tab | Six tabs is the most that fit at 320px; Vault is linked from the top of the Budget page on phones. (The phone drawer in Sidebar.tsx is never opened.) |
 | Gemini key move left for last | Owner's request. |
 | Auto-reload on update only early or in the background | Never interrupts someone mid-form; still gets everyone onto the new version within one app switch. |
 | No Mac trackpad haptics | No web API exists; would need a native (Electron/Tauri/Swift) wrapper. |

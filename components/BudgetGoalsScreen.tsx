@@ -9,6 +9,8 @@ import { useFinancialInsight } from '../hooks/useFinancialInsight';
 import { getCurrencySymbol } from '../utils/currency';
 import { formatDisplayDate, parseLocalDate } from '../utils/date';
 import { formatMoney } from '../utils/format';
+import { Link } from 'react-router';
+import { ROUTES } from '../routes';
 
 
 const ProgressRing: React.FC<{ percentage: number, color: string, size?: number }> = ({ percentage, color, size = 60 }) => {
@@ -225,6 +227,12 @@ const BudgetGoalsScreen: React.FC = () => {
             <div className="flex flex-col gap-1">
                     <h1 className="text-4xl md:text-5xl font-black text-text-light-main dark:text-text-dark-main tracking-tight">Budget & Goals</h1>
                     <p className="text-text-light-muted dark:text-text-dark-muted text-lg">Set your budgets & goals.</p>
+                    {/* Phones have no Vault tab, so it's offered here (lg+ has it in the sidebar) */}
+                    <Link to={ROUTES.VAULT}
+                      className="lg:hidden mt-3 w-fit flex items-center gap-2 px-4 py-2 rounded-full bg-violet-500/10 text-violet-600 dark:text-violet-300 text-sm font-bold border border-violet-500/20 hover:bg-violet-500/20 transition-colors">
+                      <span aria-hidden="true" className="material-symbols-outlined text-[18px]">savings</span>Impulse Vault
+                      <span aria-hidden="true" className="material-symbols-outlined text-[18px]">arrow_forward</span>
+                    </Link>
                 </div>
             <div className="flex flex-col items-center justify-center gap-6 text-center">
                 

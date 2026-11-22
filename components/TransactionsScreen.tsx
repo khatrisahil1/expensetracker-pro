@@ -262,7 +262,7 @@ export const TransactionsScreen: React.FC = () => {
       <div className="flex flex-col gap-1 mb-8">
         <h1 className="text-4xl md:text-5xl font-black text-text-light-main dark:text-text-dark-main">Transactions</h1>
         <p className="text-text-light-muted dark:text-text-dark-muted text-lg">Manage and track your activity effortlessly.</p>
-        {/* Split bills isn't in the phone tab bar, so it's offered here */}
+        {/* Shortcut to Split bills from the transactions page */}
         <button type="button" onClick={() => navigate(ROUTES.SPLIT_BILL)}
           className="mt-3 w-fit flex items-center gap-2 px-4 py-2 rounded-full bg-orange-500/10 text-orange-600 dark:text-orange-400 text-sm font-bold border border-orange-500/20 hover:bg-orange-500/20 transition-colors">
           <span aria-hidden="true" className="material-symbols-outlined text-[18px]">call_split</span>Split a bill with friends
