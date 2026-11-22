@@ -619,6 +619,7 @@ Your store mock creates new objects on every render. Use one stable object (see 
 
 | Decision | Why |
 |---|---|
+| `createGeminiClient()` is async | Lazy-imports `@google/genai` so ~50 KB gzip stays out of startup. Always `await` it. |
 | Wait max 4 s for Firestore acks | Long enough to surface real errors online; short enough not to block offline. |
 | No service worker in dev | Dev pages change constantly; a caching worker served stale or offline pages. |
 | Language / date-format settings removed from UI | Saved but never used anywhere. |
@@ -636,7 +637,7 @@ Your store mock creates new objects on every render. Use one stable object (see 
 - [ ] **Deploy `firestore.rules`**: compare with live rules first, then wire into `firebase.json`.
 - [ ] Light-mode pass on the redesigned screens.
 - [ ] Screen-reader pass: label icon-only buttons, hide decorative icons.
-- [ ] Code-split heavy features (receipt scanner, Gemini) to cut the ~2 MB initial download.
+- [x] Code-split heavy features: Gemini SDK and the Lottie player load on demand; React and Firebase are separate cached chunks (startup ≈276 KB gzip, was ≈395 KB).
 - [ ] Gemini fallback for merchants the rules can't categorise.
 - [ ] Make Split Bill real (or remove it).
 

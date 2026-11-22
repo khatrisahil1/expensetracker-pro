@@ -128,7 +128,7 @@ const ImpulseVaultScreen: React.FC = () => {
       setIsAnalyzing(true); setAnalyzingSource('image');
       try {
           const base64Data = base64String.split(',')[1];
-          const ai = createGeminiClient();
+          const ai = await createGeminiClient();
           const response = await ai.models.generateContent({
               model: 'gemini-3-pro-preview',
               contents: { parts: [ { inlineData: { mimeType: 'image/jpeg', data: base64Data } }, { text: "Identify product: name, price (number) in JSON." } ] },
@@ -143,7 +143,7 @@ const ImpulseVaultScreen: React.FC = () => {
     if (!newItem.link) return;
     setIsAnalyzing(true); setAnalyzingSource('link');
     try {
-        const ai = createGeminiClient();
+        const ai = await createGeminiClient();
         const response = await ai.models.generateContent({
             model: GEMINI_MODEL,
             contents: `Search product link: ${newItem.link}. Extract name and price in JSON.`,

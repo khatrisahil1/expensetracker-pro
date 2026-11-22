@@ -128,6 +128,18 @@ export default defineConfig(({ mode }) => {
         'process.env.API_KEY': JSON.stringify(env.GEMINI_API_KEY || env.VITE_GEMINI_API_KEY),
         'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY || env.VITE_GEMINI_API_KEY)
       },
+      build: {
+        rollupOptions: {
+          output: {
+            // Libraries that rarely change get their own files, so an app update
+            // doesn't make returning users re-download them.
+            manualChunks: {
+              react: ['react', 'react-dom', 'react-router'],
+              firebase: ['firebase/app', 'firebase/auth', 'firebase/firestore'],
+            },
+          },
+        },
+      },
       resolve: {
         alias: {
           '@': path.resolve(__dirname, '.'),

@@ -1,4 +1,3 @@
-import { GoogleGenAI } from "@google/genai";
 
 /** Model used for every AI feature (audit, receipt scan, link lookup). Change it here. */
 export const GEMINI_MODEL = 'gemini-3-flash-preview';
@@ -10,9 +9,9 @@ export const GEMINI_MODEL = 'gemini-3-flash-preview';
  * bundled into the browser build, so anyone can read it. It should move behind
  * a server-side proxy such as a Cloud Function.
  *
- * @throws if no key is configured.
+ * @throws (rejects) if no key is configured.
  */
-export const createGeminiClient = () => {
+export const createGeminiClient = async () => {
   const apiKey = import.meta.env.VITE_GEMINI_API_KEY ||
                  (typeof process !== 'undefined' ? (process.env.GEMINI_API_KEY || process.env.API_KEY) : null);
 
@@ -22,5 +21,8 @@ export const createGeminiClient = () => {
     );
   }
 
+  // Loaded on first use: the SDK is large and most sessions never call it,
+  // so it stays out of the startup bundle.
+  const { GoogleGenAI } = await import('@google/genai');
   return new GoogleGenAI({ apiKey });
 };

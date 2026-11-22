@@ -178,7 +178,7 @@ export const TransactionsScreen: React.FC = () => {
   const analyzeReceipt = async (base64Image: string) => {
     setIsProcessing(true);
     try {
-      const ai = createGeminiClient();
+      const ai = await createGeminiClient();
       // Use Gemini Flash for speed and cost efficiency
       const response = await ai.models.generateContent({
         model: GEMINI_MODEL,

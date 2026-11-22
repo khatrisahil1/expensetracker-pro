@@ -998,7 +998,7 @@ export const StoreProvider = ({ children }: PropsWithChildren) => {
   const generateFinancialAudit = async () => {
       if (!userSettings || transactions.length === 0) return "Not enough data for an audit.";
       try {
-          const ai = createGeminiClient();
+          const ai = await createGeminiClient();
           const recentTx = transactions.slice(0, 30).map(t => ({ title: String(t.title), amt: Number(t.amount), cat: String(t.category), type: String(t.type) }));
           const budgetSummary: Record<string, number> = {};
           if (userSettings.categoryBudgets) {

@@ -3,7 +3,7 @@
 // Calculations live in utils/period.ts and utils/transactionStats.ts.
 import React, { useState, useMemo, useEffect } from 'react';
 import { usePWAInstall } from "../usePWAInstall";
-import { DotLottieReact } from "@lottiefiles/dotlottie-react";
+import LazyLottie from './ui/LazyLottie';
 import { useStore } from '../context/Store';
 import { useDialog } from './ui/DialogProvider';
 import { useNavigate } from 'react-router';
@@ -160,7 +160,7 @@ export const StreakVisual: React.FC<{ count: number }> = ({ count }) => {
 
       {/* Base streak lottie */}
 
-      <DotLottieReact
+      <LazyLottie
 
         src={STREAK_LOTTIE_MAP[tier]}
 
@@ -181,7 +181,7 @@ export const StreakVisual: React.FC<{ count: number }> = ({ count }) => {
 
         <div className="absolute inset-0 pointer-events-none">
 
-          <DotLottieReact
+          <LazyLottie
 
             src={STREAK_LOTTIE_MAP[tier]}
 

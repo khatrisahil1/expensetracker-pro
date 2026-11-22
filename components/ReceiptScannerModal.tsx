@@ -77,7 +77,7 @@ const ReceiptScannerModal: React.FC<ReceiptScannerModalProps> = ({ onClose, onRe
 
     try {
       const base64 = dataUrl.split(',')[1];
-      const ai = createGeminiClient();
+      const ai = await createGeminiClient();
       const response = await ai.models.generateContent({
         model: GEMINI_MODEL,
         contents: {
