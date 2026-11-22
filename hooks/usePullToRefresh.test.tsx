@@ -46,7 +46,7 @@ describe('usePullToRefresh', () => {
     await act(async () => { fireEvent.touchEnd(el); });
     expect(onRefresh).toHaveBeenCalledTimes(1);
     expect(state()).toMatch(/^refreshing:/);
-    await act(async () => { await vi.advanceTimersByTimeAsync(2000); });
+    await act(async () => { await vi.advanceTimersByTimeAsync(3000); });
     expect(state()).toBe('idle:0');
     vi.useRealTimers();
   });
@@ -55,6 +55,27 @@ describe('usePullToRefresh', () => {
     render(<Harness onRefresh={vi.fn()} />);
     const el = screen.getByTestId('scroller');
     act(() => drag(el, -80));
+    expect(state()).toBe('idle:0');
+  });
+});
+
+describe('usePullToRefresh with a trackpad', () => {
+  it('pulls when scrolling up from the top, and refreshes after the gesture pauses', async () => {
+    vi.useFakeTimers();
+    const onRefresh = vi.fn().mockResolvedValue(undefined);
+    render(<Harness onRefresh={onRefresh} />);
+    const el = screen.getByTestId('scroller');
+    for (let i = 0; i < 12; i++) act(() => { fireEvent.wheel(el, { deltaY: -60 }); });
+    expect(state()).toMatch(/^armed:/);
+    await act(async () => { await vi.advanceTimersByTimeAsync(200); });
+    expect(onRefresh).toHaveBeenCalledTimes(1);
+    vi.useRealTimers();
+  });
+
+  it('ignores scrolling down and pinch-zoom', () => {
+    render(<Harness onRefresh={vi.fn()} />);
+    const el = screen.getByTestId('scroller');
+    act(() => { fireEvent.wheel(el, { deltaY: 80 }); fireEvent.wheel(el, { deltaY: -80, ctrlKey: true }); });
     expect(state()).toBe('idle:0');
   });
 });

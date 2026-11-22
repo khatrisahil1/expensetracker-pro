@@ -190,7 +190,8 @@ body.scrolling {
 
 
 /* ===== Boot splash (shown on every load/refresh) =====
-   A piggy bank catches a flipping ₹ coin in its slot (clink!), squishes and hops.
+   A piggy bank catches a flipping ₹ coin in its slot (clink!), squishes and hops,
+   over a soft glow that pulses on each clink. Below: wordmark, tagline, slim bar.
    Plain CSS so it paints before any script runs. The markup lives once, in
    <template id="boot-template">; index.html stamps it into #boot and
    LoadingScreen.tsx reuses the same template, so the hand-over is seamless. */
@@ -200,7 +201,7 @@ body.scrolling {
 .boot.light { background: radial-gradient(circle at 50% 45%, rgba(46,204,113,0.18), transparent 55%), #f6f7f6; color: #111827; }
 .boot.hide { opacity: 0; visibility: hidden; }
 .boot.hide .boot-pig-wrap { transform: scale(1.15); opacity: 0; transition: transform .4s cubic-bezier(.34,1.56,.64,1), opacity .4s; }
-.boot-pig-wrap { position: relative; width: 200px; height: 209px; }
+.boot-pig-wrap { position: relative; width: 176px; height: 184px; }
 .boot-pig-wrap svg { width: 100%; height: 100%; overflow: visible; }
 .pb-pig { transform-box: view-box; transform-origin: 112px 160px; animation: pb-squish 2s cubic-bezier(.34,1.56,.64,1) infinite; }
 .pb-shadow { transform-box: view-box; transform-origin: 112px 166px; animation: pb-shadow 2s cubic-bezier(.34,1.56,.64,1) infinite; }
@@ -221,15 +222,24 @@ body.scrolling {
 @keyframes pb-tail { from { transform: rotate(-12deg); } to { transform: rotate(16deg); } }
 @keyframes pb-clink { 0%, 43% { transform: scale(.3); opacity: 0; } 48% { transform: scale(1.1); opacity: 1; } 60%, 100% { transform: scale(1.3) translateY(-4px); opacity: 0; } }
 
-.boot-name { margin: 0; font-weight: 800; font-size: 22px; letter-spacing: -0.02em; animation: boot-fade .6s ease-out both; }
-.boot-name b { color: #2ECC71; }
-.boot-lines { position: relative; height: 18px; width: 220px; text-align: center; font-size: 13px; font-weight: 700; opacity: .75; }
-.boot-lines span { position: absolute; inset: 0; opacity: 0; animation: boot-line 5.4s infinite; }
-.boot-lines span:nth-child(2) { animation-delay: 1.8s; } .boot-lines span:nth-child(3) { animation-delay: 3.6s; }
+.boot-stage { position: relative; display: grid; place-items: center; animation: boot-pop .7s cubic-bezier(.34,1.56,.64,1) both; }
+.boot-glow { position: absolute; width: 230px; height: 230px; border-radius: 999px; top: 50%; left: 50%; translate: -50% -46%;
+  background: radial-gradient(circle, rgba(46,204,113,.22), rgba(46,204,113,0) 65%); animation: boot-glow 2s ease-in-out infinite; }
+.boot-glow::after { content: ""; position: absolute; inset: 34px; border-radius: inherit; border: 1.5px solid rgba(46,204,113,.28); animation: boot-ring 2s ease-out infinite; }
+.boot.light .boot-glow { background: radial-gradient(circle, rgba(46,204,113,.2), rgba(46,204,113,0) 65%); }
+.boot-name { margin: 6px 0 0; font-weight: 800; font-size: 24px; letter-spacing: -0.03em; animation: boot-fade .6s .15s ease-out both; }
+.boot-name b { color: #2ECC71; font-weight: 800; }
+.boot.light .boot-name b { color: #15803d; }
+.boot-tag { margin: -10px 0 0; font-size: 12px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; opacity: .5; animation: boot-fade .6s .3s ease-out both; }
+.boot-bar { position: relative; width: 132px; height: 3px; border-radius: 999px; overflow: hidden; background: rgba(127,127,127,.18); animation: boot-fade .6s .45s ease-out both; }
+.boot-bar::after { content: ""; position: absolute; inset: 0; width: 40%; border-radius: inherit; background: linear-gradient(90deg, transparent, #2ECC71, #7BE3A6, transparent); animation: boot-slide 1.3s cubic-bezier(.65,0,.35,1) infinite; }
+@keyframes boot-slide { from { transform: translateX(-110%); } to { transform: translateX(260%); } }
+@keyframes boot-pop { from { opacity: 0; transform: scale(.85) translateY(10px); } to { opacity: 1; transform: none; } }
+@keyframes boot-glow { 0%, 40%, 100% { opacity: .8; transform: scale(1); } 48% { opacity: 1; transform: scale(1.06); } }
+@keyframes boot-ring { 0%, 44% { transform: scale(.9); opacity: 0; } 48% { opacity: 1; } 75%, 100% { transform: scale(1.25); opacity: 0; } }
 .boot-dots { display: flex; gap: 6px; }
 .boot-dots i { width: 7px; height: 7px; border-radius: 999px; background: #2ECC71; animation: boot-dot 1s ease-in-out infinite; }
 .boot-dots i:nth-child(2) { animation-delay: .15s; } .boot-dots i:nth-child(3) { animation-delay: .3s; }
-@keyframes boot-line { 0% { opacity: 0; transform: translateY(6px); } 5%, 28% { opacity: 1; transform: none; } 33%, 100% { opacity: 0; transform: translateY(-6px); } }
 @keyframes boot-dot { 0%, 100% { transform: translateY(0); opacity: .35; } 50% { transform: translateY(-6px); opacity: 1; } }
 @keyframes boot-fade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 
@@ -238,7 +248,22 @@ body.scrolling {
 @keyframes ptr-squash { 0% { transform: scale(1.3, 0.7); } 40% { transform: scale(0.9, 1.12); } 70% { transform: scale(1.05, 0.96); } 100% { transform: scale(1); } }
 @keyframes ptr-jelly { 0%, 100% { transform: scale(1, 1); } 25% { transform: scale(1.08, 0.92); } 50% { transform: scale(0.94, 1.06); } 75% { transform: scale(1.04, 0.97); } }
 @keyframes ptr-flip { from { transform: rotateY(0); } to { transform: rotateY(360deg); } }
+@keyframes ptr-hop { 0% { transform: none; } 40% { transform: translateY(-12px) scale(1.06, 0.95); } 70% { transform: translateY(2px) scale(0.97, 1.04); } 100% { transform: none; } }
 @keyframes ptr-bye { to { transform: scale(0.2); opacity: 0; } }
+
+/* ===== Interactive piggy (components/PiggyCharacter.tsx) ===== */
+.pchar-body { transform-box: view-box; transform-origin: 112px 160px; animation: pchar-breathe 3.2s ease-in-out infinite; }
+.pchar-body.pchar-happy { animation: pchar-jump 0.7s cubic-bezier(.34,1.56,.64,1) 0.45s; }
+.pchar-body.pchar-sad { animation: pchar-shake 0.45s ease-in-out; }
+.pchar-blink { transform-box: fill-box; transform-origin: center; animation: pchar-blink 4s infinite; }
+.pchar-coin { transform-box: fill-box; transform-origin: center; animation: pchar-coin 0.6s cubic-bezier(.5,0,.8,.4) forwards; }
+.pchar-tear { animation: pchar-tear 1.4s ease-in infinite; }
+@keyframes pchar-breathe { 0%, 100% { transform: none; } 50% { transform: scale(1.015, 0.985); } }
+@keyframes pchar-jump { 0% { transform: none; } 30% { transform: scale(1.08, .9); } 55% { transform: translateY(-16px) scale(.96, 1.05); } 80% { transform: translateY(0) scale(1.03, .97); } 100% { transform: none; } }
+@keyframes pchar-shake { 0%, 100% { transform: none; } 25% { transform: translateX(-6px) rotate(-2deg); } 75% { transform: translateX(6px) rotate(2deg); } }
+@keyframes pchar-blink { 0%, 92%, 100% { transform: scaleY(1); } 95% { transform: scaleY(0.1); } }
+@keyframes pchar-coin { 0% { transform: translateY(-60px) scaleX(1); opacity: 0; } 20% { opacity: 1; } 50% { transform: translateY(-20px) scaleX(.2); } 100% { transform: translateY(48px) scaleX(1); opacity: 1; } }
+@keyframes pchar-tear { 0% { transform: translateY(0); opacity: 0; } 20% { opacity: 1; } 100% { transform: translateY(14px); opacity: 0; } }
 
 /* ===== Login screen ===== */
 @keyframes login-drift { 0%, 100% { transform: translate(0, 0) scale(1); } 33% { transform: translate(40px, -30px) scale(1.08); } 66% { transform: translate(-30px, 25px) scale(0.95); } }
@@ -327,7 +352,8 @@ html:not(.dark) .text-sky-400 { color: #0369a1; }
   <body class="bg-background-light dark:bg-background-dark text-text-light-main dark:text-text-dark-main font-display antialiased">
     <!-- Boot splash markup (single source). Stamped into #boot below and reused by LoadingScreen.tsx. -->
     <template id="boot-template">
-      <div class="boot-pig-wrap" aria-hidden="true">
+      <div class="boot-stage" aria-hidden="true"><div class="boot-glow"></div>
+      <div class="boot-pig-wrap">
         <svg viewBox="0 -50 220 230" width="220" height="230" overflow="visible">
           <defs>
             <linearGradient id="pb-body" x1="0" y1="0" x2="0" y2="1">
@@ -410,9 +436,10 @@ html:not(.dark) .text-sky-400 { color: #0369a1; }
             </g>
           </g>
         </svg>
-      </div>
+      </div></div>
       <p class="boot-name">Expense<b>Tracker</b></p>
-      <div class="boot-lines"><span>Counting your coins…</span><span>Feeding the piggy bank…</span><span>Sorting the receipts…</span></div>
+      <p class="boot-tag">Every rupee, accounted for</p>
+      <div class="boot-bar"></div>
     </template>
 
     <!-- Boot splash: removed by index.tsx once the app has rendered. -->

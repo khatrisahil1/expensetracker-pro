@@ -8,7 +8,7 @@ import React from 'react';
 /** The splash markup from index.html; a simple fallback where it isn't present (tests). */
 const bootMarkup = () =>
   (typeof document !== 'undefined' && document.getElementById('boot-template')?.innerHTML) ||
-  '<p class="boot-name">Expense<b>Tracker</b></p><span class="boot-dots"><i></i><i></i><i></i></span>';
+  '<p class="boot-name">Expense<b>Tracker</b></p><div class="boot-bar"></div>';
 
 export const LoadingScreen: React.FC = () => {
   const light = typeof document !== 'undefined' && document.documentElement.classList.contains('light');

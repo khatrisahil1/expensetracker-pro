@@ -400,13 +400,16 @@ stateDiagram-v2
   armed --> pulling: drag back up
   pulling --> settling: release
   armed --> refreshing: release
-  refreshing --> done: refresh finished (min 0.9s)
+  refreshing --> done: refresh finished (min 1.3s)
   done --> settling
   settling --> idle
 ```
 
-- Touch only, and only when the page is scrolled to the very top. Rubber-band resistance (`rubberBand`), max 140px.
-- A gold **₹ coin** on a gooey tail: stretches and spins with the pull, wobbles and sparkles when armed, squashes and keeps flipping while refreshing, ticks and shrinks away.
+- **Touch**: pull down when the page is scrolled to the very top.
+- **Laptop trackpad / mouse wheel**: keep two-finger scrolling *up* while already at the top. The gesture only counts if it **started** at the top (so the momentum of a normal scroll back up can't trigger it); a 180 ms pause acts as "letting go"; pinch-zoom (`ctrlKey`) is ignored. Constants in [usePullToRefresh.ts](../hooks/usePullToRefresh.ts).
+- Rubber-band resistance (`rubberBand`), max 140px.
+- While pulling: a gold **₹ coin** on a gooey tail stretches and spins, wobbles and sparkles when armed. While refreshing: a mini piggy catches coins; when done it hops with a ✓ and "Up to date ✨".
+- **Haptics** ([utils/haptics.ts](../utils/haptics.ts)): light tick on arming, selection tick on un-arming, medium on release, success when done.
 - **Soft refresh**: data is already live, so it re-draws the page, re-checks the account and looks for an app update. A full reload would re-show the splash and re-lock the app.
 - The content's transform is removed when idle (`style` is `undefined`), so fixed dialogs keep working.
 </details>
@@ -463,9 +466,28 @@ The `?action=` parameter is removed after use, so a refresh doesn't repeat it.
 </details>
 
 <details>
+<summary><b>📳 Haptic feedback</b></summary>
+
+`haptic(kind)` in [utils/haptics.ts](../utils/haptics.ts), kinds `selection | light | medium | heavy | success | warning | error`.
+
+| Device | How | Notes |
+|---|---|---|
+| Android | Vibration API with short patterns | Chrome, Firefox, Samsung |
+| iPhone (iOS 18+) | Clicks the label of a hidden native `<input type="checkbox" switch>`, which plays the system tick | Focus is restored to the field you were typing in, so the keyboard stays open |
+| Mac trackpad / desktop | Nothing | **Browsers expose no trackpad haptics API** (Force Touch feedback is only available to native macOS apps). A native wrapper would be needed. |
+
+Skipped when the system "reduce motion" setting is on. Never throws.
+</details>
+
+<details>
 <summary><b>🔐 Login & setup screens</b></summary>
 
-- [LoginScreen.tsx](../components/LoginScreen.tsx): errors from Firebase are translated to plain language (`authMessage`); the card shakes (Web Animations, keeps focus) and the phone vibrates on error; confetti on success.
+- [LoginScreen.tsx](../components/LoginScreen.tsx):
+  - **Interactive piggy** ([PiggyCharacter.tsx](../components/PiggyCharacter.tsx), moods `idle | cover | peek | happy | sad`): its eye follows the cursor (desktop) or the email caret; a hoof covers its eye while you type the password and lifts to peek when you press *Show*; sad face and tear on errors; happy jump and coin drop on success.
+  - **Sign in** is one form. **Create account** is a 3-step wizard (email → password with strength meter → name) with progress dots, Back, and slide transitions.
+  - Desktop: background cards parallax with the cursor and the card tilts slightly in 3D (CSS vars `--px/--py`, `--tilt-x/--tilt-y`).
+  - Fields: gradient focus ring and a ✓ when valid. The *Show password* button uses `onMouseDown={preventDefault}` so the field keeps focus.
+  - Errors from Firebase are translated to plain language (`authMessage`); the card shakes; haptics on taps, steps, errors and success; confetti on success.
 - Removed: "Remember me" (did nothing), "Continue with Phone" (not implemented), "256-bit encryption" claim.
 - [OnboardingScreen.tsx](../components/OnboardingScreen.tsx): steps slide in from the side matching direction; avatar saved via `completeOnboarding({ avatar })`.
 - Both use the piggy mascot via `PiggyMascot` from [LoadingScreen.tsx](../components/LoadingScreen.tsx).
@@ -504,7 +526,7 @@ dialog.toast('Could not save', 'error');
 | Entrances | `animate-slide-up`, `animate-fade-in`, `animate-sheet-in`, `animate-pop`, `animate-toast-in`, `animate-shake` |
 | Number rolls to new value | `useCountUp(value)` |
 | Celebration | `celebrate()`, `celebrate(null, 'coins')`, `celebrate(el, 'hearts')` |
-| Boot splash on reload | **Piggy bank catching a coin** (v2: shaded body, folded ear, happy eye; the ₹ coin flips as it falls and is clipped at the slot so it really goes *in*, with clink sparks; CSS classes `pb-*`). Markup lives once in `<template id="boot-template">` in [index.html](../index.html); stamped into `#boot`, reused by `LoadingScreen` and `PiggyMascot`; hidden by [index.tsx](../index.tsx) after ≥1.2 s |
+| Boot splash on reload | **Piggy bank catching a coin** (v2: shaded body, folded ear, happy eye; the ₹ coin flips as it falls and is clipped at the slot so it really goes *in*, with clink sparks; CSS classes `pb-*`). Markup lives once in `<template id="boot-template">` in [index.html](../index.html); stamped into `#boot`, reused by `LoadingScreen` and `PiggyMascot`; hidden by [index.tsx](../index.tsx) after ≥1.2 s. **v3 (professional)**: a soft green glow and ring pulse on each clink, then the wordmark, a small-caps tagline ("Every rupee, accounted for") and a slim sliding progress bar (`.boot-stage`, `.boot-glow`, `.boot-tag`, `.boot-bar`), each fading in after the other. The rotating jokey lines were removed. |
 | Chart animations | `.chart-draw` (donut segments, needs `pathLength={1}`), `.chart-wipe` (trend line), `.chart-rise` (area fill). Re-key the chart to replay on view change. Don't combine `.chart-draw` with `vector-effect: non-scaling-stroke`. |
 | Pull to refresh (touch) | [hooks/usePullToRefresh.ts](../hooks/usePullToRefresh.ts) + [components/PullToRefresh.tsx](../components/PullToRefresh.tsx), wired in [AppLayout.tsx](../components/AppLayout.tsx) |
 
@@ -671,6 +693,15 @@ Your store mock creates new objects on every render. Use one stable object (see 
 </details>
 
 <details>
+<summary><b>Premium login, haptics, trackpad pull-to-refresh, splash v3</b></summary>
+
+- **Login / sign-up**: interactive piggy (follows cursor, covers its eyes for the password, peeks on Show), 3-step create-account wizard, parallax and tilt, haptics, confetti.
+- **Haptics** everywhere it matters (`utils/haptics.ts`): Android vibration, iPhone switch-tick trick. Mac trackpads can't be reached from the web.
+- **Pull to refresh** now works with a laptop trackpad / mouse wheel, has haptic ticks, and shows a mini piggy catching coins while refreshing.
+- **Boot splash v3**: same piggy, cleaner type, tagline, glow, slim progress bar.
+</details>
+
+<details>
 <summary><b>Decisions worth knowing</b></summary>
 
 | Decision | Why |
@@ -681,6 +712,7 @@ Your store mock creates new objects on every render. Use one stable object (see 
 | Language / date-format settings removed from UI | Saved but never used anywhere. |
 | Split Bill kept as a labelled preview | Design exists; feature doesn't. Not linked in nav. |
 | Gemini key move left for last | Owner's request. |
+| No Mac trackpad haptics | No web API exists; would need a native (Electron/Tauri/Swift) wrapper. |
 | Built-in SVG avatars instead of amrit.art Toy Faces | Paid pack, all rights reserved, bundling terms unclear. `EXTRA_AVATARS` makes adding licensed art a one-line change. |
 | Avatars stored as data URLs | Works with every existing `<img src>`; no storage bucket needed; SVG presets ~1–2 KB, crops ~10–40 KB. |
 </details>
