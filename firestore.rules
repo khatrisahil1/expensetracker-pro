@@ -4,10 +4,8 @@ rules_version = '2';
 // context/Store.tsx run in the browser and can be bypassed; these rules are the
 // real protection.
 //
-// Not yet referenced from firebase.json. Before deploying, compare these with the
-// rules currently live in the Firebase console. Then add
-//   "firestore": { "rules": "firestore.rules" }
-// to firebase.json and run: firebase deploy --only firestore:rules
+// Deploy: npx firebase deploy --only firestore:rules
+// (referenced from firebase.json). Check with --dry-run first.
 service cloud.firestore {
   match /databases/{database}/documents {
 
