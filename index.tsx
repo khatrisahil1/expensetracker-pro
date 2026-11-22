@@ -1,6 +1,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
+import { watchForAppUpdates } from './utils/appUpdate';
 
 // In development there is no service worker (see vite.config.ts). Remove any
 // left over from older builds, along with their caches, so a stale worker can't
@@ -13,6 +14,9 @@ if (import.meta.env.DEV && 'serviceWorker' in navigator) {
     console.info(`Removed ${regs.length} stale service worker(s) in dev.`);
   });
 }
+
+// Production: pick up new deploys without needing two restarts (utils/appUpdate.ts).
+if (import.meta.env.PROD) watchForAppUpdates();
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {

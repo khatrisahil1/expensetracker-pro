@@ -466,6 +466,18 @@ The `?action=` parameter is removed after use, so a refresh doesn't repeat it.
 </details>
 
 <details>
+<summary><b>🚀 Getting people onto a new deploy</b></summary>
+
+The service worker serves the app from its offline cache, so the first open after a deploy used to show the **old** version (the new one installed in the background and only appeared after one or two restarts). [utils/appUpdate.ts](../utils/appUpdate.ts), started from [index.tsx](../index.tsx) in production:
+
+- Checks for a new version on start, whenever the app returns to the foreground, and every 30 minutes.
+- When a new version takes over a page an older one loaded: within the first 8 s it reloads straight away (looks like a normal start); later, it waits until the app goes to the background and reloads then, so nobody loses what they're typing.
+- Hosting headers ([firebase.json](../firebase.json)): hashed `/assets/*` and `workbox-*.js` are cached forever; page URLs, `index.html`, `sw.js`, `push-sw.js`, `registerSW.js` and the manifest are `no-cache`; icons one day.
+
+Deploy: `npm run build && npx firebase deploy --only hosting` (rules: `--only firestore:rules`). Live at https://expensetracker-pro-35f24.web.app.
+</details>
+
+<details>
 <summary><b>📳 Haptic feedback</b></summary>
 
 `haptic(kind)` in [utils/haptics.ts](../utils/haptics.ts), kinds `selection | light | medium | heavy | success | warning | error`.
@@ -682,7 +694,7 @@ Your store mock creates new objects on every render. Use one stable object (see 
 <summary><b>Commits <code>b326b3f</code>…<code>7812dae</code> — CI, Wrapped, shortcuts, light mode, a11y, speed, Split Bill, push</b></summary>
 
 - **CI** (GitHub Actions): type check, tests, build on every push/PR.
-- **Firestore rules** wired into `firebase.json`, validated with `--dry-run` (**not deployed yet**).
+- **Firestore rules** wired into `firebase.json`, **deployed** 2026-11-22.
 - **Monthly Wrapped** story + first-time spotlight tutorial (hold your profile picture).
 - **Home-screen shortcuts**: Add, Scan, Wrapped, History.
 - **Light mode**: theme follows settings in Guest mode; readable green text.
@@ -712,6 +724,7 @@ Your store mock creates new objects on every render. Use one stable object (see 
 | Language / date-format settings removed from UI | Saved but never used anywhere. |
 | Split Bill kept as a labelled preview | Design exists; feature doesn't. Not linked in nav. |
 | Gemini key move left for last | Owner's request. |
+| Auto-reload on update only early or in the background | Never interrupts someone mid-form; still gets everyone onto the new version within one app switch. |
 | No Mac trackpad haptics | No web API exists; would need a native (Electron/Tauri/Swift) wrapper. |
 | Built-in SVG avatars instead of amrit.art Toy Faces | Paid pack, all rights reserved, bundling terms unclear. `EXTRA_AVATARS` makes adding licensed art a one-line change. |
 | Avatars stored as data URLs | Works with every existing `<img src>`; no storage bucket needed; SVG presets ~1–2 KB, crops ~10–40 KB. |
