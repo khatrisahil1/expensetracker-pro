@@ -34,11 +34,14 @@ export const NAV_ITEMS: NavItem[] = [
   { to: ROUTES.VAULT, label: 'Vault', shortLabel: 'Vault', icon: 'savings' },
   { to: ROUTES.SUBSCRIPTIONS, label: 'Subscriptions', shortLabel: 'Subs', icon: 'subscriptions' },
   { to: ROUTES.BUDGET, label: 'Budget', shortLabel: 'Budget', icon: 'money_bag' },
+  { to: ROUTES.SPLIT_BILL, label: 'Split bills', shortLabel: 'Split', icon: 'call_split' },
 ];
 
 /** Bottom bar on phones: a subset of NAV_ITEMS plus the profile/settings page. */
 export const MOBILE_NAV_ITEMS: NavItem[] = [
-  ...NAV_ITEMS.filter(item => item.to !== ROUTES.VAULT),
+  // Vault and Split bills are reached from the pages themselves on phones,
+  // keeping the bar to five tabs.
+  ...NAV_ITEMS.filter(item => item.to !== ROUTES.VAULT && item.to !== ROUTES.SPLIT_BILL),
   { to: ROUTES.SETTINGS, label: 'Settings', shortLabel: 'Profile', icon: 'person' },
 ];
 
@@ -52,7 +55,7 @@ export const PAGE_TITLES: Record<string, string> = {
   [ROUTES.BUDGET]: 'Budget & Goals',
   [ROUTES.SETTINGS]: 'Settings',
   [ROUTES.SIMULATOR]: 'Simulator',
-  [ROUTES.SPLIT_BILL]: 'Split Bill',
+  [ROUTES.SPLIT_BILL]: 'Split bills',
   [ROUTES.LOGIN]: 'Sign in',
   [ROUTES.ONBOARDING]: 'Welcome',
 };

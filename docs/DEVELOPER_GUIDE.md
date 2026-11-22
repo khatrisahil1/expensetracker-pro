@@ -82,7 +82,7 @@ A personal finance PWA: log income and expenses, see where money goes, set budge
 | Vault | `/vault` | "Impulse vault": park a wish, resist it, count what you saved. |
 | Profile | `/settings?section=…` | Account, App Lock, notifications & tone, currency/theme, categories, export/backup, help. |
 | Simulator | `/simulator` | "What if" forecast with planned purchases. |
-| Split Bill | `/split-bill` | **Preview only** (sample data, not linked in nav). |
+| Split bills | `/split-bill` | Split with friends (equal / amounts / percent), balances per friend, settle up, reminders via share sheet, optional “my share” expense. In the desktop sidebar; on phones via Transactions → “Split a bill”. |
 
 **Guest mode**: "Try as guest" on the login screen. Data lives in `localStorage` only and never reaches Firestore.
 
@@ -146,6 +146,7 @@ docs/                   This guide
 | [celebrate.ts](../utils/celebrate.ts) | Confetti / coins / hearts bursts. |
 | [avatars.ts](../utils/avatars.ts) | 12 built-in avatars drawn as SVG (feminine / masculine / neutral), `presetsFor(gender)`. Add purchased art via `EXTRA_AVATARS`. |
 | [wrapped.ts](../utils/wrapped.ts) | `buildWrapped(transactions, month)`: totals, savings rate, top category, biggest spend, busiest weekday, vs last month, piggy mood. `defaultWrappedMonth`. |
+| [split.ts](../utils/split.ts) | `computeShares` (equal with leftover paise, exact, percent), `friendBalances`, `balanceTotals`, `settleWithFriend`, `isFullySettled`. |
 | [password.ts](../utils/password.ts) | `passwordStrength` → score 0–4, label, hint (sign-up form). |
 | [notifications.ts](../utils/notifications.ts) | Budget, monthly, daily-reminder checks and system notifications. |
 | [gemini.ts](../utils/gemini.ts) / [json.ts](../utils/json.ts) | Gemini client; pull JSON out of model replies. |
@@ -406,6 +407,15 @@ flowchart LR
 </details>
 
 <details>
+<summary><b>🤝 Split bills</b></summary>
+
+- Friends are names, not accounts. Data: `userSettings.splitBills` (array of `SplitBill`) and `userSettings.splitFriends` (recent names), saved with `updateUserSettings`, so it syncs, works offline and in Guest mode, and is covered by the `users/{uid}` Firestore rule.
+- Balances only track debts involving **you** (friend-to-friend debts are ignored). Positive = they owe you.
+- “Add my share as an expense” records your share as a normal transaction when **you** paid.
+- If splits grow large, move them to their own collection (the settings document is limited to 1 MiB).
+</details>
+
+<details>
 <summary><b>📲 Home-screen shortcuts</b></summary>
 
 Defined in the PWA manifest (`shortcuts` in [vite.config.ts](../vite.config.ts)). Long-press the installed app icon (Android, desktop Chrome/Edge; iOS doesn't support them):
@@ -639,7 +649,7 @@ Your store mock creates new objects on every render. Use one stable object (see 
 - [ ] Screen-reader pass: label icon-only buttons, hide decorative icons.
 - [x] Code-split heavy features: Gemini SDK and the Lottie player load on demand; React and Firebase are separate cached chunks (startup ≈276 KB gzip, was ≈395 KB).
 - [ ] Gemini fallback for merchants the rules can't categorise.
-- [ ] Make Split Bill real (or remove it).
+- [x] Make Split Bill real.
 
 ---
 

@@ -39,6 +39,7 @@ import { toLocalISODate, addInterval } from '../utils/date';
 import { STORAGE_KEYS, UNDO_WINDOW_MS, MAX_STORED_NOTIFICATIONS } from '../constants/app';
 import { playTone } from '../utils/sounds';
 import { settleWrite } from '../utils/offline';
+import type { SplitBill } from '../utils/split';
 
 // --- SECURITY HELPERS ---
 /** SHA-256 hash a string using the Web Crypto API. Returns a lowercase hex digest. */
@@ -174,6 +175,10 @@ export interface UserSettings {
   shakeToLock?: boolean;
   appPin?: string | null; 
   biometricEnabled?: boolean; 
+  /** Split Bill: shared expenses with friends (see utils/split.ts). */
+  splitBills?: SplitBill[];
+  /** Split Bill: friends' names, most recent first. */
+  splitFriends?: string[];
   paymentMethods: string[];
   expenseCategories: string[];
   incomeCategories: string[];
@@ -598,7 +603,9 @@ export const StoreProvider = ({ children }: PropsWithChildren) => {
             monthlyInsights: true,
             tipsAndTricks: true
           },
-          notificationTune: data.notificationTune || 'Aurora'
+          notificationTune: data.notificationTune || 'Aurora',
+          splitBills: data.splitBills || [],
+          splitFriends: data.splitFriends || [],
         };
         setUserSettings(settings);
         setPinState(data.appPin || null);
