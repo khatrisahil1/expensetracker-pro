@@ -2,7 +2,7 @@
 
 > **Start here.** This guide explains what the app does, how the code is organised, how data moves, and what has been changed and why. Sections are collapsible. Click a ▸ to open one. Diagrams render on GitHub, in VS Code (with a Mermaid preview extension) and in most Markdown viewers.
 
-**Last updated:** 22 Nov 2026 (login, avatars, piggy loader, chart animations) · **Branch:** `improve/review-fixes-and-ux`
+**Last updated:** 23 Nov 2026 (CI, Wrapped, shortcuts, light mode, a11y, speed, Split Bill, push) · **Branch:** `improve/review-fixes-and-ux`
 
 ---
 
@@ -654,6 +654,20 @@ Your store mock creates new objects on every render. Use one stable object (see 
 - **Piggy-bank loading animation** (replaces the coin-into-logo splash; redrawn once after feedback: shaded 3D-ish body, coin drops into the slot).
 - **Dashboard charts animate** on Week/Month/Year, date and Income/Expense changes.
 - **Celebrations**: confetti/coins/hearts on save, goal deposit (bigger when reached), resisting an impulse, renewals added, Tidy up done, PIN set.
+</details>
+
+<details>
+<summary><b>Commits <code>b326b3f</code>…<code>7812dae</code> — CI, Wrapped, shortcuts, light mode, a11y, speed, Split Bill, push</b></summary>
+
+- **CI** (GitHub Actions): type check, tests, build on every push/PR.
+- **Firestore rules** wired into `firebase.json`, validated with `--dry-run` (**not deployed yet**).
+- **Monthly Wrapped** story + first-time spotlight tutorial (hold your profile picture).
+- **Home-screen shortcuts**: Add, Scan, Wrapped, History.
+- **Light mode**: theme follows settings in Guest mode; readable green text.
+- **Screen readers**: icon ligatures hidden, icon-only buttons labelled, guard test.
+- **Faster startup** (~30% smaller): Gemini SDK and Lottie lazy; React/Firebase chunks.
+- **Split bills** made real.
+- **Push notifications**: client side done; reminder function written (needs VAPID key + Blaze plan).
 </details>
 
 <details>
