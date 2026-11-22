@@ -517,6 +517,17 @@ export const StoreProvider = ({ children }: PropsWithChildren) => {
     return () => { unsubTx(); unsubImpulse(); };
   }, [user, isDemo]);
 
+  // Apply the theme whenever the setting changes. It used to be applied only
+  // when Firestore delivered settings, so Guest mode (no Firestore) ignored the
+  // Light/Dark switch.
+  useEffect(() => {
+    const theme = userSettings?.theme;
+    if (theme !== 'light' && theme !== 'dark') return;
+    document.documentElement.classList.remove('light', 'dark');
+    document.documentElement.classList.add(theme);
+    try { localStorage.setItem(STORAGE_KEYS.THEME, theme); } catch { /* private mode */ }
+  }, [userSettings?.theme]);
+
   // 2b. Process recurring transactions once on first load
   const recurringProcessedRef = useRef(false);
   useEffect(() => {

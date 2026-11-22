@@ -480,6 +480,14 @@ All motion turns off with the system **Reduce motion** setting.
 </details>
 
 <details>
+<summary><b>Light mode</b></summary>
+
+- The theme follows `userSettings.theme` through one effect in the store (works in Guest mode too; it used to be applied only when Firestore delivered settings).
+- In light mode, green/amber/sky **text** is deepened by a few global rules in `index.html` (the brand green is ~2:1 on white). Fills, borders and buttons keep the brand colours, so keep using `text-primary` as normal.
+- Checked by scanning every page for text under 3:1 contrast.
+</details>
+
+<details>
 <summary><b>Tailwind gotchas</b></summary>
 
 The config in `index.html` overrides radii: `rounded-lg` = 1.5rem, `rounded-xl` = 2rem, `rounded-2xl` = 3rem. Use arbitrary values (`rounded-[14px]`) when you need a specific radius. The forms plugin adds borders to inputs; reset with `border-0 shadow-none p-0` where needed.

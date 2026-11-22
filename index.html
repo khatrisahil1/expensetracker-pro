@@ -265,6 +265,15 @@ body.scrolling {
 @keyframes chart-wipe { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } }
 @keyframes chart-rise { from { transform: scaleY(0); opacity: 0; } to { transform: none; opacity: 1; } }
 
+/* ===== Light mode text contrast =====
+   The brand green (#2ECC71) is only ~2:1 as text on white, too faint to read.
+   In light mode, green and amber *text* use deeper shades (≥4.5:1). Buttons,
+   fills and borders keep the brand colours. */
+html:not(.dark) .text-primary { color: #15803d; }
+html:not(.dark) .text-emerald-400, html:not(.dark) .text-emerald-500 { color: #047857; }
+html:not(.dark) .text-amber-400 { color: #b45309; }
+html:not(.dark) .text-sky-400 { color: #0369a1; }
+
 /* ===== Micro-interactions =====
    :where() keeps these at zero specificity, so any Tailwind class on an
    element still wins. Press feedback uses the standalone `scale` property,
