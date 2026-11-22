@@ -251,20 +251,6 @@ body.scrolling {
 @keyframes ptr-hop { 0% { transform: none; } 40% { transform: translateY(-12px) scale(1.06, 0.95); } 70% { transform: translateY(2px) scale(0.97, 1.04); } 100% { transform: none; } }
 @keyframes ptr-bye { to { transform: scale(0.2); opacity: 0; } }
 
-/* ===== Interactive piggy (components/PiggyCharacter.tsx) ===== */
-.pchar-body { transform-box: view-box; transform-origin: 112px 160px; animation: pchar-breathe 3.2s ease-in-out infinite; }
-.pchar-body.pchar-happy { animation: pchar-jump 0.7s cubic-bezier(.34,1.56,.64,1) 0.45s; }
-.pchar-body.pchar-sad { animation: pchar-shake 0.45s ease-in-out; }
-.pchar-blink { transform-box: fill-box; transform-origin: center; animation: pchar-blink 4s infinite; }
-.pchar-coin { transform-box: fill-box; transform-origin: center; animation: pchar-coin 0.6s cubic-bezier(.5,0,.8,.4) forwards; }
-.pchar-tear { animation: pchar-tear 1.4s ease-in infinite; }
-@keyframes pchar-breathe { 0%, 100% { transform: none; } 50% { transform: scale(1.015, 0.985); } }
-@keyframes pchar-jump { 0% { transform: none; } 30% { transform: scale(1.08, .9); } 55% { transform: translateY(-16px) scale(.96, 1.05); } 80% { transform: translateY(0) scale(1.03, .97); } 100% { transform: none; } }
-@keyframes pchar-shake { 0%, 100% { transform: none; } 25% { transform: translateX(-6px) rotate(-2deg); } 75% { transform: translateX(6px) rotate(2deg); } }
-@keyframes pchar-blink { 0%, 92%, 100% { transform: scaleY(1); } 95% { transform: scaleY(0.1); } }
-@keyframes pchar-coin { 0% { transform: translateY(-60px) scaleX(1); opacity: 0; } 20% { opacity: 1; } 50% { transform: translateY(-20px) scaleX(.2); } 100% { transform: translateY(48px) scaleX(1); opacity: 1; } }
-@keyframes pchar-tear { 0% { transform: translateY(0); opacity: 0; } 20% { opacity: 1; } 100% { transform: translateY(14px); opacity: 0; } }
-
 /* ===== Login screen ===== */
 @keyframes login-drift { 0%, 100% { transform: translate(0, 0) scale(1); } 33% { transform: translate(40px, -30px) scale(1.08); } 66% { transform: translate(-30px, 25px) scale(0.95); } }
 @keyframes login-float { 0%, 100% { transform: translateY(0) rotate(-1deg); } 50% { transform: translateY(-12px) rotate(1.5deg); } }

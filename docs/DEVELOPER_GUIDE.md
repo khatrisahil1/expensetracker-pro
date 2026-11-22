@@ -483,7 +483,7 @@ Skipped when the system "reduce motion" setting is on. Never throws.
 <summary><b>🔐 Login & setup screens</b></summary>
 
 - [LoginScreen.tsx](../components/LoginScreen.tsx):
-  - **Interactive piggy** ([PiggyCharacter.tsx](../components/PiggyCharacter.tsx), moods `idle | cover | peek | happy | sad`): its eye follows the cursor (desktop) or the email caret; a hoof covers its eye while you type the password and lifts to peek when you press *Show*; sad face and tear on errors; happy jump and coin drop on success.
+  - **Live preview card** (`HeroCard` inside LoginScreen): a dark "Spent this month" card whose number counts up and chart draws in. While you type a password the numbers blur behind a lock ("Private"); pressing *Show* clears it; errors tint it red; success shows "All set" with a check. (An interactive piggy was tried here and removed after feedback; the piggy stays on the splash, pull-to-refresh, onboarding and Wrapped.)
   - **Sign in** is one form. **Create account** is a 3-step wizard (email → password with strength meter → name) with progress dots, Back, and slide transitions.
   - Desktop: background cards parallax with the cursor and the card tilts slightly in 3D (CSS vars `--px/--py`, `--tilt-x/--tilt-y`).
   - Fields: gradient focus ring and a ✓ when valid. The *Show password* button uses `onMouseDown={preventDefault}` so the field keeps focus.
@@ -695,7 +695,7 @@ Your store mock creates new objects on every render. Use one stable object (see 
 <details>
 <summary><b>Premium login, haptics, trackpad pull-to-refresh, splash v3</b></summary>
 
-- **Login / sign-up**: interactive piggy (follows cursor, covers its eyes for the password, peeks on Show), 3-step create-account wizard, parallax and tilt, haptics, confetti.
+- **Login / sign-up**: live preview card that hides its numbers while you type a password, 3-step create-account wizard, parallax and tilt, haptics, confetti. (The interactive piggy was removed from login after feedback.)
 - **Haptics** everywhere it matters (`utils/haptics.ts`): Android vibration, iPhone switch-tick trick. Mac trackpads can't be reached from the web.
 - **Pull to refresh** now works with a laptop trackpad / mouse wheel, has haptic ticks, and shows a mini piggy catching coins while refreshing.
 - **Boot splash v3**: same piggy, cleaner type, tagline, glow, slim progress bar.

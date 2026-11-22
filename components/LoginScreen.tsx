@@ -1,9 +1,9 @@
 // Sign-in / sign-up page (/login): a premium, interactive welcome.
-//  - The piggy mascot (PiggyCharacter) watches the cursor, reads along as you
-//    type your email, covers its eyes while you type a password (peeks if you
-//    show it), smiles at a valid email and looks sad on errors.
-//  - Wide screens: hero with parallax cards that drift with the cursor, and a
-//    form card that tilts slightly in 3D. Phones: piggy on top, form below.
+//  - A live "balance card" preview (HeroCard): the number counts up and the
+//    chart draws in; it blurs behind a lock while you type a password (clears
+//    if you press Show), tints red on errors and shows a check on success.
+//  - Wide screens: parallax cards drift with the cursor around it, and the
+//    form card tilts slightly in 3D. Phones: compact card on top, form below.
 //  - Sign in is one screen. Create account is a 3-step flow (email → password
 //    → name) with progress, so each step has one clear job.
 //  - Haptics (utils/haptics.ts) on tab switches, steps, errors and success;
@@ -12,13 +12,12 @@
 //
 // Removed earlier: "Remember me" (did nothing), "Continue with Phone" (not
 // implemented) and the "256-bit encryption" claim.
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useStore, SocialProvider } from '../context/Store';
 import { STORAGE_KEYS } from '../constants/app';
 import { passwordStrength } from '../utils/password';
 import { celebrate } from '../utils/celebrate';
 import { haptic } from '../utils/haptics';
-import PiggyCharacter, { type PiggyMood } from './PiggyCharacter';
 
 type Mode = 'signin' | 'signup';
 type SignupStep = 0 | 1 | 2;
@@ -48,8 +47,8 @@ interface FieldProps {
 
 /** Floating-label input with a glowing focus ring and an optional "valid" tick. */
 const Field: React.FC<FieldProps> = ({ id, label, icon, type = 'text', value, onChange, autoComplete, trailing, autoFocus, valid, onFocus, onBlur, inputRef }) => {
-  // Fields that auto-focus (each sign-up step) report it, so the piggy reacts
-  // straight away: React's autoFocus doesn't always deliver a focus event.
+  // Fields that auto-focus (each sign-up step) report it, so the hero card
+  // reacts straight away: React's autoFocus doesn't always deliver a focus event.
   const own = useRef<HTMLInputElement | null>(null);
   useEffect(() => {
     if (!autoFocus) return;
@@ -97,6 +96,94 @@ const Spinner: React.FC<{ dark?: boolean }> = ({ dark }) => (
   <span className={`size-5 rounded-full border-[3px] animate-spin ${dark ? 'border-[#0b2615]/30 border-t-[#0b2615]' : 'border-slate-300 border-t-slate-700'}`} />
 );
 
+type HeroState = 'idle' | 'private' | 'error' | 'success';
+
+/** Count from 0 to `to` once, easing out. */
+const useCountUp = (to: number, ms = 1400) => {
+  const [n, setN] = useState(0);
+  useEffect(() => {
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) { setN(to); return; }
+    let raf = 0; const t0 = performance.now();
+    const tick = (t: number) => {
+      const k = Math.min(1, (t - t0) / ms);
+      setN(Math.round(to * (1 - Math.pow(1 - k, 3))));
+      if (k < 1) raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [to, ms]);
+  return n;
+};
+
+const CHART = 'M0 46 C 18 44, 26 30, 44 32 S 70 40, 88 26 S 118 12, 136 20 S 166 30, 184 14 S 210 8, 224 6';
+const HERO_CATEGORIES = [
+  { label: 'Food', pct: 42, color: 'bg-orange-400' },
+  { label: 'Travel', pct: 23, color: 'bg-sky-400' },
+  { label: 'Bills', pct: 18, color: 'bg-violet-400' },
+];
+
+/**
+ * A dark "this month" card that previews the app. It reacts to the form:
+ * private (password being typed) blurs the numbers behind a lock, error tints
+ * it red for a moment, success shows a check.
+ */
+const HeroCard: React.FC<{ state: HeroState }> = ({ state }) => {
+  const spent = useCountUp(24180);
+  const hidden = state === 'private';
+  const ring = state === 'error' ? 'ring-rose-500/60 shadow-[0_30px_80px_-20px_rgba(244,63,94,0.45)]'
+    : state === 'success' ? 'ring-primary/70 shadow-[0_30px_80px_-20px_rgba(46,204,113,0.55)]'
+    : 'ring-white/10 shadow-[0_30px_80px_-24px_rgba(0,0,0,0.6)]';
+  return (
+    <div className={`relative overflow-hidden rounded-[28px] p-5 lg:p-6 text-white text-left ring-1 transition-all duration-500 animate-[onb-in-right_0.6s_cubic-bezier(0.16,1,0.3,1)_backwards]
+      bg-[radial-gradient(120%_90%_at_100%_0%,rgba(46,204,113,0.28),transparent_55%),linear-gradient(160deg,#132820,#0a1212_60%)] ${ring}`}>
+      {/* sheen */}
+      <div className="pointer-events-none absolute -inset-x-10 -top-1/2 h-full rotate-12 bg-gradient-to-b from-white/[0.07] to-transparent" aria-hidden="true" />
+
+      <div className="relative flex items-center justify-between">
+        <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-white/50">Spent this month</span>
+        <span className={`h-7 px-2.5 rounded-full flex items-center gap-1 text-[11px] font-bold transition-colors duration-300 ${hidden ? 'bg-white/15 text-white' : state === 'success' ? 'bg-primary text-[#0b2615]' : 'bg-white/[0.08] text-white/70'}`}>
+          <span key={state} aria-hidden="true" className="material-symbols-outlined text-[15px] animate-pop">{hidden ? 'lock' : state === 'success' ? 'check' : state === 'error' ? 'error' : 'calendar_month'}</span>
+          {hidden ? 'Private' : state === 'success' ? 'All set' : state === 'error' ? 'Oops' : 'This month'}
+        </span>
+      </div>
+
+      <div className={`relative mt-2 transition-[filter,opacity] duration-300 ${hidden ? 'blur-md opacity-60' : ''}`}>
+        <p className="text-[2.1rem] lg:text-[2.6rem] leading-none font-black tracking-tight tabular-nums">₹{spent.toLocaleString('en-IN')}</p>
+        <p className="mt-1.5 text-xs font-bold text-primary flex items-center gap-1">
+          <span aria-hidden="true" className="material-symbols-outlined text-[15px]">trending_down</span>12% less than last month
+        </p>
+
+        <svg viewBox="0 0 224 56" className="mt-3 w-full h-14 overflow-visible" aria-hidden="true">
+          <defs>
+            <linearGradient id="hero-fill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#2ECC71" stopOpacity=".35" /><stop offset="1" stopColor="#2ECC71" stopOpacity="0" /></linearGradient>
+          </defs>
+          <path d={`${CHART} L224 56 L0 56 Z`} fill="url(#hero-fill)" className="chart-rise" />
+          <path d={CHART} pathLength={1} fill="none" stroke="#2ECC71" strokeWidth="2.5" strokeLinecap="round" className="chart-draw" />
+          <circle cx="224" cy="6" r="4" fill="#2ECC71" className="animate-pulse" />
+        </svg>
+
+        <div className="mt-4 grid grid-cols-3 gap-2">
+          {HERO_CATEGORIES.map((c, i) => (
+            <div key={c.label} className="rounded-xl bg-white/[0.06] px-2.5 py-2">
+              <span className="flex justify-between text-[10px] font-bold text-white/60"><span>{c.label}</span><span>{c.pct}%</span></span>
+              <span className="mt-1.5 block h-1 rounded-full bg-white/10 overflow-hidden">
+                <span className={`block h-full rounded-full ${c.color} animate-[login-bar_1.6s_cubic-bezier(0.16,1,0.3,1)_backwards]`} style={{ width: `${c.pct * 2}%`, animationDelay: `${300 + i * 120}ms` }} />
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Lock shown over the blurred numbers */}
+      <div className={`pointer-events-none absolute inset-0 flex items-center justify-center transition-opacity duration-300 ${hidden ? 'opacity-100' : 'opacity-0'}`} aria-hidden="true">
+        <span className={`size-14 rounded-2xl bg-white/10 border border-white/15 backdrop-blur flex items-center justify-center transition-transform duration-500 [transition-timing-function:cubic-bezier(0.34,1.56,0.64,1)] ${hidden ? 'scale-100' : 'scale-50'}`}>
+          <span aria-hidden="true" className="material-symbols-outlined text-[28px]">lock</span>
+        </span>
+      </div>
+    </div>
+  );
+};
+
 const LoginScreen: React.FC = () => {
   const { login, signup, googleLogin, loginWithProvider, enableDemo, resetPassword } = useStore();
   const [mode, setMode] = useState<Mode>('signin');
@@ -111,12 +198,9 @@ const LoginScreen: React.FC = () => {
   const [busyProvider, setBusyProvider] = useState<SocialProvider | null>(null);
   const [success, setSuccess] = useState(false);
 
-  // Piggy state
+  // Hero card state
   const [focus, setFocus] = useState<'email' | 'password' | 'name' | null>(null);
-  const [look, setLook] = useState({ x: 0, y: 0 });
   const [sad, setSad] = useState(false);
-  const piggyRef = useRef<HTMLDivElement>(null);
-  const emailRef = useRef<HTMLInputElement>(null);
   const shakeRef = useRef<HTMLDivElement>(null);
   const cardRef = useRef<HTMLDivElement>(null);
   const heroRef = useRef<HTMLDivElement>(null);
@@ -141,19 +225,9 @@ const LoginScreen: React.FC = () => {
   const strength = passwordStrength(password);
   const signingUp = mode === 'signup';
 
-  /** Point the piggy's eyes at a screen point. */
-  const lookAt = useCallback((x: number, y: number) => {
-    const box = piggyRef.current?.getBoundingClientRect();
-    if (!box) return;
-    const cx = box.left + box.width * 0.72; // the eye sits on the right of the drawing
-    const cy = box.top + box.height * 0.45;
-    setLook({ x: Math.max(-1, Math.min(1, (x - cx) / 300)), y: Math.max(-1, Math.min(1, (y - cy) / 300)) });
-  }, []);
-
-  // Eyes follow the cursor, and the hero cards / form card react to it (desktop).
+  // The hero cards and the form card react to the cursor (desktop).
   useEffect(() => {
     const onMove = (e: PointerEvent) => {
-      if (focus !== 'email') lookAt(e.clientX, e.clientY);
       if (e.pointerType !== 'mouse') return;
       const nx = e.clientX / window.innerWidth - 0.5;
       const ny = e.clientY / window.innerHeight - 0.5;
@@ -164,20 +238,12 @@ const LoginScreen: React.FC = () => {
     };
     window.addEventListener('pointermove', onMove);
     return () => window.removeEventListener('pointermove', onMove);
-  }, [focus, lookAt]);
+  }, []);
 
-  // While typing an email, the piggy "reads along" the text.
-  useEffect(() => {
-    if (focus !== 'email' || !emailRef.current) return;
-    const r = emailRef.current.getBoundingClientRect();
-    lookAt(r.left + 48 + Math.min(email.length * 8, r.width - 60), r.top + r.height / 2);
-  }, [focus, email, lookAt]);
-
-  const mood: PiggyMood =
-    success ? 'happy'
-    : sad ? 'sad'
-    : focus === 'password' ? (showPassword ? 'peek' : 'cover')
-    : focus === 'email' && emailValid ? 'happy'
+  const cardState: HeroState =
+    success ? 'success'
+    : sad ? 'error'
+    : focus === 'password' && !showPassword ? 'private'
     : 'idle';
 
   const fail = (message: string) => {
@@ -284,7 +350,7 @@ const LoginScreen: React.FC = () => {
 
   const passwordToggle = (
     <button type="button" onClick={() => { setShowPassword(v => !v); haptic('selection'); }} aria-label={showPassword ? 'Hide password' : 'Show password'}
-      // Keep focus in the password field, so the piggy keeps covering / peeking.
+      // Keep focus in the password field (and the keyboard open) when toggling.
       onMouseDown={e => e.preventDefault()}
       className="size-9 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/10">
       <span key={String(showPassword)} aria-hidden="true" className="material-symbols-outlined text-[20px] animate-pop">{showPassword ? 'visibility_off' : 'visibility'}</span>
@@ -293,7 +359,7 @@ const LoginScreen: React.FC = () => {
 
   const ctaLabel = signingUp ? (['Continue', 'Continue', 'Create my account'] as const)[step] : 'Sign in';
   const titles = signingUp
-    ? [['Create your account', 'First, your email.'], ['Choose a password', 'Piggy won’t peek. Promise. 🙈'], ['What should we call you?', 'This is how we’ll greet you.']][step]
+    ? [['Create your account', 'First, your email.'], ['Choose a password', 'Your numbers hide while you type. 🔒'], ['What should we call you?', 'This is how we’ll greet you.']][step]
     : ['Welcome back 👋', 'Sign in to pick up where you left off.'];
 
   return (
@@ -320,36 +386,30 @@ const LoginScreen: React.FC = () => {
           </div>
 
           <div className="relative w-full max-w-lg flex flex-col items-center lg:items-start">
-            <div className="relative w-[230px] h-[200px] lg:w-[460px] lg:h-[380px] self-center">
+            <div className="relative w-full max-w-[300px] lg:max-w-none lg:w-[460px] lg:h-[380px] self-center flex items-center justify-center">
               {/* Parallax cards (desktop): each drifts with the cursor at its own depth */}
-              <div className="hidden lg:flex absolute left-0 top-6 items-center gap-2 px-3 py-2 rounded-2xl bg-white/90 dark:bg-white/[0.07] border border-black/5 dark:border-white/10 backdrop-blur shadow-xl animate-[login-float_6s_ease-in-out_infinite]"
-                style={{ translate: 'calc(var(--px) * -36px) calc(var(--py) * -24px)' }}>
-                <span className="size-8 rounded-xl bg-primary/15 text-primary flex items-center justify-center"><span aria-hidden="true" className="material-symbols-outlined text-[18px]">trending_up</span></span>
-                <span className="text-left"><span className="block text-[10px] font-bold uppercase tracking-widest text-slate-400">Balance</span><span className="block text-sm font-black">₹64,970</span></span>
-              </div>
-              <div className="hidden lg:flex absolute right-0 top-24 items-center gap-2 px-3 py-2 rounded-2xl bg-white/90 dark:bg-white/[0.07] border border-black/5 dark:border-white/10 backdrop-blur shadow-xl animate-[login-float_7s_ease-in-out_1s_infinite]"
+              <div className="hidden lg:flex absolute z-20 -right-2 top-6 items-center gap-2 px-3 py-2 rounded-2xl bg-white/90 dark:bg-white/[0.07] border border-black/5 dark:border-white/10 backdrop-blur shadow-xl animate-[login-float_7s_ease-in-out_1s_infinite]"
                 style={{ translate: 'calc(var(--px) * 28px) calc(var(--py) * 20px)' }}>
                 <span className="size-8 rounded-xl bg-orange-500/15 text-orange-500 flex items-center justify-center"><span aria-hidden="true" className="material-symbols-outlined text-[18px]">restaurant</span></span>
                 <span className="text-left"><span className="block text-sm font-bold">Zomato</span><span className="block text-xs font-black text-rose-500">−₹415</span></span>
               </div>
-              <div className="hidden lg:flex absolute left-10 bottom-4 items-center gap-2 px-3 py-2 rounded-2xl bg-white/90 dark:bg-white/[0.07] border border-black/5 dark:border-white/10 backdrop-blur shadow-xl animate-[login-float_8s_ease-in-out_2s_infinite]"
+              <div className="hidden lg:flex absolute z-20 -left-2 bottom-10 items-center gap-2 px-3 py-2 rounded-2xl bg-white/90 dark:bg-white/[0.07] border border-black/5 dark:border-white/10 backdrop-blur shadow-xl animate-[login-float_8s_ease-in-out_2s_infinite]"
                 style={{ translate: 'calc(var(--px) * -20px) calc(var(--py) * 30px)' }}>
                 <span className="text-lg">🔥</span><span className="text-sm font-black">7-day streak</span>
               </div>
-              <div className="hidden lg:block absolute right-6 bottom-10 w-44 px-3 py-2.5 rounded-2xl bg-white/90 dark:bg-white/[0.07] border border-black/5 dark:border-white/10 backdrop-blur shadow-xl animate-[login-float_6.5s_ease-in-out_0.5s_infinite]"
+              <div className="hidden lg:block absolute z-20 right-0 bottom-0 w-44 px-3 py-2.5 rounded-2xl bg-white/90 dark:bg-white/[0.07] border border-black/5 dark:border-white/10 backdrop-blur shadow-xl animate-[login-float_6.5s_ease-in-out_0.5s_infinite]"
                 style={{ translate: 'calc(var(--px) * 40px) calc(var(--py) * -18px)' }}>
                 <span className="flex justify-between text-[11px] font-bold"><span>🚲 New bike</span><span className="text-primary">68%</span></span>
                 <span className="mt-1.5 block h-1.5 rounded-full bg-slate-200 dark:bg-white/10 overflow-hidden"><span className="block h-full w-[68%] rounded-full bg-primary animate-[login-bar_2.4s_ease-out]" /></span>
               </div>
 
-              {/* The piggy, reacting to everything */}
-              <div ref={piggyRef} className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[200px] lg:w-[300px]"
-                style={{ translate: 'calc(var(--px) * 10px) calc(var(--py) * 8px)' }}>
-                <PiggyCharacter mood={mood} look={look} className="w-full h-auto drop-shadow-[0_20px_40px_rgba(236,121,180,0.25)]" />
+              {/* Live preview card, reacting to the form */}
+              <div className="relative w-full lg:w-[320px]" style={{ translate: 'calc(var(--px) * 10px) calc(var(--py) * 8px)' }}>
+                <HeroCard state={cardState} />
               </div>
             </div>
 
-            <h1 className="mt-2 text-[2rem] leading-[1.1] lg:text-6xl font-black tracking-tight animate-slide-up">
+            <h1 className="mt-6 lg:mt-2 text-[2rem] leading-[1.1] lg:text-6xl font-black tracking-tight animate-slide-up">
               Money, made <span className="bg-gradient-to-r from-primary via-emerald-400 to-sky-400 bg-clip-text text-transparent">delightfully</span> simple.
             </h1>
             <p className="mt-3 lg:mt-5 text-sm lg:text-lg text-slate-500 dark:text-slate-400 max-w-md animate-slide-up [animation-delay:80ms] hidden sm:block">
@@ -401,7 +461,7 @@ const LoginScreen: React.FC = () => {
               {!signingUp ? (
                 <form onSubmit={handleSignIn} className="flex flex-col gap-3" noValidate>
                   <Field id="email" label="Email" icon="mail" type="email" value={email} onChange={setEmail} autoComplete="email" valid={emailValid}
-                    inputRef={emailRef} onFocus={() => setFocus('email')} onBlur={() => setFocus(null)} />
+                    onFocus={() => setFocus('email')} onBlur={() => setFocus(null)} />
                   <Field id="password" label="Password" icon="lock" type={showPassword ? 'text' : 'password'} value={password} onChange={setPassword}
                     autoComplete="current-password" trailing={passwordToggle} onFocus={() => setFocus('password')} onBlur={() => setFocus(null)} />
                   <button type="button" onClick={() => { setResetEmail(email); setShowReset(true); }} className="self-end text-sm font-bold text-primary hover:underline">Forgot password?</button>
@@ -412,7 +472,7 @@ const LoginScreen: React.FC = () => {
                   <div key={step} className={stepDir === 1 ? 'animate-[onb-in-right_0.4s_cubic-bezier(0.16,1,0.3,1)_backwards]' : 'animate-[onb-in-left_0.4s_cubic-bezier(0.16,1,0.3,1)_backwards]'}>
                     {step === 0 && (
                       <Field id="su-email" label="Email" icon="mail" type="email" value={email} onChange={setEmail} autoComplete="email" autoFocus valid={emailValid}
-                        inputRef={emailRef} onFocus={() => setFocus('email')} onBlur={() => setFocus(null)} />
+                        onFocus={() => setFocus('email')} onBlur={() => setFocus(null)} />
                     )}
                     {step === 1 && (
                       <div className="flex flex-col gap-3">
