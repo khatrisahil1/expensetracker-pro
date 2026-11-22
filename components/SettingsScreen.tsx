@@ -10,6 +10,7 @@
 // "Pro Plan" card with all-time totals labelled "Monthly", the "persona" badge,
 // and the "Save All Lists" button (lists already save on every change).
 import React, { useEffect, useState } from 'react';
+import { version } from '../package.json';
 import { useSearchParams } from 'react-router';
 import { useStore } from '../context/Store';
 import BackupRestoreModal from './BackupRestoreModal';
@@ -46,7 +47,8 @@ const NOTIFICATION_PREFS = [
 ] as const;
 type NotifPrefs = Record<(typeof NOTIFICATION_PREFS)[number]['id'], boolean>;
 
-const APP_VERSION = '2.5.0';
+// Single source of truth: the "version" in package.json (only that field is bundled).
+const APP_VERSION = version;
 
 const SettingsScreen: React.FC = () => {
   const {
