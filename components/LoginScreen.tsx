@@ -159,7 +159,7 @@ const LoginScreen: React.FC = () => {
       {/* Theme toggle */}
       <button onClick={() => setTheme(t => (t === 'dark' ? 'light' : 'dark'))} aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
         className="fixed top-4 right-4 z-50 size-11 rounded-full bg-white/80 dark:bg-white/10 border border-black/5 dark:border-white/10 backdrop-blur flex items-center justify-center shadow-lg">
-        <span key={theme} className={`material-symbols-outlined text-[20px] animate-pop ${theme === 'dark' ? 'text-amber-300' : 'text-orange-500'}`}>{theme === 'dark' ? 'dark_mode' : 'light_mode'}</span>
+        <span aria-hidden="true" key={theme} className={`material-symbols-outlined text-[20px] animate-pop ${theme === 'dark' ? 'text-amber-300' : 'text-orange-500'}`}>{theme === 'dark' ? 'dark_mode' : 'light_mode'}</span>
       </button>
 
       <div className="relative z-10 min-h-screen grid lg:grid-cols-2">
@@ -175,11 +175,11 @@ const LoginScreen: React.FC = () => {
             <div className="relative w-[300px] h-[230px] lg:w-[440px] lg:h-[330px] mb-2 lg:mb-8 self-center">
               <PiggyMascot className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 scale-[0.95] lg:scale-[1.45]" />
               <div className="flex absolute -left-3 top-2 lg:-left-2 lg:top-4 scale-[0.8] lg:scale-100 origin-top-left items-center gap-2 px-3 py-2 rounded-2xl bg-white/90 dark:bg-white/[0.07] border border-black/5 dark:border-white/10 backdrop-blur shadow-xl animate-[login-float_6s_ease-in-out_infinite]">
-                <span className="size-8 rounded-xl bg-primary/15 text-primary flex items-center justify-center"><span className="material-symbols-outlined text-[18px]">trending_up</span></span>
+                <span className="size-8 rounded-xl bg-primary/15 text-primary flex items-center justify-center"><span aria-hidden="true" className="material-symbols-outlined text-[18px]">trending_up</span></span>
                 <span className="text-left"><span className="block text-[10px] font-bold uppercase tracking-widest text-slate-400">Balance</span><span className="block text-sm font-black">₹64,970</span></span>
               </div>
               <div className="flex absolute -right-3 bottom-0 lg:bottom-auto lg:-right-4 lg:top-16 scale-[0.8] lg:scale-100 origin-bottom-right lg:origin-top-right items-center gap-2 px-3 py-2 rounded-2xl bg-white/90 dark:bg-white/[0.07] border border-black/5 dark:border-white/10 backdrop-blur shadow-xl animate-[login-float_7s_ease-in-out_1s_infinite]">
-                <span className="size-8 rounded-xl bg-orange-500/15 text-orange-500 flex items-center justify-center"><span className="material-symbols-outlined text-[18px]">restaurant</span></span>
+                <span className="size-8 rounded-xl bg-orange-500/15 text-orange-500 flex items-center justify-center"><span aria-hidden="true" className="material-symbols-outlined text-[18px]">restaurant</span></span>
                 <span className="text-left"><span className="block text-sm font-bold">Zomato</span><span className="block text-xs font-black text-rose-500">−₹415</span></span>
               </div>
               <div className="hidden lg:flex absolute left-6 bottom-0 items-center gap-2 px-3 py-2 rounded-2xl bg-white/90 dark:bg-white/[0.07] border border-black/5 dark:border-white/10 backdrop-blur shadow-xl animate-[login-float_8s_ease-in-out_2s_infinite]">
@@ -200,7 +200,7 @@ const LoginScreen: React.FC = () => {
             <ul className="hidden lg:flex flex-wrap gap-2 mt-8 stagger">
               {[['bolt', 'Add in seconds'], ['cloud_off', 'Works offline'], ['savings', 'Goals & budgets'], ['auto_awesome', 'Smart categories']].map(([icon, text]) => (
                 <li key={text} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/70 dark:bg-white/5 border border-black/5 dark:border-white/10 text-xs font-bold">
-                  <span className="material-symbols-outlined text-[16px] text-primary">{icon}</span>{text}
+                  <span aria-hidden="true" className="material-symbols-outlined text-[16px] text-primary">{icon}</span>{text}
                 </li>
               ))}
             </ul>
@@ -245,7 +245,7 @@ const LoginScreen: React.FC = () => {
                 trailing={
                   <button type="button" onClick={() => setShowPassword(v => !v)} aria-label={showPassword ? 'Hide password' : 'Show password'}
                     className="size-9 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/10">
-                    <span key={String(showPassword)} className="material-symbols-outlined text-[20px] animate-pop">{showPassword ? 'visibility_off' : 'visibility'}</span>
+                    <span aria-hidden="true" key={String(showPassword)} className="material-symbols-outlined text-[20px] animate-pop">{showPassword ? 'visibility_off' : 'visibility'}</span>
                   </button>
                 } />
 
@@ -273,7 +273,7 @@ const LoginScreen: React.FC = () => {
                 <span className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-700 bg-gradient-to-r from-transparent via-white/40 to-transparent" aria-hidden="true" />
                 <span className="relative flex items-center justify-center gap-2">
                   {isSubmitting ? <span className="size-5 rounded-full border-[3px] border-[#0b2615]/30 border-t-[#0b2615] animate-spin" /> : (
-                    <>{signingUp ? 'Create account' : 'Sign in'}<span className="material-symbols-outlined text-[20px] transition-transform group-hover:translate-x-1">arrow_forward</span></>
+                    <>{signingUp ? 'Create account' : 'Sign in'}<span aria-hidden="true" className="material-symbols-outlined text-[20px] transition-transform group-hover:translate-x-1">arrow_forward</span></>
                   )}
                 </span>
               </button>
@@ -307,7 +307,7 @@ const LoginScreen: React.FC = () => {
 
             <button onClick={enableDemo} className="group w-full mt-5 py-2 text-sm font-bold text-slate-500 dark:text-slate-400 hover:text-primary flex items-center justify-center gap-1.5">
               Just looking? Try it without an account
-              <span className="material-symbols-outlined text-[18px] transition-transform group-hover:translate-x-1">arrow_forward</span>
+              <span aria-hidden="true" className="material-symbols-outlined text-[18px] transition-transform group-hover:translate-x-1">arrow_forward</span>
             </button>
 
             <p className="mt-4 text-center text-[11px] text-slate-400 flex items-center justify-center gap-1">
@@ -326,7 +326,7 @@ const LoginScreen: React.FC = () => {
             className="w-full max-w-sm rounded-[2rem] bg-white dark:bg-[#121818] border border-black/5 dark:border-white/10 p-6 shadow-2xl animate-sheet-in">
             {resetStatus === 'sent' ? (
               <div className="flex flex-col items-center gap-3 py-4 text-center">
-                <span className="size-14 rounded-full bg-primary/15 text-primary flex items-center justify-center animate-pop"><span className="material-symbols-outlined text-3xl">mark_email_read</span></span>
+                <span className="size-14 rounded-full bg-primary/15 text-primary flex items-center justify-center animate-pop"><span aria-hidden="true" className="material-symbols-outlined text-3xl">mark_email_read</span></span>
                 <p className="font-black text-lg">Check your inbox</p>
                 <p className="text-sm text-slate-500">We sent a reset link to {resetEmail}.</p>
               </div>

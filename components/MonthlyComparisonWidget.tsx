@@ -88,7 +88,7 @@ const MonthlyComparisonWidget: React.FC = () => {
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <div className="size-10 rounded-full border border-border-light dark:border-white/20 flex items-center justify-center text-primary bg-primary/10">
-            <span className="material-symbols-outlined text-xl">compare_arrows</span>
+            <span aria-hidden="true" className="material-symbols-outlined text-xl">compare_arrows</span>
           </div>
           <div>
             <h3 className="text-xl font-black text-text-light-main dark:text-text-dark-main">

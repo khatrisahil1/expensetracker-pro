@@ -115,7 +115,7 @@ const ReceiptScannerModal: React.FC<ReceiptScannerModalProps> = ({ onClose, onRe
             <h3 className="text-lg font-black">Receipt Scanner</h3>
             <p className="text-xs text-text-light-muted dark:text-text-dark-muted">Snap a receipt and auto-fill transaction details.</p>
           </div>
-          <button onClick={() => { stopCamera(); onClose(); }} className="size-10 rounded-full hover:bg-gray-100 dark:hover:bg-surface-darker transition-all"><span className="material-symbols-outlined">close</span></button>
+          <button onClick={() => { stopCamera(); onClose(); }} className="size-10 rounded-full hover:bg-gray-100 dark:hover:bg-surface-darker transition-all"><span aria-hidden="true" className="material-symbols-outlined">close</span></button>
         </div>
 
         <div className="p-6">
@@ -128,7 +128,7 @@ const ReceiptScannerModal: React.FC<ReceiptScannerModalProps> = ({ onClose, onRe
               <video ref={videoRef} autoPlay playsInline className="w-full h-full object-cover" />
             ) : (
               <div className="w-full h-full flex flex-col items-center justify-center gap-3 text-text-light-muted">
-                <span className="material-symbols-outlined text-5xl">photo_camera</span>
+                <span aria-hidden="true" className="material-symbols-outlined text-5xl">photo_camera</span>
                 <p className="text-sm">No camera active.</p>
               </div>
             )}

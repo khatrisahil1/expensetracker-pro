@@ -27,7 +27,7 @@ const SplitBillScreen: React.FC = () => {
             <p className="text-text-light-muted dark:text-text-dark-muted mt-1">Avoid awkwardness. Split it fair and square.</p>
           </div>
           <button className="bg-gray-100 dark:bg-border-dark hover:bg-gray-200 dark:hover:bg-surface-darker text-sm text-text-light-main dark:text-text-dark-main font-medium px-5 py-2.5 rounded-full border border-transparent transition-colors flex items-center gap-2 w-fit">
-            <span className="material-symbols-outlined text-[18px]">history</span> History
+            <span aria-hidden="true" className="material-symbols-outlined text-[18px]">history</span> History
           </button>
         </div>
 
@@ -42,7 +42,7 @@ const SplitBillScreen: React.FC = () => {
                 <div>
                   <h3 className="text-xl font-bold text-text-light-main dark:text-text-dark-main">Sushi Sambar</h3>
                   <p className="text-text-light-muted dark:text-text-dark-muted text-sm flex items-center gap-1 mt-1">
-                    <span className="material-symbols-outlined text-[16px]">restaurant</span> Dining Out • Yesterday, 8:30 PM
+                    <span aria-hidden="true" className="material-symbols-outlined text-[16px]">restaurant</span> Dining Out • Yesterday, 8:30 PM
                   </p>
                 </div>
                 <div className="text-right">
@@ -55,7 +55,7 @@ const SplitBillScreen: React.FC = () => {
                 <div className="flex -space-x-2">
                   <div className="size-8 rounded-full border-2 border-surface-light dark:border-surface-dark bg-primary flex items-center justify-center text-[10px] font-bold text-background-dark z-10">YOU</div>
                   <div className="size-8 rounded-full border-2 border-surface-light dark:border-surface-dark bg-gray-200 dark:bg-border-dark flex items-center justify-center text-gray-500">
-                    <span className="material-symbols-outlined text-[16px]">add</span>
+                    <span aria-hidden="true" className="material-symbols-outlined text-[16px]">add</span>
                   </div>
                 </div>
                 <button className="text-primary text-sm font-semibold hover:underline">View Receipt</button>
@@ -68,7 +68,7 @@ const SplitBillScreen: React.FC = () => {
         <div className="bg-surface-light dark:bg-surface-dark rounded-xl p-6 lg:p-8 shadow-sm border border-border-light dark:border-border-dark">
           <div className="flex items-center gap-2 mb-6">
             <div className="p-2 bg-primary/10 rounded-full text-primary">
-              <span className="material-symbols-outlined">call_split</span>
+              <span aria-hidden="true" className="material-symbols-outlined">call_split</span>
             </div>
             <h3 className="text-xl font-bold text-text-light-main dark:text-text-dark-main">Split this Bill</h3>
           </div>
@@ -76,13 +76,13 @@ const SplitBillScreen: React.FC = () => {
           {/* Tabs */}
           <div className="flex border-b border-border-light dark:border-border-dark gap-8 mb-8 overflow-x-auto">
             <button className="flex items-center gap-2 border-b-[3px] border-primary text-text-light-main dark:text-text-dark-main pb-3 px-1 transition-colors whitespace-nowrap">
-              <span className="material-symbols-outlined text-[18px]">percent</span> <span className="text-sm font-bold">By Percentage</span>
+              <span aria-hidden="true" className="material-symbols-outlined text-[18px]">percent</span> <span className="text-sm font-bold">By Percentage</span>
             </button>
             <button className="flex items-center gap-2 border-b-[3px] border-transparent text-text-light-muted dark:text-text-dark-muted hover:text-text-light-main dark:hover:text-text-dark-main pb-3 px-1 transition-colors whitespace-nowrap">
-              <span className="material-symbols-outlined text-[18px]">attach_money</span> <span className="text-sm font-bold">By Amount</span>
+              <span aria-hidden="true" className="material-symbols-outlined text-[18px]">attach_money</span> <span className="text-sm font-bold">By Amount</span>
             </button>
             <button className="flex items-center gap-2 border-b-[3px] border-transparent text-text-light-muted dark:text-text-dark-muted hover:text-text-light-main dark:hover:text-text-dark-main pb-3 px-1 transition-colors whitespace-nowrap">
-              <span className="material-symbols-outlined text-[18px]">balance</span> <span className="text-sm font-bold">Even Split</span>
+              <span aria-hidden="true" className="material-symbols-outlined text-[18px]">balance</span> <span className="text-sm font-bold">Even Split</span>
             </button>
           </div>
 
@@ -91,12 +91,12 @@ const SplitBillScreen: React.FC = () => {
             <label className="block text-sm font-medium text-text-light-muted dark:text-text-dark-muted mb-3">Split with whom?</label>
             <div className="flex items-center gap-3 overflow-x-auto pb-2">
               <button className="shrink-0 size-12 rounded-full border border-dashed border-gray-400 dark:border-gray-600 flex items-center justify-center hover:bg-gray-100 dark:hover:bg-border-dark transition-colors group">
-                <span className="material-symbols-outlined text-gray-400 group-hover:text-primary">person_add</span>
+                <span aria-hidden="true" className="material-symbols-outlined text-gray-400 group-hover:text-primary">person_add</span>
               </button>
               <div className="shrink-0 flex flex-col items-center gap-1 cursor-pointer">
                 <div className="size-12 rounded-full bg-cover bg-center border-2 border-primary relative" style={{backgroundImage: 'url("https://lh3.googleusercontent.com/aida-public/AB6AXuACAubVoNERCZuXwpwqDYk-EGPodyTxLqE-ab4x5yqka04dopWvdgttr80ZW4xhZyY0ZlN-WlYoVqG4W_4fFGzAiacwbShly_fedpGKXgQ0Y5V9x0ERkSeMM63vtbb9_gnRDF6FIoJSHO6VYLgrlCDoS0m19zWzt0ksTwN59ilOSHZWLD9TDg0_QxCOGg-jxlWhBOJHY3T41h5Xri3vTXWVqU1Fh7qiDgufPBlw2lPH3fbesTtFTG4dYM2EoPlK2O32d0lJgI4pKtY")'}}>
                   <div className="absolute -bottom-1 -right-1 bg-primary text-background-dark rounded-full size-5 flex items-center justify-center border-2 border-surface-light dark:border-surface-dark">
-                    <span className="material-symbols-outlined text-[12px] font-bold">check</span>
+                    <span aria-hidden="true" className="material-symbols-outlined text-[12px] font-bold">check</span>
                   </div>
                 </div>
                 <span className="text-xs font-medium text-text-light-main dark:text-text-dark-main">Mike</span>
@@ -120,7 +120,7 @@ const SplitBillScreen: React.FC = () => {
               </div>
               <input className="absolute top-0 w-full h-full opacity-0 cursor-pointer z-10" type="range" max="100" min="0" defaultValue="50" />
               <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 size-7 bg-white dark:bg-background-dark border-4 border-primary rounded-full shadow-lg pointer-events-none flex items-center justify-center">
-                 <span className="material-symbols-outlined text-[14px] text-primary">drag_handle</span>
+                 <span aria-hidden="true" className="material-symbols-outlined text-[14px] text-primary">drag_handle</span>
               </div>
             </div>
             <div className="flex items-center justify-between gap-4">
@@ -129,7 +129,7 @@ const SplitBillScreen: React.FC = () => {
                 <p className="text-xl font-bold text-text-light-main dark:text-text-dark-main">₹64.25</p>
               </div>
               <div className="flex items-center justify-center">
-                <span className="material-symbols-outlined text-gray-400">arrow_forward</span>
+                <span aria-hidden="true" className="material-symbols-outlined text-gray-400">arrow_forward</span>
               </div>
               <div className="flex-1 bg-gray-100 dark:bg-border-dark p-4 rounded-xl border border-transparent">
                 <p className="text-xs text-text-light-muted dark:text-text-dark-muted mb-1">Mike Owes</p>
@@ -141,7 +141,7 @@ const SplitBillScreen: React.FC = () => {
           <div className="flex flex-col sm:flex-row gap-4 justify-end pt-4 border-t border-border-light dark:border-border-dark">
             <button className="px-6 py-3 rounded-full text-text-light-muted dark:text-text-dark-muted font-medium text-sm hover:bg-gray-100 dark:hover:bg-border-dark transition-colors">Cancel</button>
             <button disabled title="Not available yet" className="px-8 py-3 bg-primary text-background-dark font-bold rounded-full text-sm transition-all opacity-50 cursor-not-allowed shadow-[0_0_20px_rgba(70,236,19,0.3)] hover:shadow-[0_0_30px_rgba(70,236,19,0.4)] flex items-center gap-2">
-              Send Request <span className="material-symbols-outlined text-[18px]">send</span>
+              Send Request <span aria-hidden="true" className="material-symbols-outlined text-[18px]">send</span>
             </button>
           </div>
         </div>
@@ -153,7 +153,7 @@ const SplitBillScreen: React.FC = () => {
           <div className="flex items-center justify-between mb-6">
             <h3 className="text-lg font-bold text-text-light-main dark:text-text-dark-main">Settlement Status</h3>
             <button className="p-2 hover:bg-gray-100 dark:hover:bg-border-dark rounded-full transition-colors">
-              <span className="material-symbols-outlined text-gray-500">more_horiz</span>
+              <span aria-hidden="true" className="material-symbols-outlined text-gray-500">more_horiz</span>
             </button>
           </div>
           
@@ -179,7 +179,7 @@ const SplitBillScreen: React.FC = () => {
                 <p className="font-bold text-text-light-main dark:text-text-dark-main">₹45.00</p>
               </div>
               <button className="w-full py-2 bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 rounded-lg text-xs font-bold hover:bg-orange-200 dark:hover:bg-orange-900/50 transition-colors flex items-center justify-center gap-1">
-                <span className="material-symbols-outlined text-[14px]">notifications_active</span> Nudge John
+                <span aria-hidden="true" className="material-symbols-outlined text-[14px]">notifications_active</span> Nudge John
               </button>
             </div>
 
@@ -197,7 +197,7 @@ const SplitBillScreen: React.FC = () => {
               </div>
                <div className="flex justify-end">
                 <button className="text-xs text-gray-400 hover:text-text-light-main dark:hover:text-text-dark-main flex items-center gap-1 transition-colors">
-                  <span className="material-symbols-outlined text-[14px]">edit</span> Edit
+                  <span aria-hidden="true" className="material-symbols-outlined text-[14px]">edit</span> Edit
                 </button>
               </div>
             </div>
@@ -220,7 +220,7 @@ const SplitBillScreen: React.FC = () => {
 
           <div className="mt-auto pt-6">
             <div className="bg-primary/10 rounded-lg p-3 flex gap-3 items-start">
-              <span className="material-symbols-outlined text-primary text-[20px] shrink-0 mt-0.5">tips_and_updates</span>
+              <span aria-hidden="true" className="material-symbols-outlined text-primary text-[20px] shrink-0 mt-0.5">tips_and_updates</span>
               <p className="text-xs text-text-light-muted dark:text-text-dark-muted leading-relaxed">
                 <span className="font-bold text-primary">Pro Tip:</span> Regular nudges (once a week) are 40% more effective than waiting until the end of the month.
               </p>

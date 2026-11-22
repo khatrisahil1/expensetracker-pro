@@ -209,7 +209,7 @@ const SimulatorScreen: React.FC = () => {
         </div>
         <div className="flex items-center gap-2 rounded-full bg-surface-light dark:bg-surface-dark border border-border-light dark:border-border-dark p-1 pr-4">
           <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/20 text-primary animate-pulse">
-            <span className="material-symbols-outlined text-sm">auto_graph</span>
+            <span aria-hidden="true" className="material-symbols-outlined text-sm">auto_graph</span>
           </div>
           <span className="text-xs font-bold text-primary tracking-wider uppercase">Live Preview Active</span>
         </div>
@@ -220,7 +220,7 @@ const SimulatorScreen: React.FC = () => {
         {/* Stat 1: Current Balance */}
         <div className="relative overflow-hidden rounded-2xl border border-border-light dark:border-border-dark bg-surface-light dark:bg-surface-dark p-6 group transition-all hover:border-primary/50 shadow-sm">
           <div className="absolute right-0 top-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
-            <span className="material-symbols-outlined text-5xl text-text-light-main dark:text-text-dark-main">account_balance_wallet</span>
+            <span aria-hidden="true" className="material-symbols-outlined text-5xl text-text-light-main dark:text-text-dark-main">account_balance_wallet</span>
           </div>
           <div className="flex flex-col gap-1">
             <p className="text-text-light-muted dark:text-text-dark-muted text-sm font-medium uppercase tracking-wider">Current Balance</p>
@@ -228,7 +228,7 @@ const SimulatorScreen: React.FC = () => {
                 {currencySymbol}{currentBalance.toLocaleString()}
             </p>
             <div className={`flex items-center gap-1 text-sm font-bold mt-2 ${avgMonthlyNet >= 0 ? 'text-primary' : 'text-danger'}`}>
-              <span className="material-symbols-outlined text-base">{avgMonthlyNet >= 0 ? 'trending_up' : 'trending_down'}</span>
+              <span aria-hidden="true" className="material-symbols-outlined text-base">{avgMonthlyNet >= 0 ? 'trending_up' : 'trending_down'}</span>
               <span>{formatMoney(Math.round(avgMonthlyNet), currencySymbol, { signed: true })} / month</span>
             </div>
           </div>
@@ -237,7 +237,7 @@ const SimulatorScreen: React.FC = () => {
         {/* Stat 2: Projected Low */}
         <div className={`relative overflow-hidden rounded-2xl border p-6 shadow-lg transition-all ${forecast.lowestSimulated < 0 ? 'bg-red-500/10 border-red-500/30' : 'bg-primary/5 border-primary/30'}`}>
           <div className="absolute right-0 top-0 p-4 opacity-20">
-            <span className="material-symbols-outlined text-5xl text-current">visibility</span>
+            <span aria-hidden="true" className="material-symbols-outlined text-5xl text-current">visibility</span>
           </div>
           <div className="flex flex-col gap-1">
             <p className={`text-sm font-medium uppercase tracking-wider ${forecast.lowestSimulated < 0 ? 'text-danger' : 'text-primary-dim'}`}>Projected Low</p>
@@ -245,7 +245,7 @@ const SimulatorScreen: React.FC = () => {
                 {currencySymbol}{forecast.lowestSimulated.toLocaleString()}
             </p>
             <div className="flex items-center gap-1 text-text-light-muted dark:text-text-dark-muted text-sm font-medium mt-2">
-              <span className="material-symbols-outlined text-base">{forecast.lowestSimulated < 0 ? 'warning' : 'check_circle'}</span>
+              <span aria-hidden="true" className="material-symbols-outlined text-base">{forecast.lowestSimulated < 0 ? 'warning' : 'check_circle'}</span>
               <span>
                   {forecast.lowestSimulated < 0 
                     ? "Warning: Negative Balance" 
@@ -258,7 +258,7 @@ const SimulatorScreen: React.FC = () => {
         {/* Stat 3: Runway */}
         <div className="relative overflow-hidden rounded-2xl border border-border-light dark:border-border-dark bg-surface-light dark:bg-surface-dark p-6 group hover:border-primary/50 transition-all shadow-sm">
           <div className="absolute right-0 top-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
-            <span className="material-symbols-outlined text-5xl text-text-light-main dark:text-text-dark-main">verified_user</span>
+            <span aria-hidden="true" className="material-symbols-outlined text-5xl text-text-light-main dark:text-text-dark-main">verified_user</span>
           </div>
           <div className="flex flex-col gap-1">
             <p className="text-text-light-muted dark:text-text-dark-muted text-sm font-medium uppercase tracking-wider">Runway Status</p>
@@ -377,7 +377,7 @@ const SimulatorScreen: React.FC = () => {
                     <div key={sim.id} className={`flex items-center justify-between p-3 rounded-xl border transition-all cursor-pointer ${sim.active ? 'bg-gray-50 dark:bg-border-dark/30 border-border-light dark:border-border-dark/50' : 'bg-transparent border-transparent opacity-50 grayscale'}`} onClick={() => toggleScenario(sim.id)}>
                        <div className="flex items-center gap-3">
                           <div className={`size-8 rounded-full flex items-center justify-center text-text-light-muted dark:text-text-dark-muted ${sim.active ? 'bg-gray-200 dark:bg-border-dark' : 'bg-transparent border border-gray-600'}`}>
-                             <span className="material-symbols-outlined text-sm">{sim.icon}</span>
+                             <span aria-hidden="true" className="material-symbols-outlined text-sm">{sim.icon}</span>
                           </div>
                           <div className="flex flex-col">
                              <span className="text-sm font-bold text-text-light-main dark:text-text-dark-main">{sim.name}</span>
@@ -405,7 +405,7 @@ const SimulatorScreen: React.FC = () => {
                  <p className="text-xs font-bold text-text-light-muted dark:text-text-dark-muted uppercase tracking-wider">New Scenario</p>
                  <div className="space-y-3">
                     <div className="relative">
-                       <span className="material-symbols-outlined absolute left-3 top-2.5 text-text-light-muted dark:text-text-dark-muted text-lg">edit</span>
+                       <span aria-hidden="true" className="material-symbols-outlined absolute left-3 top-2.5 text-text-light-muted dark:text-text-dark-muted text-lg">edit</span>
                        <input 
                             className="w-full bg-background-light dark:bg-surface-darker border border-border-light dark:border-border-dark text-text-light-main dark:text-text-dark-main text-sm rounded-xl py-2.5 pl-10 pr-4 focus:ring-1 focus:ring-primary focus:border-primary outline-none placeholder-gray-400 dark:placeholder:text-text-dark-muted/50" 
                             placeholder="Expense Name (e.g. Car)" 
@@ -440,13 +440,13 @@ const SimulatorScreen: React.FC = () => {
                     onClick={handleAddScenario}
                     className="w-full mt-2 rounded-full bg-primary hover:bg-primary-hover text-[#131811] font-bold py-3 px-4 transition-all duration-300 flex items-center justify-center gap-2 group shadow-glow active:scale-95"
                  >
-                    <span className="material-symbols-outlined text-lg transition-transform group-hover:rotate-90">add</span>
+                    <span aria-hidden="true" className="material-symbols-outlined text-lg transition-transform group-hover:rotate-90">add</span>
                     Add to Simulation
                  </button>
               </div>
 
               <div className={`mt-auto rounded-xl p-3 flex gap-3 items-start border ${forecast.lowestSimulated < 0 ? 'bg-red-500/10 border-red-500/20' : 'bg-primary/10 border-primary/20'}`}>
-                 <span className={`material-symbols-outlined text-lg mt-0.5 ${forecast.lowestSimulated < 0 ? 'text-danger' : 'text-primary'}`}>info</span>
+                 <span aria-hidden="true" className={`material-symbols-outlined text-lg mt-0.5 ${forecast.lowestSimulated < 0 ? 'text-danger' : 'text-primary'}`}>info</span>
                  <p className="text-xs text-text-light-muted dark:text-text-dark-muted leading-relaxed">
                     {forecast.lowestSimulated < 0 
                         ? <span className="font-bold text-danger">Critical Alert:</span> 

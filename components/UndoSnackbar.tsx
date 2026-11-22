@@ -78,7 +78,7 @@ const UndoSnackbar: React.FC = () => {
                 <div className="flex items-center gap-2">
                     <span className={`text-[11px] font-bold tracking-wide ${isUrgent ? 'text-amber-100' : 'text-gray-300'}`}>{Math.ceil((progress / 100) * UNDO_WINDOW_MS / 1000)}s</span>
                     <button onClick={handleUndo} className={`text-sm font-black px-4 py-2 rounded-full border transition-all active:scale-95 ${isUrgent ? 'bg-amber-500/20 border-amber-300 text-amber-100 hover:bg-amber-500/30' : 'bg-primary/15 border-primary/25 text-primary hover:bg-primary/25'}`}>UNDO</button>
-                    <button onClick={clearUndo} className="size-8 rounded-full flex items-center justify-center text-gray-400 hover:text-white hover:bg-white/10 transition-colors"><span className="material-symbols-outlined text-lg">close</span></button>
+                    <button onClick={clearUndo} className="size-8 rounded-full flex items-center justify-center text-gray-400 hover:text-white hover:bg-white/10 transition-colors"><span aria-hidden="true" className="material-symbols-outlined text-lg">close</span></button>
                 </div>
             </div>
         </div>

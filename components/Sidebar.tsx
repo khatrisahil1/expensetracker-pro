@@ -76,9 +76,10 @@ const Sidebar: React.FC<SidebarProps> = ({
             {isMobileMode && (
               <button
                 onClick={onClose}
+                aria-label="Close menu"
                 className="size-9 flex items-center justify-center rounded-full hover:bg-gray-100 dark:hover:bg-surface-dark transition"
               >
-                <span className="material-symbols-outlined">close</span>
+                <span aria-hidden="true" className="material-symbols-outlined">close</span>
               </button>
             )}
           </div>

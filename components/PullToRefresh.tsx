@@ -46,7 +46,7 @@ const PullToRefresh: React.FC<Props> = ({ pull, phase, dragging }) => {
           {/* Coin face: ₹ spins with the pull, flips while refreshing, becomes a tick when done */}
           <span className="absolute inset-0 flex items-center justify-center text-[#7A4B00] font-black text-xl [perspective:200px]">
             {phase === 'done' ? (
-              <span className="material-symbols-outlined text-[22px] animate-pop">check</span>
+              <span aria-hidden="true" className="material-symbols-outlined text-[22px] animate-pop">check</span>
             ) : (
               <span className={phase === 'refreshing' ? 'animate-[ptr-flip_0.8s_linear_infinite]' : ''}
                 style={phase === 'pulling' || phase === 'armed' ? { transform: `rotateY(${progress * 360}deg)`, display: 'inline-block' } : { display: 'inline-block' }}>

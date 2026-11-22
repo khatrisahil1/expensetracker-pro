@@ -68,7 +68,7 @@ const BackupRestoreModal: React.FC<BackupRestoreModalProps> = ({ onClose }) => {
         <div className="flex items-center justify-between p-6 border-b border-border-light dark:border-border-dark">
           <div className="flex items-center gap-3">
             <div className="size-10 rounded-2xl bg-primary/10 text-primary flex items-center justify-center">
-              <span className="material-symbols-outlined">cloud_sync</span>
+              <span aria-hidden="true" className="material-symbols-outlined">cloud_sync</span>
             </div>
             <div>
               <h2 className="text-lg font-black text-text-light-main dark:text-text-dark-main">Backup & Restore</h2>
@@ -76,7 +76,7 @@ const BackupRestoreModal: React.FC<BackupRestoreModalProps> = ({ onClose }) => {
             </div>
           </div>
           <button onClick={onClose} className="size-9 rounded-full hover:bg-gray-100 dark:hover:bg-surface-darker flex items-center justify-center transition-colors">
-            <span className="material-symbols-outlined text-text-light-muted">close</span>
+            <span aria-hidden="true" className="material-symbols-outlined text-text-light-muted">close</span>
           </button>
         </div>
 
@@ -100,7 +100,7 @@ const BackupRestoreModal: React.FC<BackupRestoreModalProps> = ({ onClose }) => {
             <>
               <div className="p-4 rounded-2xl bg-primary/5 border border-primary/20 flex flex-col gap-2">
                 <div className="flex items-center gap-2 text-primary font-bold text-sm">
-                  <span className="material-symbols-outlined text-[18px]">info</span>
+                  <span aria-hidden="true" className="material-symbols-outlined text-[18px]">info</span>
                   What's included
                 </div>
                 <ul className="text-xs text-text-light-muted dark:text-text-dark-muted space-y-1 ml-6">
@@ -123,7 +123,7 @@ const BackupRestoreModal: React.FC<BackupRestoreModalProps> = ({ onClose }) => {
                 disabled={isDemo}
                 className="w-full py-4 bg-primary text-[#131811] font-black rounded-2xl shadow-glow hover:bg-primary/90 active:scale-[0.98] transition-all disabled:opacity-50 flex items-center justify-center gap-2"
               >
-                <span className="material-symbols-outlined">download</span>
+                <span aria-hidden="true" className="material-symbols-outlined">download</span>
                 Download Backup
               </button>
             </>
@@ -133,7 +133,7 @@ const BackupRestoreModal: React.FC<BackupRestoreModalProps> = ({ onClose }) => {
                 <div className="flex flex-col gap-4 animate-fade-in">
                   <div className="p-4 rounded-2xl bg-warning/10 border border-warning/20">
                     <div className="flex items-center gap-2 text-warning font-bold text-sm mb-2">
-                      <span className="material-symbols-outlined text-[18px]">warning</span>
+                      <span aria-hidden="true" className="material-symbols-outlined text-[18px]">warning</span>
                       Confirm Restore
                     </div>
                     <p className="text-xs text-text-light-muted dark:text-text-dark-muted">
@@ -151,7 +151,7 @@ const BackupRestoreModal: React.FC<BackupRestoreModalProps> = ({ onClose }) => {
                       disabled={isImporting}
                       className="flex-1 py-3 rounded-xl bg-primary text-[#131811] font-black shadow-glow disabled:opacity-50 flex items-center justify-center gap-2"
                     >
-                      {isImporting && <span className="material-symbols-outlined animate-spin text-sm">sync</span>}
+                      {isImporting && <span aria-hidden="true" className="material-symbols-outlined animate-spin text-sm">sync</span>}
                       {isImporting ? 'Restoring...' : 'Restore Now'}
                     </button>
                   </div>
@@ -164,14 +164,14 @@ const BackupRestoreModal: React.FC<BackupRestoreModalProps> = ({ onClose }) => {
                         ? 'bg-primary/10 border-primary/20 text-primary'
                         : 'bg-danger/10 border-danger/20 text-danger'
                     }`}>
-                      <span className="material-symbols-outlined text-[18px]">
+                      <span aria-hidden="true" className="material-symbols-outlined text-[18px]">
                         {importStatus.type === 'success' ? 'check_circle' : 'error'}
                       </span>
                       {importStatus.message}
                     </div>
                   )}
                   <div className="p-4 rounded-2xl bg-gray-50 dark:bg-surface-darker border border-dashed border-border-light dark:border-border-dark flex flex-col items-center gap-3">
-                    <span className="material-symbols-outlined text-4xl text-text-light-muted opacity-40">upload_file</span>
+                    <span aria-hidden="true" className="material-symbols-outlined text-4xl text-text-light-muted opacity-40">upload_file</span>
                     <p className="text-sm text-text-light-muted dark:text-text-dark-muted text-center">Select a <code>.json</code> backup file to restore from</p>
                     <button
                       onClick={() => fileRef.current?.click()}

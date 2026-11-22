@@ -64,7 +64,7 @@ const slidesFor = (s: WrappedStats, symbol: string): Slide[] => {
       <div className="flex flex-col items-center text-center gap-6">
         <span className={kicker} style={anim(0)}>Your top category</span>
         <span className="size-28 rounded-[2rem] bg-white/15 flex items-center justify-center" style={{ animation: 'wrap-float 4s ease-in-out infinite' }}>
-          <span className="material-symbols-outlined text-6xl" style={{ color: style.hex }}>{style.icon}</span>
+          <span aria-hidden="true" className="material-symbols-outlined text-6xl" style={{ color: style.hex }}>{style.icon}</span>
         </span>
         <h2 className={big} style={anim(150)}>{s.topCategory!.name}</h2>
         <p className="text-xl font-bold" style={anim(250)}><Count value={s.topCategory!.amount} symbol={symbol} /> · {s.topCategory!.share}% of your spending</p>
@@ -234,7 +234,7 @@ const MonthlyWrapped: React.FC<Props> = ({ transactions, symbol, initialMonth, o
             <span className="material-symbols-outlined text-[18px] absolute right-2 pointer-events-none" aria-hidden="true">expand_more</span>
           </label>
           <button onClick={onClose} aria-label="Close" className="size-10 rounded-full bg-black/25 backdrop-blur flex items-center justify-center">
-            <span className="material-symbols-outlined">close</span>
+            <span aria-hidden="true" className="material-symbols-outlined">close</span>
           </button>
         </div>
 
@@ -248,10 +248,10 @@ const MonthlyWrapped: React.FC<Props> = ({ transactions, symbol, initialMonth, o
           {isLast ? (
             <>
               <button onClick={() => setIndex(0)} className="h-12 px-5 rounded-full bg-white/15 backdrop-blur font-bold flex items-center gap-2">
-                <span className="material-symbols-outlined text-[20px]">replay</span>Replay
+                <span aria-hidden="true" className="material-symbols-outlined text-[20px]">replay</span>Replay
               </button>
               <button onClick={share} className="h-12 flex-1 rounded-full bg-white text-black font-black flex items-center justify-center gap-2">
-                <span className="material-symbols-outlined text-[20px]">ios_share</span>{copied ? 'Copied!' : 'Share my month'}
+                <span aria-hidden="true" className="material-symbols-outlined text-[20px]">ios_share</span>{copied ? 'Copied!' : 'Share my month'}
               </button>
             </>
           ) : (

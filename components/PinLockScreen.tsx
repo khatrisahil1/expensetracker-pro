@@ -167,7 +167,7 @@ export const PinLockScreen = () => {
                     ${isActive ? 'scale-90 bg-primary/20 !text-primary shadow-glow' : 'active:scale-95'}
                 `}
             >
-                {icon ? <span className="material-symbols-outlined text-3xl">{icon}</span> : value}
+                {icon ? <span aria-hidden="true" className="material-symbols-outlined text-3xl">{icon}</span> : value}
             </button>
         );
     };
@@ -188,7 +188,7 @@ export const PinLockScreen = () => {
                              <div className="flex gap-3">
                                  <button type="button" onClick={() => setShowResetModal(false)} className="flex-1 py-3 rounded-xl font-bold text-text-light-muted">Cancel</button>
                                  <button type="submit" disabled={isVerifying} className="flex-1 py-3 rounded-xl font-bold bg-primary text-black flex items-center justify-center gap-2">
-                                     {isVerifying && <span className="material-symbols-outlined animate-spin text-sm">sync</span>}
+                                     {isVerifying && <span aria-hidden="true" className="material-symbols-outlined animate-spin text-sm">sync</span>}
                                      Verify
                                  </button>
                              </div>
@@ -223,7 +223,7 @@ export const PinLockScreen = () => {
              <div className="flex flex-col items-center gap-10 max-w-sm w-full text-center relative z-10">
                  <div className="mb-4">
                      <div className={`size-20 rounded-[2rem] bg-primary/10 flex items-center justify-center mx-auto mb-8 text-primary shadow-glow transition-transform duration-500 ${isBioVerifying ? 'animate-pulse scale-110' : 'animate-float'}`}>
-                        <span className="material-symbols-outlined text-5xl">lock_person</span>
+                        <span aria-hidden="true" className="material-symbols-outlined text-5xl">lock_person</span>
                      </div>
                      <h1 className="text-3xl font-black text-text-light-main dark:text-text-dark-main tracking-tight uppercase">App Locked</h1>
                      <p className="text-text-light-muted dark:text-text-dark-muted text-sm font-bold mt-2 tracking-widest opacity-60">
@@ -262,7 +262,7 @@ export const PinLockScreen = () => {
                         onClick={handleBiometricUnlock}
                         className="mt-6 text-primary flex items-center gap-2 font-bold uppercase tracking-widest text-xs hover:bg-primary/10 px-4 py-2 rounded-full transition-colors"
                      >
-                         <span className="material-symbols-outlined">fingerprint</span> Use Biometric
+                         <span aria-hidden="true" className="material-symbols-outlined">fingerprint</span> Use Biometric
                      </button>
                  )}
              </div>

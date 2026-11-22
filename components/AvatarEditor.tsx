@@ -172,7 +172,7 @@ const AvatarEditor: React.FC<Props> = ({ current, gender, initials, onSave, onCl
                   <button key={p.id} onClick={() => setChosen(p.src)} aria-label={p.label} aria-pressed={chosen === p.src}
                     className={`relative aspect-square rounded-full overflow-hidden transition-all duration-200 hover:scale-105 ${chosen === p.src ? 'ring-4 ring-primary scale-105 shadow-glow' : 'ring-1 ring-black/5 dark:ring-white/10'}`}>
                     <img src={p.src} alt="" className="w-full h-full object-cover" draggable={false} />
-                    {chosen === p.src && <span className="absolute bottom-0 right-0 size-6 rounded-full bg-primary text-[#131811] flex items-center justify-center border-2 border-surface-light dark:border-surface-dark animate-pop"><span className="material-symbols-outlined text-[14px]">check</span></span>}
+                    {chosen === p.src && <span className="absolute bottom-0 right-0 size-6 rounded-full bg-primary text-[#131811] flex items-center justify-center border-2 border-surface-light dark:border-surface-dark animate-pop"><span aria-hidden="true" className="material-symbols-outlined text-[14px]">check</span></span>}
                   </button>
                 ))}
               </div>
@@ -203,7 +203,7 @@ const AvatarEditor: React.FC<Props> = ({ current, gender, initials, onSave, onCl
               ) : (
                 <button onClick={() => fileRef.current?.click()}
                   className="h-56 rounded-3xl border-2 border-dashed border-border-light dark:border-border-dark hover:border-primary/50 flex flex-col items-center justify-center gap-2 text-text-light-muted transition-colors">
-                  <span className="size-14 rounded-full bg-primary/10 text-primary flex items-center justify-center animate-float"><span className="material-symbols-outlined text-3xl">add_a_photo</span></span>
+                  <span className="size-14 rounded-full bg-primary/10 text-primary flex items-center justify-center animate-float"><span aria-hidden="true" className="material-symbols-outlined text-3xl">add_a_photo</span></span>
                   <span className="font-bold text-text-light-main dark:text-text-dark-main">Choose a photo</span>
                   <span className="text-xs">You'll be able to crop it next</span>
                 </button>

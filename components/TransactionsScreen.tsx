@@ -269,7 +269,7 @@ export const TransactionsScreen: React.FC = () => {
           <div className="bg-surface-light dark:bg-surface-dark border border-border-light dark:border-border-dark rounded-[2.5rem] p-6 md:p-10 shadow-sm relative">
             <div className="flex items-center gap-3 mb-10">
                 <div className="size-10 rounded-2xl bg-primary/10 flex items-center justify-center text-primary">
-                    <span className="material-symbols-outlined">add_circle</span>
+                    <span aria-hidden="true" className="material-symbols-outlined">add_circle</span>
                 </div>
                 <h2 className="text-xl font-bold text-text-light-main dark:text-text-dark-main uppercase tracking-tight">Add Transaction</h2>
             </div>
@@ -300,10 +300,10 @@ export const TransactionsScreen: React.FC = () => {
                   <div className="flex flex-wrap gap-2">
                     {userSettings?.expenseCategories.slice(0, 4).map(cat => (
                       <button key={cat} type="button" onClick={() => pickCategory(cat)} className={`flex items-center gap-2 px-5 py-2.5 rounded-full border text-sm font-bold transition-all ${formData.category === cat ? 'bg-primary border-primary text-[#131811] shadow-glow' : 'bg-transparent border-border-light dark:border-border-dark text-text-light-muted hover:border-primary/50'}`}>
-                        <span className="material-symbols-outlined text-[18px]">{CATEGORY_STYLES[cat]?.icon || 'label'}</span>{cat}
+                        <span aria-hidden="true" className="material-symbols-outlined text-[18px]">{CATEGORY_STYLES[cat]?.icon || 'label'}</span>{cat}
                       </button>
                     ))}
-                    <button type="button" onClick={() => navigate(ROUTES.SETTINGS)} className="size-10 rounded-full border border-border-light dark:border-border-dark flex items-center justify-center text-text-light-muted hover:bg-gray-100 dark:hover:bg-surface-darker transition-colors"><span className="material-symbols-outlined text-[20px]">add</span></button>
+                    <button type="button" onClick={() => navigate(ROUTES.SETTINGS)} aria-label="Add or edit categories" className="size-10 rounded-full border border-border-light dark:border-border-dark flex items-center justify-center text-text-light-muted hover:bg-gray-100 dark:hover:bg-surface-darker transition-colors"><span aria-hidden="true" className="material-symbols-outlined text-[20px]">add</span></button>
                   </div>
                 </div>
               )}
@@ -315,7 +315,7 @@ export const TransactionsScreen: React.FC = () => {
                   </label>
                   <div className="relative group">
                     <input type="text" value={formData.merchant} onChange={(e) => handleMerchantChange(e.target.value)} className="w-full bg-gray-50 dark:bg-surface-darker border border-border-light dark:border-border-dark rounded-2xl p-4 text-sm font-bold focus:border-primary outline-none transition-all pr-14" placeholder={formData.type === 'income' ? 'e.g. Employer, Client' : 'e.g. Starbucks, Amazon'} />
-                    <button type="button" onClick={startCamera} className="absolute right-2 top-1/2 -translate-y-1/2 size-10 flex items-center justify-center text-primary hover:bg-primary/10 rounded-xl transition-all"><span className="material-symbols-outlined text-[22px]">qr_code_scanner</span></button>
+                    <button type="button" onClick={startCamera} aria-label="Scan a receipt" className="absolute right-2 top-1/2 -translate-y-1/2 size-10 flex items-center justify-center text-primary hover:bg-primary/10 rounded-xl transition-all"><span aria-hidden="true" className="material-symbols-outlined text-[22px]">qr_code_scanner</span></button>
                   </div>
                 </div>
                 <div className="flex flex-col gap-2">
@@ -353,7 +353,7 @@ export const TransactionsScreen: React.FC = () => {
                   <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
                           <div className={`size-10 rounded-xl flex items-center justify-center transition-all ${formData.isSubscription ? 'bg-primary/20 text-primary' : 'bg-gray-200 text-gray-400'}`}>
-                              <span className="material-symbols-outlined">{formData.isSubscription ? 'subscriptions' : 'sync'}</span>
+                              <span aria-hidden="true" className="material-symbols-outlined">{formData.isSubscription ? 'subscriptions' : 'sync'}</span>
                           </div>
                           <div>
                               <p className="text-xs font-black uppercase tracking-tight">Recurring Subscription</p>
@@ -362,6 +362,9 @@ export const TransactionsScreen: React.FC = () => {
                       </div>
                       <button 
                         type="button"
+                        role="switch"
+                        aria-checked={formData.isSubscription}
+                        aria-label="Recurring subscription"
                         onClick={() => setFormData({...formData, isSubscription: !formData.isSubscription})}
                         className={`w-12 h-6 rounded-full relative transition-all ${formData.isSubscription ? 'bg-primary' : 'bg-gray-300 dark:bg-border-dark'}`}
                       >
@@ -386,15 +389,15 @@ export const TransactionsScreen: React.FC = () => {
               </div>
 
               <div className="grid grid-cols-2 gap-4">
-                <button type="button" onClick={startCamera} className="flex-1 bg-gray-100 dark:bg-surface-darker hover:bg-gray-200 dark:hover:bg-border-dark py-3.5 rounded-2xl text-xs font-black uppercase tracking-widest flex items-center justify-center gap-2 transition-all"><span className="material-symbols-outlined text-[18px]">photo_camera</span>Scan Receipt</button>
-                <label className="flex-1 bg-gray-100 dark:bg-surface-darker hover:bg-gray-200 dark:hover:bg-border-dark py-3.5 rounded-2xl text-xs font-black uppercase tracking-widest flex items-center justify-center gap-2 cursor-pointer transition-all"><span className="material-symbols-outlined text-[18px]">cloud_upload</span>Upload File<input type="file" className="hidden" accept="image/*" onChange={(e) => { const f = e.target.files?.[0]; if(f) { const r = new FileReader(); r.onloadend = async () => { try { const img = await compressDataUrl(r.result as string, RECEIPT_MAX_SIDE); setPreviewImage(img); analyzeReceipt(img); } catch (err: any) { setSaveStatus({ kind: 'error', message: err?.message || 'Could not read that image.' }); } }; r.readAsDataURL(f); }}} /></label>
+                <button type="button" onClick={startCamera} className="flex-1 bg-gray-100 dark:bg-surface-darker hover:bg-gray-200 dark:hover:bg-border-dark py-3.5 rounded-2xl text-xs font-black uppercase tracking-widest flex items-center justify-center gap-2 transition-all"><span aria-hidden="true" className="material-symbols-outlined text-[18px]">photo_camera</span>Scan Receipt</button>
+                <label className="flex-1 bg-gray-100 dark:bg-surface-darker hover:bg-gray-200 dark:hover:bg-border-dark py-3.5 rounded-2xl text-xs font-black uppercase tracking-widest flex items-center justify-center gap-2 cursor-pointer transition-all"><span aria-hidden="true" className="material-symbols-outlined text-[18px]">cloud_upload</span>Upload File<input type="file" className="hidden" accept="image/*" onChange={(e) => { const f = e.target.files?.[0]; if(f) { const r = new FileReader(); r.onloadend = async () => { try { const img = await compressDataUrl(r.result as string, RECEIPT_MAX_SIDE); setPreviewImage(img); analyzeReceipt(img); } catch (err: any) { setSaveStatus({ kind: 'error', message: err?.message || 'Could not read that image.' }); } }; r.readAsDataURL(f); }}} /></label>
                 
                 {/* Hidden Fallback Input for Camera */}
                 <input ref={fallbackInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if(f) { const r = new FileReader(); r.onloadend = () => analyzeReceipt(r.result as string); r.readAsDataURL(f); }}} />
               </div>
 
               <button type="submit" disabled={!formData.amount || !formData.merchant || isProcessing || isSaving} className="w-full bg-primary hover:bg-primary-hover text-[#131811] font-black py-5 rounded-[2rem] shadow-glow transition-all flex items-center justify-center gap-2 transform active:scale-[0.98] disabled:opacity-50 disabled:grayscale">
-                {isProcessing || isSaving ? <span className="material-symbols-outlined animate-spin">sync</span> : <span className="material-symbols-outlined">check_circle</span>}
+                {isProcessing || isSaving ? <span aria-hidden="true" className="material-symbols-outlined animate-spin">sync</span> : <span aria-hidden="true" className="material-symbols-outlined">check_circle</span>}
                 {isProcessing ? 'SCANNING...' : isSaving ? 'SAVING...' : 'SAVE TRANSACTION'}
               </button>
               {saveStatus && (
@@ -410,8 +413,8 @@ export const TransactionsScreen: React.FC = () => {
               <div className="absolute inset-0 z-50 bg-black rounded-[2.5rem] overflow-hidden flex flex-col">
                 <video ref={videoRef} autoPlay playsInline className="w-full h-full object-cover" />
                 <div className="absolute bottom-10 left-0 w-full flex justify-center gap-6">
-                    <button onClick={stopCamera} className="size-14 rounded-full bg-white/10 backdrop-blur-md text-white flex items-center justify-center border border-white/20"><span className="material-symbols-outlined">close</span></button>
-                    <button onClick={captureImage} className="size-16 rounded-full bg-white text-black flex items-center justify-center shadow-2xl border-4 border-white/30"><span className="material-symbols-outlined text-3xl">camera</span></button>
+                    <button onClick={stopCamera} className="size-14 rounded-full bg-white/10 backdrop-blur-md text-white flex items-center justify-center border border-white/20"><span aria-hidden="true" className="material-symbols-outlined">close</span></button>
+                    <button onClick={captureImage} className="size-16 rounded-full bg-white text-black flex items-center justify-center shadow-2xl border-4 border-white/30"><span aria-hidden="true" className="material-symbols-outlined text-3xl">camera</span></button>
                 </div>
               </div>
             )}
@@ -421,8 +424,8 @@ export const TransactionsScreen: React.FC = () => {
         {/* Recent Transactions Sidebar */}
         <div className="lg:col-span-5 flex flex-col gap-6">
             <div className="flex items-center justify-between px-2">
-                <h3 className="text-xl font-black text-text-light-main dark:text-text-dark-main flex items-center gap-2"><span className="material-symbols-outlined text-primary">history</span> Recent Activity</h3>
-                <button onClick={() => navigate(ROUTES.TRANSACTION_HISTORY)} className="text-primary text-xs font-black uppercase tracking-widest hover:underline flex items-center gap-1 group">Full History<span className="material-symbols-outlined text-[14px] group-hover:translate-x-0.5 transition-transform">arrow_forward</span></button>
+                <h3 className="text-xl font-black text-text-light-main dark:text-text-dark-main flex items-center gap-2"><span aria-hidden="true" className="material-symbols-outlined text-primary">history</span> Recent Activity</h3>
+                <button onClick={() => navigate(ROUTES.TRANSACTION_HISTORY)} className="text-primary text-xs font-black uppercase tracking-widest hover:underline flex items-center gap-1 group">Full History<span aria-hidden="true" className="material-symbols-outlined text-[14px] group-hover:translate-x-0.5 transition-transform">arrow_forward</span></button>
             </div>
             <div className="flex flex-col gap-3 stagger">
                 {recentTransactions.map(tx => {
@@ -430,13 +433,13 @@ export const TransactionsScreen: React.FC = () => {
                     return (
                         <div key={tx.id} onClick={() => setViewingTransaction(tx)} className="group bg-surface-light dark:bg-surface-dark border border-border-light dark:border-border-dark rounded-3xl p-5 flex items-center justify-between transition-all hover:bg-gray-50 dark:hover:bg-surface-darker cursor-pointer shadow-sm">
                             <div className="flex items-center gap-4">
-                                <div className={`size-12 rounded-2xl flex items-center justify-center border ${style.colorClass}`}><span className="material-symbols-outlined text-xl">{style.icon}</span></div>
+                                <div className={`size-12 rounded-2xl flex items-center justify-center border ${style.colorClass}`}><span aria-hidden="true" className="material-symbols-outlined text-xl">{style.icon}</span></div>
                                 <div className="flex flex-col">
                                     <div className="flex items-center gap-2">
                                         <p className="text-text-light-main dark:text-text-dark-main font-bold text-base">{tx.title}</p>
                                         {tx.isSubscription && (
                                             <span className="bg-primary/20 text-primary text-[8px] font-black uppercase px-2 py-0.5 rounded-full border border-primary/20 flex items-center gap-1">
-                                                <span className="material-symbols-outlined text-[10px]">sync</span>
+                                                <span aria-hidden="true" className="material-symbols-outlined text-[10px]">sync</span>
                                                 Sub
                                             </span>
                                         )}

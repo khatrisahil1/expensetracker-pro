@@ -158,7 +158,7 @@ const TransactionsCalendarScreen: React.FC<TransactionsCalendarScreenProps> = ({
                     onClick={() => navigate(ROUTES.TRANSACTIONS)} 
                     className="flex items-center gap-2 text-sm font-bold text-primary hover:bg-primary/10 px-4 py-2 rounded-full border border-primary/20 w-fit transition-all active:scale-95"
                 >
-                    <span className="material-symbols-outlined text-lg">arrow_back</span>
+                    <span aria-hidden="true" className="material-symbols-outlined text-lg">arrow_back</span>
                     Back to Transactions
                 </button>
                 <div className="mt-2">
@@ -209,12 +209,12 @@ const TransactionsCalendarScreen: React.FC<TransactionsCalendarScreenProps> = ({
 
                     {/* Date Navigation */}
                     <div className="flex items-center justify-between mb-8">
-                         <button onClick={() => handleNavigate('prev')} className="size-10 rounded-full flex items-center justify-center hover:bg-gray-100 dark:hover:bg-surface-darker text-text-light-muted dark:text-text-dark-muted transition-colors">
-                            <span className="material-symbols-outlined">chevron_left</span>
+                         <button onClick={() => handleNavigate('prev')} aria-label="Previous period" className="size-10 rounded-full flex items-center justify-center hover:bg-gray-100 dark:hover:bg-surface-darker text-text-light-muted dark:text-text-dark-muted transition-colors">
+                            <span aria-hidden="true" className="material-symbols-outlined">chevron_left</span>
                         </button>
                         <h3 className="text-2xl font-bold text-text-light-main dark:text-text-dark-main select-none">{getPeriodLabel()}</h3>
-                        <button onClick={() => handleNavigate('next')} className="size-10 rounded-full flex items-center justify-center hover:bg-gray-100 dark:hover:bg-surface-darker text-text-light-muted dark:text-text-dark-muted transition-colors">
-                            <span className="material-symbols-outlined">chevron_right</span>
+                        <button onClick={() => handleNavigate('next')} aria-label="Next period" className="size-10 rounded-full flex items-center justify-center hover:bg-gray-100 dark:hover:bg-surface-darker text-text-light-muted dark:text-text-dark-muted transition-colors">
+                            <span aria-hidden="true" className="material-symbols-outlined">chevron_right</span>
                         </button>
                     </div>
 
@@ -312,14 +312,14 @@ const TransactionsCalendarScreen: React.FC<TransactionsCalendarScreenProps> = ({
                 {/* Header Actions */}
                 <div className="flex justify-between items-center">
                     <h2 className="text-lg font-bold text-text-light-main dark:text-text-dark-main flex items-center gap-2">
-                        <span className="material-symbols-outlined text-primary">history</span> Recent Activity
+                        <span aria-hidden="true" className="material-symbols-outlined text-primary">history</span> Recent Activity
                     </h2>
                     <div className="flex items-center gap-3">
                         <button
                             onClick={() => setShowImportModal(true)}
                             className="flex items-center gap-1.5 text-xs font-bold text-text-light-muted dark:text-text-dark-muted hover:text-primary transition-colors uppercase tracking-wider"
                         >
-                            <span className="material-symbols-outlined text-sm">upload_file</span>
+                            <span aria-hidden="true" className="material-symbols-outlined text-sm">upload_file</span>
                             Import
                         </button>
                         <button
@@ -358,7 +358,7 @@ const TransactionsCalendarScreen: React.FC<TransactionsCalendarScreenProps> = ({
                             >
                                 <div className="flex items-center gap-4">
                                     <div className={`size-12 rounded-full flex items-center justify-center border ${style.colorClass}`}>
-                                        <span className="material-symbols-outlined text-xl">{style.icon}</span>
+                                        <span aria-hidden="true" className="material-symbols-outlined text-xl">{style.icon}</span>
                                     </div>
                                     <div className="flex flex-col">
                                         <p className="font-bold text-text-light-main dark:text-text-dark-main text-base">{tx.title}</p>
@@ -377,7 +377,7 @@ const TransactionsCalendarScreen: React.FC<TransactionsCalendarScreenProps> = ({
                         );
                     }) : (
                         <div className="flex flex-col items-center justify-center py-12 text-text-light-muted dark:text-text-dark-muted border border-dashed border-border-light dark:border-border-dark rounded-2xl">
-                            <span className="material-symbols-outlined text-3xl mb-2 opacity-30">search_off</span>
+                            <span aria-hidden="true" className="material-symbols-outlined text-3xl mb-2 opacity-30">search_off</span>
                             <p className="text-sm">{searchWords.length ? `Nothing matches "${filters.searchQuery.trim()}".` : 'No transactions in this period.'}</p>
                             {searchWords.length > 0 && <p className="text-xs mt-1 opacity-70">Try fewer words, part of a name, an amount, or a month like "oct".</p>}
                         </div>

@@ -189,7 +189,7 @@ const SubscriptionsScreen: React.FC = () => {
                     <p className="text-text-light-muted dark:text-text-dark-muted text-sm md:text-lg">Track, Pause, and Optimize your recurring spend.</p>
                 </div>
                 <button onClick={detectSubscriptions} disabled={isDetecting} className="flex items-center gap-2 px-6 py-3 rounded-2xl bg-primary/10 border border-primary/20 text-primary text-xs font-black uppercase tracking-widest hover:bg-primary/20 transition-all active:scale-95">
-                    <span className={`material-symbols-outlined text-lg ${isDetecting ? 'animate-spin' : ''}`}>{isDetecting ? 'sync' : 'auto_awesome'}</span>
+                    <span aria-hidden="true" className={`material-symbols-outlined text-lg ${isDetecting ? 'animate-spin' : ''}`}>{isDetecting ? 'sync' : 'auto_awesome'}</span>
                     {isDetecting ? 'Analyzing...' : 'Magic Detect'}
                 </button>
             </div>
@@ -216,12 +216,12 @@ const SubscriptionsScreen: React.FC = () => {
                         <div className="relative z-10 flex items-center justify-between mt-8">
                             <div className="flex items-center gap-4">
                                 <div className="size-10 rounded-xl bg-white/20 backdrop-blur-md flex items-center justify-center border border-white/10">
-                                    <span className="material-symbols-outlined">trending_down</span>
+                                    <span aria-hidden="true" className="material-symbols-outlined">trending_down</span>
                                 </div>
                                 <span className="text-xs font-bold opacity-80">{subscriptions.length} detected • {activeSubscriptions.length} active</span>
                             </div>
                             <button onClick={() => setIsFlipped(true)} className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest bg-white/10 hover:bg-white/20 px-4 py-2 rounded-xl transition-all">
-                                Category Breakdown <span className="material-symbols-outlined text-sm">bar_chart</span>
+                                Category Breakdown <span aria-hidden="true" className="material-symbols-outlined text-sm">bar_chart</span>
                             </button>
                         </div>
                     </div>
@@ -233,7 +233,7 @@ const SubscriptionsScreen: React.FC = () => {
                                 <h4 className="text-xl font-black">Monthly Allocation</h4>
                                 <p className="text-[10px] font-black uppercase tracking-widest opacity-50">Where your money goes</p>
                             </div>
-                            <button onClick={() => setIsFlipped(false)} className="size-10 rounded-full bg-white/5 flex items-center justify-center hover:bg-white/10"><span className="material-symbols-outlined">close</span></button>
+                            <button onClick={() => setIsFlipped(false)} aria-label="Close breakdown" className="size-10 rounded-full bg-white/5 flex items-center justify-center hover:bg-white/10"><span aria-hidden="true" className="material-symbols-outlined">close</span></button>
                         </div>
                         <div className="flex flex-col gap-3 max-h-32 overflow-y-auto pr-2">
                             {(Object.entries(stats.breakdown) as [string, number][]).sort((a,b) => b[1] - a[1]).map(([cat, amt]) => {
@@ -262,26 +262,27 @@ const SubscriptionsScreen: React.FC = () => {
                 {/* Active Subs List */}
                 <div className="lg:col-span-8 flex flex-col gap-6">
                     <div className="flex items-center justify-between px-2">
-                        <h4 className="text-xl font-black flex items-center gap-2"><span className="material-symbols-outlined text-primary">list</span> Manage Subscriptions</h4>
+                        <h4 className="text-xl font-black flex items-center gap-2"><span aria-hidden="true" className="material-symbols-outlined text-primary">list</span> Manage Subscriptions</h4>
                         <div className="flex items-center gap-2">
                             {isEditMode && selectedIds.length > 0 && (
                                 <button onClick={handleMassDelete} className="flex items-center gap-2 px-4 py-2 bg-rose-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest animate-scale-up">
-                                    <span className="material-symbols-outlined text-sm">delete_sweep</span>
+                                    <span aria-hidden="true" className="material-symbols-outlined text-sm">delete_sweep</span>
                                     Delete ({selectedIds.length})
                                 </button>
                             )}
                             <button 
-                                onClick={() => { setIsEditMode(!isEditMode); setSelectedIds([]); }} 
+                                onClick={() => { setIsEditMode(!isEditMode); setSelectedIds([]); }}
+                                aria-label={isEditMode ? "Done editing" : "Edit subscriptions"} 
                                 className={`size-10 rounded-xl flex items-center justify-center transition-all ${isEditMode ? 'bg-primary text-black' : 'bg-gray-100 dark:bg-surface-darker hover:bg-primary/20 hover:text-primary'}`}
                             >
-                                <span className="material-symbols-outlined">{isEditMode ? 'close' : 'edit'}</span>
+                                <span aria-hidden="true" className="material-symbols-outlined">{isEditMode ? 'close' : 'edit'}</span>
                             </button>
                         </div>
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 stagger">
                         {subscriptions.length === 0 ? (
                             <div className="col-span-full py-20 text-center opacity-30 bg-surface-light dark:bg-surface-dark border border-dashed border-border-light dark:border-border-dark rounded-[2.5rem]">
-                                <span className="material-symbols-outlined text-6xl mb-4">sentiment_neutral</span>
+                                <span aria-hidden="true" className="material-symbols-outlined text-6xl mb-4">sentiment_neutral</span>
                                 <p className="font-bold">No subscriptions yet.</p>
                             </div>
                         ) : (
@@ -294,13 +295,13 @@ const SubscriptionsScreen: React.FC = () => {
                                     {isEditMode && (
                                         <div className="absolute top-4 left-4 z-20">
                                             <div className={`size-6 rounded-full border-2 flex items-center justify-center transition-all ${selectedIds.includes(sub.id) ? 'bg-primary border-primary' : 'border-border-light dark:border-border-dark'}`}>
-                                                {selectedIds.includes(sub.id) && <span className="material-symbols-outlined text-black text-sm">check</span>}
+                                                {selectedIds.includes(sub.id) && <span aria-hidden="true" className="material-symbols-outlined text-black text-sm">check</span>}
                                             </div>
                                         </div>
                                     )}
                                     <div className={`flex items-start justify-between mb-6 ${isEditMode ? 'pl-8' : ''}`}>
                                         <div className="size-12 rounded-2xl bg-gray-100 dark:bg-surface-darker flex items-center justify-center text-primary group-hover:scale-110 transition-transform border border-border-light dark:border-border-dark">
-                                            <span className="material-symbols-outlined">{getCategoryStyle(sub.category || 'Subscription').icon}</span>
+                                            <span aria-hidden="true" className="material-symbols-outlined">{getCategoryStyle(sub.category || 'Subscription').icon}</span>
                                         </div>
                                         <div className="text-right">
                                             <p className="text-xl font-black">{formatCurrency(sub.amount)}</p>
@@ -312,10 +313,10 @@ const SubscriptionsScreen: React.FC = () => {
                                             <h5 className="text-lg font-black tracking-tight truncate">{sub.title}</h5>
                                             <div className="flex gap-1 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 lg:focus-within:opacity-100 lg:focus:opacity-100 transition-all">
                                                 <button onClick={(e) => { e.stopPropagation(); openEditModal(sub); }} className="size-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center hover:bg-primary hover:text-black transition-all">
-                                                    <span className="material-symbols-outlined text-lg">edit</span>
+                                                    <span aria-hidden="true" className="material-symbols-outlined text-lg">edit</span>
                                                 </button>
                                                 <button onClick={(e) => { e.stopPropagation(); handleDelete(sub.id); }} className="size-8 rounded-lg bg-rose-500/10 text-rose-500 flex items-center justify-center hover:bg-rose-500 hover:text-white transition-all">
-                                                    <span className="material-symbols-outlined text-lg">delete</span>
+                                                    <span aria-hidden="true" className="material-symbols-outlined text-lg">delete</span>
                                                 </button>
                                             </div>
                                         </div>
@@ -323,7 +324,7 @@ const SubscriptionsScreen: React.FC = () => {
                                             <span className="text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">{sub.category}</span>
                                             {sub.nextRenewalDate && (
                                                 <span className="text-[9px] font-bold text-text-light-muted flex items-center gap-1">
-                                                    <span className="material-symbols-outlined text-[12px]">schedule</span>
+                                                    <span aria-hidden="true" className="material-symbols-outlined text-[12px]">schedule</span>
                                                     Due: {formatDate(sub.nextRenewalDate)}
                                                 </span>
                                             )}
@@ -348,7 +349,7 @@ const SubscriptionsScreen: React.FC = () => {
 
                 {/* Renewal Timeline Sidebar */}
                 <div className="lg:col-span-4 flex flex-col gap-6">
-                    <h4 className="text-xl font-black flex items-center gap-2 px-2"><span className="material-symbols-outlined text-rose-500">alarm</span> Upcoming Bills</h4>
+                    <h4 className="text-xl font-black flex items-center gap-2 px-2"><span aria-hidden="true" className="material-symbols-outlined text-rose-500">alarm</span> Upcoming Bills</h4>
                     <div className="bg-surface-light dark:bg-surface-dark border border-border-light dark:border-border-dark rounded-[2.5rem] p-8 flex flex-col gap-8 shadow-sm">
                         {activeSubscriptions.length === 0 ? (
                             <p className="text-xs text-text-light-muted opacity-50 italic">No upcoming renewals found.</p>
@@ -380,7 +381,7 @@ const SubscriptionsScreen: React.FC = () => {
 
                     <div className="bg-primary/5 border border-primary/20 rounded-3xl p-6 flex items-center gap-4">
                         <div className="size-12 rounded-2xl bg-primary flex items-center justify-center text-black">
-                            <span className="material-symbols-outlined text-2xl">auto_fix_high</span>
+                            <span aria-hidden="true" className="material-symbols-outlined text-2xl">auto_fix_high</span>
                         </div>
                         <div>
                             <p className="text-[10px] font-black uppercase tracking-widest text-primary mb-1">Optimizer Tip</p>
@@ -392,8 +393,8 @@ const SubscriptionsScreen: React.FC = () => {
             </div>
 
             {/* Quick Add FAB */}
-            <button onClick={() => setShowAddModal(true)} className="fixed bottom-24 right-6 md:right-12 size-16 bg-primary text-black rounded-3xl shadow-glow flex items-center justify-center group hover:scale-110 active:scale-95 transition-all z-40">
-                <span className="material-symbols-outlined text-3xl group-hover:rotate-90 transition-transform">add</span>
+            <button onClick={() => setShowAddModal(true)} aria-label="Add subscription" className="fixed bottom-24 right-6 md:right-12 size-16 bg-primary text-black rounded-3xl shadow-glow flex items-center justify-center group hover:scale-110 active:scale-95 transition-all z-40">
+                <span aria-hidden="true" className="material-symbols-outlined text-3xl group-hover:rotate-90 transition-transform">add</span>
             </button>
 
             {/* Add Modal */}

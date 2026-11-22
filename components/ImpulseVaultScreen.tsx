@@ -187,23 +187,23 @@ const ImpulseVaultScreen: React.FC = () => {
             <div className="fixed inset-0 z-[999] bg-black/60 backdrop-blur-sm animate-fade-in">
                 <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-md px-4">
                     <div className="relative w-full bg-surface-light dark:bg-surface-dark border border-border-light dark:border-border-dark rounded-[2rem] md:rounded-3xl p-5 md:p-6 shadow-2xl animate-slide-up max-h-[90vh] overflow-y-auto custom-scrollbar">
-                    <div className="flex justify-between items-center mb-6"><h2 className="text-xl font-bold">Add Impulse Item</h2><button onClick={closeModal}><span className="material-symbols-outlined">close</span></button></div>
+                    <div className="flex justify-between items-center mb-6"><h2 className="text-xl font-bold">Add Impulse Item</h2><button onClick={closeModal}><span aria-hidden="true" className="material-symbols-outlined">close</span></button></div>
                     {showCamera ? (
                          <div className="relative w-full aspect-[4/3] rounded-2xl overflow-hidden bg-black mb-6">
                             <video ref={videoRef} autoPlay playsInline className="w-full h-full object-cover" />
                             <div className="absolute bottom-4 left-0 w-full flex justify-center gap-4">
-                                <button onClick={stopCamera} className="bg-white/20 text-white p-3 rounded-full"><span className="material-symbols-outlined">close</span></button>
-                                <button onClick={captureImage} className="bg-white text-black p-4 rounded-full"><span className="material-symbols-outlined">camera</span></button>
+                                <button onClick={stopCamera} className="bg-white/20 text-white p-3 rounded-full"><span aria-hidden="true" className="material-symbols-outlined">close</span></button>
+                                <button onClick={captureImage} className="bg-white text-black p-4 rounded-full"><span aria-hidden="true" className="material-symbols-outlined">camera</span></button>
                             </div>
                         </div>
                     ) : (
                         <div className="flex flex-col gap-3 mb-6">
                             <button onClick={startCamera} className="w-full bg-[#111827] dark:bg-black text-white p-4 rounded-[1.5rem] flex items-center gap-4 transition-opacity shadow-lg group relative overflow-hidden">
-                                <div className="size-10 rounded-full bg-[#2ECC71] flex items-center justify-center text-[#111827]"><span className="material-symbols-outlined">photo_camera</span></div>
+                                <div className="size-10 rounded-full bg-[#2ECC71] flex items-center justify-center text-[#111827]"><span aria-hidden="true" className="material-symbols-outlined">photo_camera</span></div>
                                 <div className="text-left"><p className="font-bold">Camera Scan</p><p className="text-xs text-gray-400">Take a photo</p></div>
                             </button>
                             <label className="w-full bg-white dark:bg-surface-dark border border-border-light p-4 rounded-[1.5rem] flex items-center gap-4 cursor-pointer hover:bg-gray-50 dark:hover:bg-surface-darker shadow-sm transition-colors">
-                                <div className="size-10 rounded-full bg-gray-100 dark:bg-border-dark flex items-center justify-center"><span className="material-symbols-outlined">upload_file</span></div>
+                                <div className="size-10 rounded-full bg-gray-100 dark:bg-border-dark flex items-center justify-center"><span aria-hidden="true" className="material-symbols-outlined">upload_file</span></div>
                                 <div><p className="font-bold">Upload File</p><p className="text-xs">Select from gallery</p></div>
                                 <input type="file" accept="image/*" onChange={handleFileUpload} className="hidden" />
                             </label>
@@ -213,7 +213,7 @@ const ImpulseVaultScreen: React.FC = () => {
                          <div><label className="text-xs font-bold uppercase mb-1 block opacity-60">Link</label>
                             <div className="flex gap-2">
                                 <input type="text" className="flex-1 bg-background-light dark:bg-surface-darker border border-border-light rounded-xl p-3 text-sm outline-none" placeholder="URL..." value={newItem.link} onChange={e => setNewItem({...newItem, link: e.target.value})} />
-                                <button onClick={analyzeLink} disabled={!newItem.link || isAnalyzing} className="bg-primary/10 text-primary border border-primary/20 rounded-xl px-3 transition-colors">{isAnalyzing && analyzingSource === 'link' ? <span className="material-symbols-outlined animate-spin text-xl">sync</span> : <span className="material-symbols-outlined">auto_fix_high</span>}</button>
+                                <button onClick={analyzeLink} disabled={!newItem.link || isAnalyzing} className="bg-primary/10 text-primary border border-primary/20 rounded-xl px-3 transition-colors">{isAnalyzing && analyzingSource === 'link' ? <span aria-hidden="true" className="material-symbols-outlined animate-spin text-xl">sync</span> : <span aria-hidden="true" className="material-symbols-outlined">auto_fix_high</span>}</button>
                             </div>
                         </div>
                         <div><label className="text-xs font-bold uppercase mb-1 block opacity-60">Item Name</label><input type="text" className="w-full bg-background-light dark:bg-surface-darker border border-border-light rounded-xl p-3 outline-none" value={newItem.name} onChange={e => setNewItem({...newItem, name: e.target.value})} /></div>
@@ -231,16 +231,16 @@ const ImpulseVaultScreen: React.FC = () => {
         <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 mb-12 animate-slide-up">
           <div className="flex flex-col gap-3 max-w-2xl"><h1 className="text-3xl md:text-5xl font-black tracking-tight">Impulse Vault</h1><p className="text-text-light-muted dark:text-text-dark-muted text-lg">Defeat the urge. Wait it out. Master your money.</p></div>
           <div className="flex flex-col gap-1 rounded-[1.5rem] p-5 border border-border-light dark:border-border-dark bg-surface-light dark:bg-surface-dark shadow-sm min-w-[200px]">
-            <div className="flex items-center gap-2 text-primary mb-1"><span className="material-symbols-outlined">savings</span><p className="text-sm font-black uppercase tracking-widest">Vault Total</p></div>
+            <div className="flex items-center gap-2 text-primary mb-1"><span aria-hidden="true" className="material-symbols-outlined">savings</span><p className="text-sm font-black uppercase tracking-widest">Vault Total</p></div>
             <p className="text-3xl font-black tabular-nums">{currencySymbol}{totalPotentialSavings.toLocaleString()}</p>
           </div>
         </div>
 
         <div className="flex justify-between items-center mb-8 animate-slide-up delay-100">
           <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-gray-100 dark:bg-surface-darker text-sm font-bold text-text-light-muted">
-            <span className="material-symbols-outlined text-primary text-lg">info</span><span>Items are locked until the timer expires.</span>
+            <span aria-hidden="true" className="material-symbols-outlined text-primary text-lg">info</span><span>Items are locked until the timer expires.</span>
           </div>
-          <button onClick={() => setShowAddModal(true)} className="flex items-center justify-center rounded-full h-12 px-6 bg-primary hover:bg-primary-hover text-[#131811] gap-2 font-black uppercase tracking-widest shadow-glow active:scale-95 transition-transform"><span className="material-symbols-outlined">add</span>New Impulse</button>
+          <button onClick={() => setShowAddModal(true)} className="flex items-center justify-center rounded-full h-12 px-6 bg-primary hover:bg-primary-hover text-[#131811] gap-2 font-black uppercase tracking-widest shadow-glow active:scale-95 transition-transform"><span aria-hidden="true" className="material-symbols-outlined">add</span>New Impulse</button>
         </div>
 
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 stagger">
@@ -252,7 +252,7 @@ const ImpulseVaultScreen: React.FC = () => {
               return (
                 <div key={item.id} className={`group relative flex flex-col overflow-hidden rounded-[1.5rem] bg-surface-light dark:bg-surface-dark border transition-all ${isLocked ? 'border-border-light dark:border-border-dark' : 'border-primary'}`}>
                     <div className="relative w-full aspect-[4/3] overflow-hidden bg-gray-100 dark:bg-surface-darker">
-                        {isLocked ? (<div className="absolute inset-0 bg-black/40 z-10 flex items-center justify-center backdrop-blur-[1px] text-white"><span className="material-symbols-outlined text-3xl">lock</span></div>) : (<div className="absolute top-2 right-2 z-20 px-2 py-1 rounded-full bg-primary text-[#131811] text-[10px] font-black uppercase tracking-widest shadow-md flex items-center gap-1"><span className="material-symbols-outlined text-xs">check_circle</span>Ready</div>)}
+                        {isLocked ? (<div className="absolute inset-0 bg-black/40 z-10 flex items-center justify-center backdrop-blur-[1px] text-white"><span aria-hidden="true" className="material-symbols-outlined text-3xl">lock</span></div>) : (<div className="absolute top-2 right-2 z-20 px-2 py-1 rounded-full bg-primary text-[#131811] text-[10px] font-black uppercase tracking-widest shadow-md flex items-center gap-1"><span aria-hidden="true" className="material-symbols-outlined text-xs">check_circle</span>Ready</div>)}
                         <div className="w-full h-full bg-center bg-cover transition-transform duration-500 group-hover:scale-110" style={{backgroundImage: `url("${item.image}")`}}></div>
                     </div>
                     <div className="flex flex-col flex-1 p-5 gap-4">
@@ -262,8 +262,8 @@ const ImpulseVaultScreen: React.FC = () => {
                             <span className="text-xl font-black tabular-nums">{currencySymbol}{item.price.toLocaleString()}</span>
                         </div>
                         <div className="flex gap-2">
-                             <button onClick={() => isLocked ? null : handleBuy(item)} disabled={isLocked} className={`flex-1 rounded-full h-10 font-black uppercase text-[10px] tracking-[0.2em] flex items-center justify-center gap-2 transition-all ${isLocked ? 'bg-gray-100 dark:bg-border-dark opacity-30 cursor-not-allowed' : 'bg-primary hover:bg-primary-hover text-[#131811] shadow-glow'}`}><span className="material-symbols-outlined text-lg">shopping_cart</span>Buy</button>
-                             <button onClick={() => handleDelete(item.id, item.price)} className="size-10 rounded-full border border-border-light hover:bg-red-500 hover:text-white transition-colors flex items-center justify-center" title="Resist & Save"><span className="material-symbols-outlined text-lg">delete</span></button>
+                             <button onClick={() => isLocked ? null : handleBuy(item)} disabled={isLocked} className={`flex-1 rounded-full h-10 font-black uppercase text-[10px] tracking-[0.2em] flex items-center justify-center gap-2 transition-all ${isLocked ? 'bg-gray-100 dark:bg-border-dark opacity-30 cursor-not-allowed' : 'bg-primary hover:bg-primary-hover text-[#131811] shadow-glow'}`}><span aria-hidden="true" className="material-symbols-outlined text-lg">shopping_cart</span>Buy</button>
+                             <button onClick={() => handleDelete(item.id, item.price)} className="size-10 rounded-full border border-border-light hover:bg-red-500 hover:text-white transition-colors flex items-center justify-center" title="Resist & Save"><span aria-hidden="true" className="material-symbols-outlined text-lg">delete</span></button>
                         </div>
                     </div>
                     <div className="absolute bottom-0 left-0 h-1 bg-gray-200 dark:bg-gray-800 w-full"><div className={`h-full transition-all duration-1000 ${isLocked ? 'bg-orange-500' : 'bg-primary w-full'}`} style={{width: `${progress}%`}}></div></div>

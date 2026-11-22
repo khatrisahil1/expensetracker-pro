@@ -97,7 +97,7 @@ const SpendingHeatmap: React.FC<SpendingHeatmapProps> = ({ onSelectDate }) => {
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h3 className="text-xl font-black text-text-light-main dark:text-text-dark-main flex items-center gap-2">
-            <span className="material-symbols-outlined text-primary">calendar_view_month</span>
+            <span aria-hidden="true" className="material-symbols-outlined text-primary">calendar_view_month</span>
             Spending Heatmap
           </h3>
           <p className="text-xs text-text-light-muted dark:text-text-dark-muted font-medium mt-1">

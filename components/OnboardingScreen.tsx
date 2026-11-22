@@ -93,7 +93,7 @@ const OnboardingScreen: React.FC = () => {
         <div className="flex items-center justify-between mb-3">
           <button onClick={() => go(step - 1)} disabled={step === 0} aria-label="Back"
             className={`size-10 rounded-full flex items-center justify-center bg-white/70 dark:bg-white/5 border border-black/5 dark:border-white/10 transition-opacity ${step === 0 ? 'opacity-0 pointer-events-none' : ''}`}>
-            <span className="material-symbols-outlined">arrow_back</span>
+            <span aria-hidden="true" className="material-symbols-outlined">arrow_back</span>
           </button>
           <span className="text-xs font-black uppercase tracking-widest text-slate-400">Step {step + 1} of 3 · {STEPS[step]}</span>
           <span className="size-10" />
@@ -148,7 +148,7 @@ const OnboardingScreen: React.FC = () => {
 
               <button onClick={() => go(1)} disabled={!form.name.trim()}
                 className="h-14 rounded-2xl font-black text-[#0b2615] bg-gradient-to-r from-primary to-emerald-400 shadow-[0_12px_30px_-8px_rgba(46,204,113,0.6)] disabled:opacity-40 disabled:shadow-none flex items-center justify-center gap-2 group">
-                Continue <span className="material-symbols-outlined transition-transform group-hover:translate-x-1">arrow_forward</span>
+                Continue <span aria-hidden="true" className="material-symbols-outlined transition-transform group-hover:translate-x-1">arrow_forward</span>
               </button>
             </div>
           )}
@@ -187,7 +187,7 @@ const OnboardingScreen: React.FC = () => {
                   {GOALS.map(g => (
                     <button key={g.id} onClick={() => set('goal', g.id)}
                       className={`p-3 rounded-2xl border flex flex-col items-center gap-1 text-center transition-all ${form.goal === g.id ? 'bg-primary/15 border-primary text-primary scale-105' : 'border-black/10 dark:border-white/10 bg-white/60 dark:bg-white/5 hover:border-primary/40'}`}>
-                      <span className={`material-symbols-outlined text-2xl ${form.goal === g.id ? 'animate-pop' : ''}`}>{g.icon}</span>
+                      <span aria-hidden="true" className={`material-symbols-outlined text-2xl ${form.goal === g.id ? 'animate-pop' : ''}`}>{g.icon}</span>
                       <span className="text-sm font-black">{g.label}</span>
                       <span className="text-[11px] text-slate-400">{g.desc}</span>
                     </button>
@@ -197,7 +197,7 @@ const OnboardingScreen: React.FC = () => {
 
               <button onClick={() => go(2)}
                 className="h-14 rounded-2xl font-black text-[#0b2615] bg-gradient-to-r from-primary to-emerald-400 shadow-[0_12px_30px_-8px_rgba(46,204,113,0.6)] flex items-center justify-center gap-2 group">
-                Looks good <span className="material-symbols-outlined transition-transform group-hover:translate-x-1">arrow_forward</span>
+                Looks good <span aria-hidden="true" className="material-symbols-outlined transition-transform group-hover:translate-x-1">arrow_forward</span>
               </button>
             </div>
           )}
@@ -223,7 +223,7 @@ const OnboardingScreen: React.FC = () => {
               </div>
               <button onClick={finish} disabled={isSubmitting}
                 className="w-full h-14 rounded-2xl font-black text-[#0b2615] bg-gradient-to-r from-primary to-emerald-400 shadow-[0_12px_30px_-8px_rgba(46,204,113,0.6)] disabled:opacity-70 flex items-center justify-center gap-2">
-                {isSubmitting ? <span className="size-5 rounded-full border-[3px] border-[#0b2615]/30 border-t-[#0b2615] animate-spin" /> : <>Take me to my dashboard <span className="material-symbols-outlined">rocket_launch</span></>}
+                {isSubmitting ? <span className="size-5 rounded-full border-[3px] border-[#0b2615]/30 border-t-[#0b2615] animate-spin" /> : <>Take me to my dashboard <span aria-hidden="true" className="material-symbols-outlined">rocket_launch</span></>}
               </button>
             </div>
           )}

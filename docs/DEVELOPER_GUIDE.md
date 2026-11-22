@@ -537,6 +537,7 @@ Wrap in `<MemoryRouter>` and, if the component uses dialogs, `<DialogProvider>`.
 - [ ] Money via `formatMoney`, dates via `utils/date.ts`.
 - [ ] Every Firestore write goes through the store (and so through `settleWrite`).
 - [ ] Animations: `backwards` fill; respect reduced motion.
+- [ ] Icons: `<span aria-hidden="true" className="material-symbols-outlined">`. Icon-only buttons get an `aria-label`; toggles use `role="switch"` + `aria-checked`. Enforced by `components/a11y.test.ts`.
 - [ ] `npm run build` must pass (it type-checks first).
 
 ---

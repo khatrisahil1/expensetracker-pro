@@ -298,7 +298,7 @@ const CSVImportModal: React.FC<CSVImportModalProps> = ({ onClose }) => {
         <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b border-border-light dark:border-border-dark shrink-0">
           <div className="flex items-center gap-3">
             <div className="size-10 rounded-full bg-primary/10 text-primary flex items-center justify-center shadow-glow">
-              <span className="material-symbols-outlined text-xl">upload_file</span>
+              <span aria-hidden="true" className="material-symbols-outlined text-xl">upload_file</span>
             </div>
             <div>
               <h2 className="text-lg font-black text-text-light-main dark:text-text-dark-main leading-none">Import CSV</h2>
@@ -309,7 +309,7 @@ const CSVImportModal: React.FC<CSVImportModalProps> = ({ onClose }) => {
             onClick={onClose}
             className="size-9 rounded-full flex items-center justify-center text-text-light-muted dark:text-text-dark-muted hover:bg-gray-100 dark:hover:bg-surface-darker hover:text-text-light-main dark:hover:text-text-dark-main transition-colors"
           >
-            <span className="material-symbols-outlined">close</span>
+            <span aria-hidden="true" className="material-symbols-outlined">close</span>
           </button>
         </div>
 
@@ -377,7 +377,7 @@ const CSVImportModal: React.FC<CSVImportModalProps> = ({ onClose }) => {
                     onChange={onFileChange}
                   />
                   <div className={`size-11 rounded-full flex items-center justify-center transition-colors ${isDragging ? 'bg-primary text-[#131811]' : 'bg-gray-100 dark:bg-surface-darker text-text-light-muted dark:text-text-dark-muted'}`}>
-                    <span className="material-symbols-outlined text-xl">upload_file</span>
+                    <span aria-hidden="true" className="material-symbols-outlined text-xl">upload_file</span>
                   </div>
                   <div className="text-center">
                     <p className="font-semibold text-text-light-main dark:text-text-dark-main text-sm">
@@ -400,7 +400,7 @@ const CSVImportModal: React.FC<CSVImportModalProps> = ({ onClose }) => {
               {/* ── Parsing Loader ── */}
               {!isParsed && fileName && rows.length === 0 && (
                 <div className="flex items-center gap-3 text-text-light-muted dark:text-text-dark-muted">
-                  <span className="material-symbols-outlined animate-spin text-primary">sync</span>
+                  <span aria-hidden="true" className="material-symbols-outlined animate-spin text-primary">sync</span>
                   <span className="text-sm">Parsing {fileName}…</span>
                 </div>
               )}
@@ -411,7 +411,7 @@ const CSVImportModal: React.FC<CSVImportModalProps> = ({ onClose }) => {
                   {/* Stats bar */}
                   <div className="flex flex-wrap items-center gap-3">
                     <div className="flex items-center gap-1.5 text-sm font-medium text-text-light-main dark:text-text-dark-main">
-                      <span className="material-symbols-outlined text-base text-primary">table_rows</span>
+                      <span aria-hidden="true" className="material-symbols-outlined text-base text-primary">table_rows</span>
                       <span className="font-bold">{rows.length}</span> rows
                       {fileName && <span className="text-text-light-muted dark:text-text-dark-muted text-xs">· {fileName}</span>}
                     </div>
@@ -444,7 +444,7 @@ const CSVImportModal: React.FC<CSVImportModalProps> = ({ onClose }) => {
                     onClick={() => fileInputRef.current?.click()}
                     className="flex items-center gap-2 text-xs font-bold text-text-light-muted dark:text-text-dark-muted hover:text-primary transition-colors w-fit"
                   >
-                    <span className="material-symbols-outlined text-sm">folder_open</span>
+                    <span aria-hidden="true" className="material-symbols-outlined text-sm">folder_open</span>
                     Choose a different file
                   </button>
                   <input ref={fileInputRef} type="file" accept=".csv,text/csv" className="hidden" onChange={onFileChange} />
@@ -514,7 +514,7 @@ const CSVImportModal: React.FC<CSVImportModalProps> = ({ onClose }) => {
               {/* ── Empty CSV ── */}
               {isParsed && rows.length === 0 && (
                 <div className="flex flex-col items-center justify-center py-10 gap-3 text-text-light-muted dark:text-text-dark-muted">
-                  <span className="material-symbols-outlined text-4xl opacity-40">description</span>
+                  <span aria-hidden="true" className="material-symbols-outlined text-4xl opacity-40">description</span>
                   <p className="text-sm font-bold">No data rows found in this file.</p>
                   <button onClick={() => { setIsParsed(false); setFileName(null); }} className="text-primary text-xs font-bold hover:underline">Try another file</button>
                 </div>
@@ -559,7 +559,7 @@ const CSVImportModal: React.FC<CSVImportModalProps> = ({ onClose }) => {
               disabled={validRows.length === 0}
               className="px-5 py-2.5 rounded-xl bg-primary text-[#131811] text-sm font-bold shadow-glow hover:bg-primary-hover transition-all active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2"
             >
-              <span className="material-symbols-outlined text-lg">upload</span>
+              <span aria-hidden="true" className="material-symbols-outlined text-lg">upload</span>
               Import {validRows.length} Row{validRows.length !== 1 ? 's' : ''}
             </button>
           </div>

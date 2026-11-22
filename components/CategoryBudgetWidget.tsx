@@ -67,7 +67,7 @@ const CategoryBudgetWidget: React.FC = () => {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="size-10 rounded-full border border-border-light dark:border-white/20 flex items-center justify-center text-primary bg-primary/10">
-            <span className="material-symbols-outlined text-xl">pie_chart</span>
+            <span aria-hidden="true" className="material-symbols-outlined text-xl">pie_chart</span>
           </div>
           <div>
             <h3 className="text-xl font-black text-text-light-main dark:text-text-dark-main">
@@ -92,7 +92,7 @@ const CategoryBudgetWidget: React.FC = () => {
           onClick={() => handleOpenEdit(expenseCategories[0], 0)}
           className="p-6 rounded-2xl border border-dashed border-border-light dark:border-border-dark text-center cursor-pointer hover:border-primary/50 transition-all"
         >
-          <span className="material-symbols-outlined text-3xl text-text-light-muted mb-2">add_task</span>
+          <span aria-hidden="true" className="material-symbols-outlined text-3xl text-text-light-muted mb-2">add_task</span>
           <p className="text-sm font-bold text-text-light-main dark:text-text-dark-main">No Category Budgets Set</p>
           <p className="text-xs text-text-light-muted">Click to set your first category limit</p>
         </div>
@@ -152,7 +152,7 @@ const CategoryBudgetWidget: React.FC = () => {
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-black text-text-light-main dark:text-text-dark-main">Set Category Limit</h3>
               <button onClick={() => setEditingCategory(null)} className="size-8 rounded-full hover:bg-gray-100 dark:hover:bg-surface-darker flex items-center justify-center">
-                <span className="material-symbols-outlined text-text-light-muted">close</span>
+                <span aria-hidden="true" className="material-symbols-outlined text-text-light-muted">close</span>
               </button>
             </div>
 
@@ -200,7 +200,7 @@ const CategoryBudgetWidget: React.FC = () => {
                 disabled={isSaving}
                 className="flex-1 py-3 rounded-xl bg-primary text-[#131811] font-black shadow-glow hover:bg-primary/90 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
               >
-                {isSaving && <span className="material-symbols-outlined animate-spin text-sm">sync</span>}
+                {isSaving && <span aria-hidden="true" className="material-symbols-outlined animate-spin text-sm">sync</span>}
                 Save Limit
               </button>
             </div>

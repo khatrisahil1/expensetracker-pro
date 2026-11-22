@@ -273,7 +273,7 @@ const BudgetGoalsScreen: React.FC = () => {
 
                             <div className="flex justify-center">
                                 <p className="text-xs font-medium text-text-light-muted opacity-60 flex items-center gap-2">
-                                    <span className="material-symbols-outlined text-sm">touch_app</span>
+                                    <span aria-hidden="true" className="material-symbols-outlined text-sm">touch_app</span>
                                     Hover or tap segments for specific metrics.
                                 </p>
                             </div>
@@ -292,10 +292,10 @@ const BudgetGoalsScreen: React.FC = () => {
                                     return (
                                         <div key={goal.id} className="bg-surface-light dark:bg-surface-dark border border-border-light dark:border-border-dark rounded-[2.5rem] p-6 shadow-sm group hover:border-primary/50 transition-all flex flex-col gap-6 relative overflow-hidden">
                                             <div className="flex justify-between items-start">
-                                                <div className="size-12 rounded-2xl bg-primary/10 text-primary flex items-center justify-center transition-transform group-hover:scale-110"><span className="material-symbols-outlined">{goal.icon}</span></div>
+                                                <div className="size-12 rounded-2xl bg-primary/10 text-primary flex items-center justify-center transition-transform group-hover:scale-110"><span aria-hidden="true" className="material-symbols-outlined">{goal.icon}</span></div>
                                                 <div className="flex items-center gap-3">
                                                     <button onClick={() => setShowFundModal({ id: goal.id, name: goal.name })} className="opacity-100 lg:opacity-0 lg:group-hover:opacity-100 lg:focus-within:opacity-100 lg:focus:opacity-100 bg-gray-100 dark:bg-surface-darker px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-primary hover:text-black transition-all">Add Funds</button>
-                                                    <button onClick={() => handleDeleteGoal(goal.id)} className="opacity-100 lg:opacity-0 lg:group-hover:opacity-100 lg:focus-within:opacity-100 lg:focus:opacity-100 text-danger hover:scale-110 transition-all"><span className="material-symbols-outlined text-lg">delete</span></button>
+                                                    <button onClick={() => handleDeleteGoal(goal.id)} className="opacity-100 lg:opacity-0 lg:group-hover:opacity-100 lg:focus-within:opacity-100 lg:focus:opacity-100 text-danger hover:scale-110 transition-all"><span aria-hidden="true" className="material-symbols-outlined text-lg">delete</span></button>
                                                 </div>
                                             </div>
                                             <div className="flex items-center justify-between gap-4">
@@ -325,7 +325,7 @@ const BudgetGoalsScreen: React.FC = () => {
                                 })}
                                 {(userSettings?.savingsGoals || []).length === 0 && (
                                     <div className="col-span-full py-24 bg-surface-light dark:bg-surface-dark rounded-[2.5rem] border border-dashed border-border-light dark:border-border-dark flex flex-col items-center justify-center text-text-light-muted">
-                                        <div className="size-20 rounded-full bg-primary/5 flex items-center justify-center mb-6"><span className="material-symbols-outlined text-4xl opacity-20">flag</span></div>
+                                        <div className="size-20 rounded-full bg-primary/5 flex items-center justify-center mb-6"><span aria-hidden="true" className="material-symbols-outlined text-4xl opacity-20">flag</span></div>
                                         <p className="font-bold text-text-light-main dark:text-white">No active milestones.</p>
                                         <p className="text-xs max-w-[200px] text-center mt-2 opacity-60">Visualize your goals and start securing the funds today.</p>
                                         <button onClick={() => setShowGoalModal(true)} className="mt-6 text-primary text-xs font-black uppercase tracking-[0.2em] hover:underline">Launch Milestone</button>
@@ -343,7 +343,7 @@ const BudgetGoalsScreen: React.FC = () => {
                         <div className="flex items-start justify-between relative z-10">
                           <div>
                             <h2 className="text-2xl md:text-3xl font-bold text-white flex items-center gap-2">
-                              <span className="material-symbols-outlined text-indigo-400">auto_awesome</span>
+                              <span aria-hidden="true" className="material-symbols-outlined text-indigo-400">auto_awesome</span>
                               Gemini Insight
                             </h2>
                             <p className="text-xs text-white/60 mt-1">AI-generated financial insights</p>
@@ -448,7 +448,7 @@ const BudgetGoalsScreen: React.FC = () => {
                             </div>
                           ) : (
                             <div className="flex flex-col items-center justify-center text-center text-white/40 h-full">
-                              <span className="material-symbols-outlined text-4xl mb-2">analytics</span>
+                              <span aria-hidden="true" className="material-symbols-outlined text-4xl mb-2">analytics</span>
                               <p className="text-sm font-bold">AI Audit</p>
                             </div>
                           )}
@@ -478,7 +478,7 @@ const BudgetGoalsScreen: React.FC = () => {
                         <div className="bg-gradient-to-br from-primary to-emerald-600 rounded-[2.5rem] p-4 md:p-8 text-[#131811] shadow-glow flex flex-col justify-between min-h-[180px] md:min-h-[220px] transition-transform hover:scale-[1.01]">
                             <div>
                                 <div className="flex items-center gap-2 mb-2">
-                                    <span className="material-symbols-outlined text-xl md:text-2xl">savings</span>
+                                    <span aria-hidden="true" className="material-symbols-outlined text-xl md:text-2xl">savings</span>
                                     <span className="text-[10px] md:text-xs font-black uppercase tracking-widest opacity-80 hidden md:inline">Realized Savings</span>
                                     <span className="text-[10px] font-black uppercase tracking-widest opacity-80 md:hidden">Saved</span>
                                 </div>
@@ -489,7 +489,7 @@ const BudgetGoalsScreen: React.FC = () => {
                         <div className="bg-surface-light dark:bg-surface-dark border border-border-light dark:border-border-dark rounded-[2.5rem] p-4 md:p-8 flex flex-col justify-between min-h-[180px] md:min-h-[220px] shadow-sm transition-transform hover:scale-[1.01]">
                             <div>
                                 <div className="flex items-center gap-2 mb-2 text-text-light-muted">
-                                    <span className="material-symbols-outlined text-xl md:text-2xl">event_repeat</span>
+                                    <span aria-hidden="true" className="material-symbols-outlined text-xl md:text-2xl">event_repeat</span>
                                     {/* Last month's income minus spending. Called "Rollover" before, which
                                         clashed with the Dashboard's "Carried over" (everything before this month). */}
                                     <span className="text-[10px] md:text-xs font-black uppercase tracking-widest">Last month's net</span>
@@ -497,7 +497,7 @@ const BudgetGoalsScreen: React.FC = () => {
                                 <h3 className={`text-2xl md:text-4xl font-black tracking-tight ${previousMonthBalance >= 0 ? 'text-primary' : 'text-danger'}`}>{formatMoney(previousMonthBalance, currencySymbol, { signed: true })}</h3>
                             </div>
                             <div className="bg-gray-100 dark:bg-surface-darker p-2 md:p-3 rounded-2xl flex items-center gap-2 md:gap-3">
-                                <span className="material-symbols-outlined text-primary text-sm md:text-base">auto_awesome</span>
+                                <span aria-hidden="true" className="material-symbols-outlined text-primary text-sm md:text-base">auto_awesome</span>
                                 <p className="text-[10px] md:text-xs font-bold text-text-light-muted dark:text-gray-400 leading-tight">Income minus spending last month.</p>
                             </div>
                         </div>
@@ -543,7 +543,7 @@ const BudgetGoalsScreen: React.FC = () => {
                                             <div className="flex items-center justify-between">
                                                 <div className="flex items-center gap-4">
                                                     <div className={`size-12 rounded-2xl flex items-center justify-center border border-border-light dark:border-border-dark bg-white dark:bg-surface-dark ${style.color} transition-transform group-hover:scale-110 shadow-sm`}>
-                                                        <span className="material-symbols-outlined">{style.icon}</span>
+                                                        <span aria-hidden="true" className="material-symbols-outlined">{style.icon}</span>
                                                     </div>
                                                     <div className="flex flex-col">
                                                         <span className="font-black text-sm text-text-light-main dark:text-white uppercase tracking-tight">{cat}</span>
@@ -556,12 +556,12 @@ const BudgetGoalsScreen: React.FC = () => {
                                                     {editingBudget === cat ? (
                                                         <div className="flex items-center gap-2 animate-fade-in">
                                                             <input type="number" className="w-24 bg-background-light dark:bg-surface-dark border border-primary rounded-xl py-2 px-3 text-sm font-bold outline-none shadow-glow" value={tempValue} onChange={e => setTempValue(e.target.value)} autoFocus />
-                                                            <button onClick={async () => { const val = Number(tempValue); if (!isNaN(val)) { const buds = { ...userSettings.categoryBudgets, [cat]: val }; await updateUserSettings({ categoryBudgets: buds }); setEditingBudget(null); setTempValue(''); } }} className="size-9 rounded-xl bg-primary text-[#131811] flex items-center justify-center shadow-glow active:scale-95"><span className="material-symbols-outlined text-lg">check</span></button>
+                                                            <button onClick={async () => { const val = Number(tempValue); if (!isNaN(val)) { const buds = { ...userSettings.categoryBudgets, [cat]: val }; await updateUserSettings({ categoryBudgets: buds }); setEditingBudget(null); setTempValue(''); } }} className="size-9 rounded-xl bg-primary text-[#131811] flex items-center justify-center shadow-glow active:scale-95"><span aria-hidden="true" className="material-symbols-outlined text-lg">check</span></button>
                                                         </div>
                                                     ) : (
                                                         <div className="flex flex-col items-end cursor-pointer group/edit" onClick={() => { setEditingBudget(cat); setTempValue(limit.toString()); }}>
                                                             <span className="text-xl font-black tracking-tighter tabular-nums text-text-light-main dark:text-white group-hover/edit:text-primary transition-colors">{formatMoney(limit, currencySymbol)}</span>
-                                                            <span className="text-[10px] font-bold text-text-light-muted flex items-center gap-1 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 lg:focus-within:opacity-100 lg:focus:opacity-100 transition-opacity uppercase tracking-widest">Adjust Cap <span className="material-symbols-outlined text-[10px]">edit</span></span>
+                                                            <span className="text-[10px] font-bold text-text-light-muted flex items-center gap-1 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 lg:focus-within:opacity-100 lg:focus:opacity-100 transition-opacity uppercase tracking-widest">Adjust Cap <span aria-hidden="true" className="material-symbols-outlined text-[10px]">edit</span></span>
                                                         </div>
                                                     )}
                                                 </div>
@@ -620,10 +620,10 @@ const BudgetGoalsScreen: React.FC = () => {
                     <div className="bg-surface-light dark:bg-surface-dark border border-border-light dark:border-border-dark rounded-[3rem] p-8 md:p-10 w-full max-w-md shadow-2xl animate-slide-up">
                         <div className="flex justify-between items-center mb-8">
                             <div className="flex items-center gap-3">
-                                <div className="size-10 rounded-2xl bg-primary/10 text-primary flex items-center justify-center"><span className="material-symbols-outlined">flag</span></div>
+                                <div className="size-10 rounded-2xl bg-primary/10 text-primary flex items-center justify-center"><span aria-hidden="true" className="material-symbols-outlined">flag</span></div>
                                 <h2 className="text-2xl font-black uppercase tracking-tight">New Milestone</h2>
                             </div>
-                            <button onClick={() => setShowGoalModal(false)} className="size-10 rounded-full hover:bg-gray-100 dark:hover:bg-surface-darker transition-colors"><span className="material-symbols-outlined">close</span></button>
+                            <button onClick={() => setShowGoalModal(false)} className="size-10 rounded-full hover:bg-gray-100 dark:hover:bg-surface-darker transition-colors"><span aria-hidden="true" className="material-symbols-outlined">close</span></button>
                         </div>
                         <div className="flex flex-col gap-6">
                             <div className="flex flex-col gap-2">
@@ -660,7 +660,7 @@ const BudgetGoalsScreen: React.FC = () => {
             {showFundModal && (
                 <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-md flex items-center justify-center p-4 animate-fade-in">
                     <div className="bg-surface-light dark:bg-surface-dark border border-border-light dark:border-border-dark rounded-[2.5rem] sm:rounded-[3rem] p-4 sm:p-8 md:p-8 w-full sm:max-w-sm md:max-w-md lg:max-w-lg xl:max-w-xl max-h-[90vh] overflow-y-auto shadow-2xl animate-slide-up text-center">
-                        <div className="size-16 rounded-3xl bg-primary/10 text-primary flex items-center justify-center mx-auto mb-6"><span className="material-symbols-outlined text-3xl">add_card</span></div>
+                        <div className="size-16 rounded-3xl bg-primary/10 text-primary flex items-center justify-center mx-auto mb-6"><span aria-hidden="true" className="material-symbols-outlined text-3xl">add_card</span></div>
                         <h3 className="text-2xl font-black text-text-light-main dark:text-text-dark-main mb-2">Inject Funds</h3>
                         <p className="text-sm text-text-light-muted mb-8">Securing capital for <span className="text-primary font-bold">{showFundModal.name}</span></p>
 
