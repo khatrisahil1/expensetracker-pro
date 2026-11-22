@@ -48,7 +48,8 @@ Put these in `.env.local` (git-ignored):
 
 | Variable | Used by | Notes |
 |---|---|---|
-| `VITE_GEMINI_API_KEY` (or `GEMINI_API_KEY`) | [utils/gemini.ts](../utils/gemini.ts) | AI insights, receipt scanning, link reading. **Currently bundled into the client** — see [Roadmap](#14-roadmap). |
+| *(none for Gemini)* | [utils/gemini.ts](../utils/gemini.ts) | AI runs through **Firebase AI Logic**: Firebase holds the Gemini key; nothing secret ships in the app. One-time setup: Firebase console → AI Logic → Get started → Gemini Developer API. |
+| `VITE_RECAPTCHA_SITE_KEY` (optional) | [utils/gemini.ts](../utils/gemini.ts) | Turns on Firebase App Check so only this app can use the project's AI quota. |
 | `VITE_FCM_VAPID_KEY` | Store `enablePushNotifications` | Public Web Push key (Firebase console → Cloud Messaging → Web Push certificates). Empty = push switch hidden. |
 
 A template is in [.env.example](../.env.example).
@@ -101,7 +102,7 @@ A personal finance PWA: log income and expenses, see where money goes, set budge
 | Routing | React Router 7 (`react-router` package) |
 | Data / auth | Firebase 12: Auth + Firestore with **persistent local cache** (offline) |
 | PWA | `vite-plugin-pwa` (Workbox `generateSW`), production builds only |
-| AI | `@google/genai` (Gemini) |
+| AI | Gemini via Firebase AI Logic (`firebase/ai`) |
 | Tests | Vitest 3 + Testing Library + jsdom |
 
 ---
@@ -152,7 +153,7 @@ docs/                   This guide
 | [split.ts](../utils/split.ts) | `computeShares` (equal with leftover paise, exact, percent), `friendBalances`, `balanceTotals`, `settleWithFriend`, `isFullySettled`. |
 | [password.ts](../utils/password.ts) | `passwordStrength` → score 0–4, label, hint (sign-up form). |
 | [notifications.ts](../utils/notifications.ts) | Budget, monthly, daily-reminder checks and system notifications. |
-| [gemini.ts](../utils/gemini.ts) / [json.ts](../utils/json.ts) | Gemini client; pull JSON out of model replies. |
+| [gemini.ts](../utils/gemini.ts) / [json.ts](../utils/json.ts) | Gemini client (Firebase AI Logic, same `models.generateContent` shape as before); pull JSON out of model replies. |
 </details>
 
 ---
@@ -171,7 +172,7 @@ flowchart TB
     SW["Service worker<br/>(production only)"]
   end
   Firebase[("Firebase Auth<br/>+ Firestore")]
-  Gemini[("Gemini API")]
+  Gemini[("Gemini (via Firebase AI Logic)")]
 
   Router --> UI
   UI -->|useStore()| Store
@@ -731,12 +732,12 @@ Everything below, released together:
 
 | Decision | Why |
 |---|---|
-| `createGeminiClient()` is async | Lazy-imports `@google/genai` so ~50 KB gzip stays out of startup. Always `await` it. |
+| `createGeminiClient()` is async | Lazy-imports `firebase/ai` so the AI SDK stays out of startup. Always `await` it. |
 | Wait max 4 s for Firestore acks | Long enough to surface real errors online; short enough not to block offline. |
 | No service worker in dev | Dev pages change constantly; a caching worker served stale or offline pages. |
 | Language / date-format settings removed from UI | Saved but never used anywhere. |
 | Impulse Vault has no phone tab | Six tabs is the most that fit at 320px; Vault is linked from the top of the Budget page on phones. (The phone drawer in Sidebar.tsx is never opened.) |
-| Gemini key move left for last | Owner's request. |
+| Gemini via Firebase AI Logic, not a Cloud Function proxy | The project is on the free Spark plan; Functions and Secret Manager need Blaze. AI Logic keeps the key on Firebase's side for free. |
 | Auto-reload on update only early or in the background | Never interrupts someone mid-form; still gets everyone onto the new version within one app switch. |
 | No Mac trackpad haptics | No web API exists; would need a native (Electron/Tauri/Swift) wrapper. |
 | Built-in SVG avatars instead of amrit.art Toy Faces | Paid pack, all rights reserved, bundling terms unclear. `EXTRA_AVATARS` makes adding licensed art a one-line change. |
@@ -747,7 +748,7 @@ Everything below, released together:
 
 ## 14. Roadmap
 
-- [ ] **Move the Gemini key server-side** (Cloud Function / proxy). Currently bundled in the client. *(Planned last.)*
+- [x] **Gemini key out of the client**: Firebase AI Logic. Next: turn on App Check (`VITE_RECAPTCHA_SITE_KEY`) and delete the old exposed key in Google AI Studio.
 - [ ] **Deploy `firestore.rules`**: compare with live rules first, then wire into `firebase.json`.
 - [ ] Light-mode pass on the redesigned screens.
 - [ ] Screen-reader pass: label icon-only buttons, hide decorative icons.

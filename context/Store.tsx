@@ -1133,7 +1133,7 @@ Respond with JSON only.`;
           return response.text || "Could not generate audit.";
       } catch (e: any) {
           console.warn('generateFinancialAudit failed:', e);
-          return "Financial AI is currently unavailable. Please check your API key.";
+          return "Financial AI is unavailable right now. Check your connection and try again.";
       }
   };
 
