@@ -557,7 +557,7 @@ Your store mock creates new objects on every render. Use one stable object (see 
 </details>
 
 <details>
-<summary><b>After <code>0d74f43</code> (current working tree)</b></summary>
+<summary><b>Commit <code>74e49ed</code> — offline, smart categories, login/setup, avatars, animations</b></summary>
 
 - **Learned categories**: imports, Tidy up and the add form follow how you filed each merchant before.
 - **Payment-method fixes**: Tidy up tab + automatic mapping on import.
